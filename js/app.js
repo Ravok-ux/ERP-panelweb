@@ -877,10 +877,14 @@ function _initSidebarCollapse() {
     const items   = grp.nextElementSibling;
     if (!items || !items.classList.contains("sb-section-items")) return;
 
-    // Restaurar estado guardado
-    if (localStorage.getItem(KEY + section) === "1") {
+    // Estado guardado — pero nunca colapsar "campo" y "ventas" (módulos principales)
+    const neverCollapse = new Set(["campo","ventas","principal"]);
+    if (!neverCollapse.has(section) && localStorage.getItem(KEY + section) === "1") {
       grp.classList.add("sb-collapsed");
       items.classList.add("sb-collapsed");
+    } else {
+      // Asegurar que los módulos principales estén siempre expandidos
+      localStorage.removeItem(KEY + section);
     }
 
     grp.addEventListener("click", () => {
