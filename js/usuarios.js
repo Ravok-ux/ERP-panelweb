@@ -577,7 +577,7 @@ function _escucharUsuarios() {
                  </div>`}
           </td>
           <td>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <div style="display:flex;gap:3px;flex-wrap:nowrap;align-items:center">
               ${esSA
                 ? `<span style="font-size:9px;color:#9CA3AF;font-style:italic">Implícito</span>`
                 : `<button class="action-btn edit"
@@ -590,13 +590,13 @@ function _escucharUsuarios() {
                    </button>
                    <button class="action-btn del"
                      onclick="UsuariosUI.toggleActivo('${uid}',${!activo})">
-                     ${activo ? "Dar baja" : "Reactivar"}
+                     ${activo ? "Baja" : "Activar"}
                    </button>
                    ${Sesion.esSuperAdmin()
                      ? `<button class="action-btn del"
                           style="background:#7f1d1d;border-color:#991b1b;color:#fca5a5"
                           onclick="UsuariosUI.eliminarPermanente('${uid}','${(u.alias||u.email||"").replace(/'/g,"\\'")}')">
-                          🗑 Eliminar
+                          🗑
                         </button>`
                      : ""}`}
             </div>
