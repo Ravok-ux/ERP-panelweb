@@ -9,7 +9,7 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, serverTimestamp,
+  doc, getDoc, setDoc, deleteDoc, serverTimestamp,
   collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -169,8 +169,9 @@ async function _cargarPerfil(user) {
         _showLoginError("Tu cuenta está desactivada. Contacta al administrador.");
         return;
       }
-      // Migrar doc alias→uid para futuros logins
+      // Migrar doc alias→uid para futuros logins y borrar el pre-registro
       await setDoc(ref, { ...preData, uid: user.uid, migradoEn: serverTimestamp() });
+      try { await deleteDoc(preSnap.docs[0].ref); } catch (_) {}
       _aplicarSesion(user.uid, user.email, preData);
       return;
     }
