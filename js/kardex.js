@@ -25,6 +25,7 @@ const fmtTs  = m => {
 };
 
 // Tipos conocidos — light-theme safe (fondo claro, texto oscuro)
+// Incluye tipos del APK (CARGA, DESCARGA, VENTA, TRANSFERENCIA) y del panel web
 const TIPO_META = {
   ENTRADA:          { bg:"#DCFCE7", text:"#166534", icon:"↑", label:"Entrada"         },
   SALIDA:           { bg:"#FEE2E2", text:"#991B1B", icon:"↓", label:"Salida"          },
@@ -36,6 +37,11 @@ const TIPO_META = {
   REABASTO_SURTIDO: { bg:"#E0F2FE", text:"#0C4A6E", icon:"📦",label:"Reabasto"       },
   DEVOLUCION:       { bg:"#F5F3FF", text:"#5B21B6", icon:"↩", label:"Devolución"     },
   TRASLADO:         { bg:"#F3F4F6", text:"#374151", icon:"⇄", label:"Traslado"       },
+  // APK types
+  CARGA:            { bg:"#ECFDF5", text:"#047857", icon:"🚚", label:"Carga Vehículo" },
+  DESCARGA:         { bg:"#FFF7ED", text:"#9A3412", icon:"↩🚚",label:"Descarga Vehículo"},
+  VENTA:            { bg:"#FEF9C3", text:"#713F12", icon:"💰", label:"Venta"          },
+  TRANSFERENCIA:    { bg:"#EFF6FF", text:"#1D4ED8", icon:"⇄",  label:"Transferencia"  },
 };
 const _meta = tipo => TIPO_META[tipo] || { bg:"#F3F4F6", text:"#374151", icon:"•", label: tipo || "—" };
 
