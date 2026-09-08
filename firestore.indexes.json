@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "campanas_promociones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activa",   "order": "ASCENDING" },
+        { "fieldPath": "fechaFin", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "pedidos",
       "queryScope": "COLLECTION",
       "fields": [

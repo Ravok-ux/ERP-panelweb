@@ -68,6 +68,11 @@ service cloud.firestore {
       // Solo SUPER_ADMIN puede crear/editar perfiles de otros
       allow write: if esSuperAdmin();
 
+      // El propio usuario puede actualizar campos de sesión no sensibles
+      allow update: if isAuth() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['ultimoAcceso', 'dispositivoId', 'fcmToken']);
+
       // El propio usuario puede crear su perfil en el primer login.
       // Rol restringido a roles no privilegiados; flags sensibles no pueden ser true.
       allow create: if isAuth() && request.auth.uid == uid
@@ -103,6 +108,16 @@ service cloud.firestore {
         miRol() in ['INGENIERO', 'RECUPERADOR'] ||
         tieneFlag('PUEDE_CREAR_PEDIDOS')
       );
+
+      // Subcollección items — mismos permisos que el pedido padre
+      match /items/{itemId} {
+        allow read: if cuentaActiva() && esRolConocido();
+        allow write: if cuentaActiva() && (
+          esAdminOSuperior() ||
+          miRol() in ['INGENIERO', 'RECUPERADOR'] ||
+          tieneFlag('PUEDE_CREAR_PEDIDOS')
+        );
+      }
     }
 
     // ── /remisiones_credito ───────────────────────────────────────────────────

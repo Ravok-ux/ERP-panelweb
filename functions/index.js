@@ -10,6 +10,7 @@ const { logger }             = require("firebase-functions");
 const { initializeApp }      = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp: FSTimestamp } = require("firebase-admin/firestore");
 const { getMessaging }       = require("firebase-admin/messaging");
+const { getAuth }            = require("firebase-admin/auth");
 const https                  = require("https");
 const { defineString }       = require("firebase-functions/params");
 
@@ -2414,6 +2415,133 @@ exports.onCampanaActivada = onDocumentUpdated(
       });
     } catch (err) {
       logger.error(`[onCampanaActivada] Error:`, err);
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH-1. CREAR FIREBASE AUTH + RE-KEYED FIRESTORE DOC
+//   Trigger: usuarios/{docId} created
+//   Problema: el panel crea usuarios con docId = alias (ej. "Sismastecnicoseis"),
+//   pero las Firestore rules hacen get(/usuarios/{request.auth.uid}).
+//   Esta función detecta cuando el docId no es un UID de Firebase (28 chars
+//   alfanumérico), crea la cuenta Auth, y mueve el documento a usuarios/{uid}.
+// ═══════════════════════════════════════════════════════════════
+exports.crearUsuarioConAuth = onDocumentCreated(
+  { document: "usuarios/{docId}", region: "us-central1" },
+  async (event) => {
+    const docId = event.params.docId;
+    const data  = event.data.data();
+
+    // Si el docId ya parece un UID de Firebase (≥28 chars, solo alfanumérico)
+    // es porque ya está bien keyed — no hacer nada.
+    const yaEsUid = /^[A-Za-z0-9]{28,}$/.test(docId);
+    if (yaEsUid) {
+      logger.info(`[crearUsuarioConAuth] ${docId} ya parece UID — omitido`);
+      return;
+    }
+
+    const correo = data.correo || data.email || null;
+    if (!correo) {
+      logger.warn(`[crearUsuarioConAuth] Doc ${docId} sin correo — omitido`);
+      return;
+    }
+
+    logger.info(`[crearUsuarioConAuth] Procesando alias="${docId}" correo="${correo}"`);
+
+    try {
+      // 1. Buscar o crear cuenta Firebase Auth
+      let uid;
+      try {
+        const existing = await getAuth().getUserByEmail(correo);
+        uid = existing.uid;
+        logger.info(`[crearUsuarioConAuth] Auth ya existe uid=${uid}`);
+      } catch (notFound) {
+        // Crear nueva cuenta sin contraseña (acceso por password-reset)
+        const created = await getAuth().createUser({
+          email:       correo,
+          displayName: data.nombre || docId,
+          disabled:    false,
+        });
+        uid = created.uid;
+        logger.info(`[crearUsuarioConAuth] Auth creada uid=${uid}`);
+      }
+
+      // 2. Verificar que no exista ya usuarios/{uid} (evitar sobreescribir)
+      const uidRef = db.collection("usuarios").doc(uid);
+      const uidSnap = await uidRef.get();
+      if (!uidSnap.exists) {
+        // 3. Crear usuarios/{uid} con todos los campos + alias + uid
+        await uidRef.set({
+          ...data,
+          alias: data.alias || docId,
+          uid,
+          _migradoDesde: docId,
+          _migradoEn:    FieldValue.serverTimestamp(),
+        });
+        logger.info(`[crearUsuarioConAuth] usuarios/${uid} creado`);
+      } else {
+        logger.info(`[crearUsuarioConAuth] usuarios/${uid} ya existe — no sobreescribe`);
+      }
+
+      // 4. Eliminar el documento original keyed por alias
+      await db.collection("usuarios").doc(docId).delete();
+      logger.info(`[crearUsuarioConAuth] usuarios/${docId} eliminado`);
+
+      // 5. Enviar email de bienvenida/reset de contraseña
+      try {
+        const resetLink = await getAuth().generatePasswordResetLink(correo);
+        logger.info(`[crearUsuarioConAuth] Reset link generado para ${correo}: ${resetLink}`);
+        // Nota: para enviar el email hay que usar un servicio de correo externo
+        // (SendGrid, Nodemailer, etc.) o usar Firebase Auth triggers de email.
+        // Por ahora registramos el link en Firestore para que el admin lo copie.
+        await db.collection("_pendientes_bienvenida").add({
+          uid,
+          correo,
+          resetLink,
+          alias:     data.alias || docId,
+          nombre:    data.nombre || docId,
+          timestamp: FieldValue.serverTimestamp(),
+        });
+      } catch (emailErr) {
+        logger.warn(`[crearUsuarioConAuth] No se pudo generar reset link:`, emailErr.message);
+      }
+
+    } catch (err) {
+      logger.error(`[crearUsuarioConAuth] Error procesando ${docId}:`, err);
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH-2. SINCRONIZAR CAMBIOS DE NOMBRE/CORREO AL USUARIO AUTH
+//   Trigger: usuarios/{docId} updated
+//   Si el docId ya es un UID, actualiza Firebase Auth con los nuevos datos.
+// ═══════════════════════════════════════════════════════════════
+exports.actualizarUsuarioAuth = onDocumentUpdated(
+  { document: "usuarios/{docId}", region: "us-central1" },
+  async (event) => {
+    const docId  = event.params.docId;
+    const antes  = event.data.before.data();
+    const despues = event.data.after.data();
+
+    // Solo actuar si el docId es un UID de Firebase
+    const esUid = /^[A-Za-z0-9]{28,}$/.test(docId);
+    if (!esUid) return;
+
+    const cambioNombre = antes.nombre  !== despues.nombre;
+    const cambioActivo = antes.activo  !== despues.activo;
+    if (!cambioNombre && !cambioActivo) return;
+
+    try {
+      const updates = {};
+      if (cambioNombre) updates.displayName = despues.nombre || docId;
+      if (cambioActivo) updates.disabled    = despues.activo === false;
+
+      await getAuth().updateUser(docId, updates);
+      logger.info(`[actualizarUsuarioAuth] uid=${docId} actualizado`, updates);
+    } catch (err) {
+      logger.error(`[actualizarUsuarioAuth] Error uid=${docId}:`, err.message);
     }
   }
 );
