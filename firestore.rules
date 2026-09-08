@@ -123,7 +123,18 @@ service cloud.firestore {
     // ── /remisiones_credito ───────────────────────────────────────────────────
     match /remisiones_credito/{remisionId} {
       allow read: if cuentaActiva() && esRolConocido();
+      // Panel y admins pueden crear o reemplazar el documento completo
       allow write: if cuentaActiva() && (esAdminOSuperior() || tieneFlag('PUEDE_REGISTRAR_REMISION'));
+      // APK (INGENIERO/RECUPERADOR) puede actualizar abonos e intereses calculados
+      allow update: if cuentaActiva()
+                    && miRol() in ['INGENIERO', 'RECUPERADOR']
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly([
+                         'abonos',
+                         'status','interesGenerado','totalAPagar','xPagarVigente',
+                         'masInteresTotal','interesPorDia','diasDeAtraso',
+                         'totalAbonado','ultimoRecalculoTs'
+                       ]);
     }
 
     // ── /abonos_remision ─────────────────────────────────────────────────────
@@ -510,18 +521,31 @@ service cloud.firestore {
       allow read: if cuentaActiva()
                   && (esAdminOSuperior() || miRol() == 'ALMACENISTA');
 
-      // Escritura: solo Cloud Functions (service account) — desde el cliente solo lectura
-      // Las Cloud Functions usan Admin SDK y saltan estas reglas
-      // Permitimos create a admins para ajustes manuales desde el panel
+      // Dos rutas de escritura (OR):
+      // 1. Panel web / ALMACENISTA — ajustes manuales con campos _ts
+      // 2. APK (INGENIERO/RECUPERADOR) — ventas, cargas, descargas; campo timestamp + _origen=apk
       allow create: if cuentaActiva()
-                    && (esAdminOSuperior() || miRol() == 'ALMACENISTA')
-                    && request.resource.data.keys().hasAll(['productoId','tipo','cantidad','_ts'])
-                    && request.resource.data.tipo in [
-                        'ENTRADA','SALIDA','AJUSTE','DEVOLUCION','TRASLADO',
-                        'AJUSTE_ENTRADA','AJUSTE_SALIDA','AJUSTE_INVENTARIO','EDITAR_MINIMO',
-                        'REABASTO_SURTIDO'
-                    ]
-                    && request.resource.data.cantidad is number;
+                    && (
+                      // Panel / almacenista
+                      ((esAdminOSuperior() || miRol() == 'ALMACENISTA')
+                        && request.resource.data.keys().hasAll(['productoId','tipo','cantidad','_ts'])
+                        && request.resource.data.tipo in [
+                            'ENTRADA','SALIDA','AJUSTE','DEVOLUCION','TRASLADO',
+                            'AJUSTE_ENTRADA','AJUSTE_SALIDA','AJUSTE_INVENTARIO','EDITAR_MINIMO',
+                            'REABASTO_SURTIDO'
+                        ]
+                        && request.resource.data.cantidad is number)
+                      ||
+                      // APK (ingeniero / recuperador / almacenista en campo)
+                      (miRol() in ['INGENIERO','RECUPERADOR','ALMACENISTA']
+                        && request.resource.data.keys().hasAll(['productoId','tipo','cantidad','timestamp'])
+                        && request.resource.data.tipo in [
+                            'VENTA','CARGA','DESCARGA','TRANSFERENCIA',
+                            'AJUSTE_ENTRADA','AJUSTE_SALIDA','DEVOLUCION'
+                        ]
+                        && request.resource.data.cantidad is number
+                        && request.resource.data.get('_origen','') == 'apk')
+                    );
 
       // Los movimientos son inmutables (auditoría)
       allow update, delete: if false;
@@ -1116,6 +1140,49 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['rehabSolicitud','historial']));
       allow delete: if esSuperAdmin();
+    }
+
+    // ── /rutas (historial GPS de ruta del ingeniero por día) ─────────────────
+    // Estructura: rutas/{alias}/dias/{fecha}/puntos/{timestamp}
+    // El APK escribe un punto por cada ping GPS durante la jornada (enJornada=true).
+    // El panel web puede leer para mostrar la ruta recorrida del día.
+    match /rutas/{alias} {
+      allow read: if cuentaActiva() && (esAdminOSuperior() || perfil().alias == alias);
+
+      match /dias/{dia}/puntos/{puntoId} {
+        allow read: if cuentaActiva() && (esAdminOSuperior() || perfil().alias == alias);
+        // Solo el propio ingeniero puede escribir sus puntos de ruta
+        allow create: if cuentaActiva() && esRolConocido()
+                      && perfil().alias == alias
+                      && request.resource.data.lat is number
+                      && request.resource.data.lng is number
+                      && request.resource.data.ts  is number;
+        allow update, delete: if false;
+      }
+    }
+
+    // ── /remisiones (copia standalone del APK, distinta de remisiones_credito) ─
+    // El APK escribe aquí para que el panel pueda leer remisiones sin esperar sync.
+    match /remisiones/{remisionId} {
+      allow read: if cuentaActiva() && esRolConocido();
+      allow create, update: if cuentaActiva() && (
+        esAdminOSuperior() ||
+        miRol() in ['INGENIERO', 'RECUPERADOR'] ||
+        tieneFlag('PUEDE_REGISTRAR_REMISION')
+      );
+      allow delete: if false;
+    }
+
+    // ── /abonos (copia standalone del APK, distinta de abonos_remision) ────────
+    // El APK escribe abonos aquí (además de embebidos en remisiones_credito).
+    match /abonos/{abonoId} {
+      allow read: if cuentaActiva() && esRolConocido();
+      allow create, update: if cuentaActiva() && (
+        esAdminOSuperior() ||
+        miRol() in ['INGENIERO', 'RECUPERADOR'] ||
+        tieneFlag('PUEDE_REGISTRAR_ABONO')
+      );
+      allow delete: if false;
     }
 
     // ── Bloqueo por defecto ───────────────────────────────────────────────────
