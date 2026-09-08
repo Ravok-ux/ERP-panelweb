@@ -31,13 +31,16 @@ const diasHasta = ts => {
   return Math.ceil((d - new Date()) / 86400000);
 };
 
-let _unsubSol = null;
-let _unsubCli = null;
+let _unsubSol  = null;
+let _unsubCli  = null;
+let _unsubHist = null;
 let _solicitudes = [];
 let _clientes    = [];
+let _historial   = [];
 let _tabActiva   = "calendario";
 let _busqueda    = "";
 let _filtroFreq  = "TODOS";
+let _histBusq    = "";
 
 const _puedeAutorizar = () =>
   Sesion.esSuperAdmin?.() ||
@@ -47,16 +50,18 @@ const _puedeAutorizar = () =>
 // ── Módulo ────────────────────────────────────────────────────
 export const VisitasModule = {
   mount(container) {
-    _busqueda = ""; _filtroFreq = "TODOS"; _tabActiva = "calendario";
+    _busqueda = ""; _filtroFreq = "TODOS"; _tabActiva = "calendario"; _histBusq = "";
     container.innerHTML = _html();
     _bindUI(container);
     _escucharSolicitudes();
     _escucharClientes();
+    _escucharHistorial();
   },
   destroy() {
-    _unsubSol?.(); _unsubSol = null;
-    _unsubCli?.(); _unsubCli = null;
-    _solicitudes = []; _clientes = [];
+    _unsubSol?.();  _unsubSol  = null;
+    _unsubCli?.();  _unsubCli  = null;
+    _unsubHist?.(); _unsubHist = null;
+    _solicitudes = []; _clientes = []; _historial = [];
     delete window.VisitasUI;
   }
 };
@@ -109,6 +114,7 @@ function _html() {
         📋 Solicitudes atemporales
         <span id="vis-badge-sol" style="display:none" class="vis-badge">0</span>
       </button>
+      <button class="vis-tab" data-tab="historial">📍 Historial de campo</button>
     </div>
 
     <!-- Panel Calendario -->
@@ -188,6 +194,31 @@ function _html() {
     <div id="vis-panel-solicitudes" style="display:none;padding-top:16px">
       <div id="vis-sol-content">
         <div style="padding:40px;text-align:center;color:#9CA3AF">Cargando solicitudes…</div>
+      </div>
+    </div>
+
+    <!-- Panel Historial de campo (colección "visitas" del APK) -->
+    <div id="vis-panel-historial" style="display:none;padding-top:16px">
+      <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="vis-hist-search" type="search" placeholder="🔍 Buscar cliente o ingeniero…"
+          style="flex:1;min-width:220px;padding:7px 10px;border:1px solid var(--border);
+            border-radius:7px;background:var(--surface);color:var(--text-primary);font-size:13px">
+      </div>
+      <div class="vis-tabla-wrap">
+        <table class="vis-tabla">
+          <thead><tr>
+            <th>Fecha</th>
+            <th>Ingeniero</th>
+            <th>Cliente</th>
+            <th>Tipo</th>
+            <th>Estado</th>
+            <th>Geocerca</th>
+          </tr></thead>
+          <tbody id="vis-tbody-hist">
+            <tr><td colspan="6" style="padding:40px;text-align:center;color:#9CA3AF">
+              Cargando historial…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>`;
@@ -381,6 +412,62 @@ function _renderSolicitudes() {
     btn.addEventListener("click", () => _resolverSolicitud(btn.dataset.id, "RECHAZADA")));
 }
 
+// ── Historial de campo (colección "visitas" del APK) ─────────
+function _escucharHistorial() {
+  _unsubHist?.();
+  _unsubHist = onSnapshot(
+    query(collection(db, "visitas"), orderBy("timestamp", "desc"), limit(300)),
+    snap => {
+      _historial = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (_tabActiva === "historial") _renderHistorial();
+    },
+    err => console.error("[Visitas/hist]", err)
+  );
+}
+
+function _renderHistorial() {
+  const tbody = document.getElementById("vis-tbody-hist");
+  if (!tbody) return;
+  const q = norm(_histBusq);
+  const lista = _historial.filter(v =>
+    !q || norm(v.clienteNombre || "").includes(q) || norm(v.aliasVendedor || "").includes(q)
+  );
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#9CA3AF">
+      ${_historial.length ? "Sin resultados." : "Sin visitas de campo registradas aún."}</td></tr>`;
+    return;
+  }
+
+  const TIPO_COLOR = {
+    NORMAL:   { bg:"#DCFCE7", c:"#166534" },
+    URGENTE:  { bg:"#FEE2E2", c:"#991B1B" },
+    SEGUIMIENTO: { bg:"#DBEAFE", c:"#1D4ED8" },
+  };
+  const ESTADO_COLOR = {
+    COMPLETADA: { bg:"#DCFCE7", c:"#166534" },
+    PENDIENTE:  { bg:"#FEF9C3", c:"#854D0E" },
+    CANCELADA:  { bg:"#F3F4F6", c:"#6B7280" },
+  };
+
+  tbody.innerHTML = lista.slice(0, 200).map(v => {
+    const tc = TIPO_COLOR[v.tipo]   || { bg:"#F3F4F6", c:"#374151" };
+    const ec = ESTADO_COLOR[v.estadoVisita] || { bg:"#F3F4F6", c:"#374151" };
+    const fuera = v.fueraDeGeocerca
+      ? `<span style="color:#DC2626;font-size:11px">⚠️ Fuera</span>`
+      : `<span style="color:#16A34A;font-size:11px">✓ Dentro</span>`;
+    return `<tr>
+      <td style="font-size:12px;white-space:nowrap">${fmtFecha(v.timestamp || v.fecha)}</td>
+      <td style="font-size:12px;color:#6B7280">${esc(v.aliasVendedor || v.ingeniero || "—")}</td>
+      <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${esc(v.clienteNombre || v.clienteId || "—")}</td>
+      <td><span class="vis-chip" style="background:${tc.bg};color:${tc.c}">${esc(v.tipo || "—")}</span></td>
+      <td><span class="vis-chip" style="background:${ec.bg};color:${ec.c}">${esc(v.estadoVisita || "—")}</span></td>
+      <td>${fuera}</td>
+    </tr>`;
+  }).join("");
+}
+
 // ── Bind UI ───────────────────────────────────────────────────
 function _bindUI(container) {
   // Tabs
@@ -394,8 +481,17 @@ function _bindUI(container) {
         _tabActiva === "calendario" ? "" : "none";
       document.getElementById("vis-panel-solicitudes").style.display =
         _tabActiva === "solicitudes" ? "" : "none";
+      document.getElementById("vis-panel-historial").style.display =
+        _tabActiva === "historial" ? "" : "none";
       if (_tabActiva === "solicitudes") _renderSolicitudes();
+      if (_tabActiva === "historial")   _renderHistorial();
     }));
+
+  // Búsqueda en historial
+  container.querySelector("#vis-hist-search")?.addEventListener("input", e => {
+    _histBusq = e.target.value;
+    _renderHistorial();
+  });
 
   // Búsqueda con autocomplete de clientes
   const visSearch = container.querySelector("#vis-search");
