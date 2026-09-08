@@ -266,12 +266,31 @@ function _escucharUbicacionesMapa(map) {
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 8,
-              fillColor: u.enJornada ? "#4ADE80" : "#6B7280",
-              fillOpacity: 1,
+              fillColor: u.enJornada ? "#4ADE80" : "#F87171",
+              fillOpacity: u.enJornada ? 1 : 0.75,
               strokeColor: "#fff",
               strokeWeight: 2
             }
           });
+
+          // Tooltip on hover
+          const _hoverIW = new google.maps.InfoWindow({ disableAutoPan: true });
+          _markers[id].addListener("mouseover", () => {
+            const ts = u.timestamp?.toDate?.();
+            const hace = ts ? _tiempoRelativo(ts) : "–";
+            _hoverIW.setContent(
+              `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
+                <strong>${u.alias || id}</strong><br>
+                <span style="color:${u.enJornada ? "#22C55E" : "#F87171"}">
+                  ${u.enJornada ? "● En campo" : "○ Sin jornada"}</span><br>
+                <span style="color:#6B7280">Última pos: ${hace}</span>
+              </div>`
+            );
+            _hoverIW.open(map, _markers[id]);
+          });
+          _markers[id].addListener("mouseout", () => _hoverIW.close());
+
+          // Click: InfoWindow con más detalle
           _markers[id].addListener("click", () => {
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
@@ -286,13 +305,13 @@ function _escucharUbicacionesMapa(map) {
         // Mapa simulado: actualizar pin DOM (si existiese lógica)
       }
 
-      // Ocultar markers de ingenieros sin jornada
+      // Actualizar icono según estado de jornada
       if (map && _markers[id]) {
         _markers[id].setIcon({
           path: google.maps.SymbolPath.CIRCLE,
           scale: 8,
-          fillColor: u.enJornada ? "#4ADE80" : "#6B7280",
-          fillOpacity: u.enJornada ? 1 : .4,
+          fillColor: u.enJornada ? "#4ADE80" : "#F87171",
+          fillOpacity: u.enJornada ? 1 : 0.75,
           strokeColor: "#fff",
           strokeWeight: 2
         });
@@ -422,6 +441,12 @@ function _fmt(n) {
 }
 function _inicioDia() {
   const d = new Date(); d.setHours(0,0,0,0); return d;
+}
+function _tiempoRelativo(ts) {
+  const diff = Math.floor((Date.now() - ts.getTime()) / 1000);
+  if (diff < 60)  return "hace " + diff + "s";
+  if (diff < 3600) return "hace " + Math.floor(diff/60) + " min";
+  return "hace " + Math.floor(diff/3600) + "h";
 }
 function _tiempoRelativo(date) {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
