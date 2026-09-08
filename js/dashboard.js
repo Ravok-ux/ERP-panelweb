@@ -4,7 +4,7 @@
 
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
-import { esc } from "./app.js";
+import { esc, estaEnJornadaHoy } from "./app.js";
 import {
   collection, query, where, onSnapshot, orderBy,
   limit, Timestamp, getDocs, doc, getDoc
@@ -859,7 +859,7 @@ function _escucharRanking() {
     const enCampo = {};
     snap.forEach(d => {
       const u = d.data();
-      if (u.enJornada) enCampo[u.alias] = true;
+      if (estaEnJornadaHoy(u)) enCampo[u.alias] = true;
     });
 
     const n = Object.keys(enCampo).length;
@@ -992,7 +992,7 @@ function _escucharUbicaciones() {
 
     snap.forEach(d => {
       const u = d.data();
-      if (!u.lat || !u.lng || !u.enJornada) return;
+      if (!u.lat || !u.lng || !estaEnJornadaHoy(u)) return;
 
       const x = _norm(u.lng, bounds.minLng, bounds.maxLng) * 100;
       const y = (1 - _norm(u.lat, bounds.minLat, bounds.maxLat)) * 100;

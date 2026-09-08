@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { db } from "./firebase-config.js";
+import { estaEnJornadaHoy } from "./app.js";
 import {
   collection, query, orderBy, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -407,7 +408,7 @@ function _render() {
     const ub   = _ubicaciones[u.id] || _ubicaciones[u.alias] || null;
     const ts   = typeof ub?.timestamp === 'number' ? ub.timestamp : (ub?.timestamp?.toDate?.()?.getTime() ?? 0);
     const mins = ts ? Math.floor((ahora - ts) / 60000) : null;
-    const enJornada = ub?.enJornada === true;
+    const enJornada = estaEnJornadaHoy(ub);
     return { ...u, ub, ts, mins, enJornada };
   });
 
