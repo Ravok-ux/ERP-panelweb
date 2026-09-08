@@ -14,6 +14,7 @@ let _markers   = {};
 let _unsubs    = [];
 let _mapsReady = false;
 let _autoFitDone = false;  // sólo auto-centrar una vez al primer snapshot
+let _nombres   = {};       // alias → nombre completo, cargado desde usuarios
 
 // ── Replay state ──────────────────────────────────────────────
 let _replay = {
@@ -236,6 +237,11 @@ function _crearMapa() {
     fullscreenControl: false
   });
 
+  // Cargar nombres reales desde usuarios para mostrar en tooltip
+  getDocs(collection(db, "usuarios")).then(snap => {
+    snap.forEach(d => { if (d.data().nombre) _nombres[d.id] = d.data().nombre; });
+  }).catch(() => {});
+
   _escucharUbicacionesMapa(_map);
 }
 
@@ -281,9 +287,10 @@ function _escucharUbicacionesMapa(map) {
             const ts = u.timestamp?.toDate?.() ?? (typeof u.timestamp === "number" ? new Date(u.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
             const enJ = estaEnJornadaHoy(u);
+            const nombreMostrar = _nombres[id] || _nombres[u.alias] || u.alias || id;
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
-                <strong>${u.alias || id}</strong><br>
+                <strong>${nombreMostrar}</strong><br>
                 <span style="color:${enJ ? "#22C55E" : "#F87171"}">
                   ${enJ ? "● En campo" : "○ Sin jornada"}</span><br>
                 <span style="color:#6B7280">Última pos: ${hace}</span>
@@ -296,9 +303,10 @@ function _escucharUbicacionesMapa(map) {
           // Click: InfoWindow con más detalle
           _markers[id].addListener("click", () => {
             const enJ = estaEnJornadaHoy(u);
+            const nombreMostrar = _nombres[id] || _nombres[u.alias] || u.alias || id;
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
-                <strong>${u.alias || id}</strong><br>
+                <strong>${nombreMostrar}</strong><br>
                 ${enJ ? "● En campo" : "○ Sin jornada"}<br>
                 ${u.lat?.slice(0,8)}, ${u.lng?.slice(0,8)}
               </div>`
