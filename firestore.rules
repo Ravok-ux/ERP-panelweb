@@ -1185,6 +1185,66 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── /historial_ventas ────────────────────────────────────────────────────
+    // Poblado exclusivamente por Cloud Functions (Admin SDK) al confirmar pedidos.
+    // El panel lee por clienteId para mostrar el historial de compras.
+    match /historial_ventas/{ventaId} {
+      allow read: if cuentaActiva() && esRolConocido();
+      allow write: if false; // Solo Cloud Functions vía Admin SDK
+    }
+
+    // ── /entregas_campo ───────────────────────────────────────────────────────
+    // Registro de entregas en campo (módulo Logística). Panel crea y lee.
+    match /entregas_campo/{entregaId} {
+      allow read: if cuentaActiva()
+                  && (esAdminOSuperior()
+                      || miRol() in ['ALMACENISTA','MESA_CONTROL','RECUPERADOR','INGENIERO']);
+      allow create: if cuentaActiva() && esRolConocido()
+                    && request.resource.data.keys().hasAll(['status','_ts']);
+      allow update: if cuentaActiva()
+                    && (esAdminOSuperior() || miRol() in ['ALMACENISTA','MESA_CONTROL']);
+      allow delete: if false;
+    }
+
+    // ── /rh_evaluaciones ─────────────────────────────────────────────────────
+    match /rh_evaluaciones/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.uid is string
+                    && request.resource.data.keys().hasAll(['uid','_ts']);
+      allow update: if cuentaActiva() && esAdminOSuperior();
+      allow delete: if esSuperAdmin();
+    }
+
+    // ── /rh_vacantes ──────────────────────────────────────────────────────────
+    match /rh_vacantes/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.keys().hasAll(['titulo','_ts']);
+      allow update: if cuentaActiva() && esAdminOSuperior();
+      allow delete: if esSuperAdmin();
+    }
+
+    // ── /rh_candidatos ────────────────────────────────────────────────────────
+    match /rh_candidatos/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.vacanteId is string
+                    && request.resource.data.keys().hasAll(['vacanteId','_ts']);
+      allow update: if cuentaActiva() && esAdminOSuperior();
+      allow delete: if esSuperAdmin();
+    }
+
+    // ── /rh_onboarding ────────────────────────────────────────────────────────
+    match /rh_onboarding/{docId} {
+      allow read:   if cuentaActiva() && (esAdminOSuperior() || miRol() == 'MESA_CONTROL');
+      allow create: if cuentaActiva() && (esAdminOSuperior() || miRol() == 'MESA_CONTROL')
+                    && request.resource.data.uid is string
+                    && request.resource.data.keys().hasAll(['uid','_ts']);
+      allow update: if cuentaActiva() && (esAdminOSuperior() || miRol() == 'MESA_CONTROL');
+      allow delete: if esSuperAdmin();
+    }
+
     // ── Bloqueo por defecto ───────────────────────────────────────────────────
     // Cualquier colección no listada queda denegada
     match /{document=**} {
