@@ -2545,3 +2545,31 @@ exports.actualizarUsuarioAuth = onDocumentUpdated(
     }
   }
 );
+
+
+// ═══════════════════════════════════════════════════════════════
+// PROPAGACIÓN APK → PANEL: remisiones → remisiones_credito
+// Trigger: remisiones/{remisionId} created o updated desde el APK
+// Garantiza consistencia aunque el batch del APK haya fallado a medias.
+// ═══════════════════════════════════════════════════════════════
+exports.propagarRemisionACredito = onDocumentWritten(
+  { document: "remisiones/{remisionId}", region: "us-central1" },
+  async (event) => {
+    const despues = event.data.after.data();
+    if (!despues) return; // documento eliminado — no propagar
+
+    const remisionId = event.params.remisionId;
+
+    // Solo propaga documentos originados en el APK
+    if (despues._origen !== "apk") return;
+
+    try {
+      const destRef = db.collection("remisiones_credito").doc(remisionId);
+      // merge: no pisa campos que el panel haya editado (notas, acuerdos, etc.)
+      await destRef.set(despues, { merge: true });
+      logger.info(`[propagarRemisionACredito] ${remisionId} propagado OK`);
+    } catch (err) {
+      logger.error(`[propagarRemisionACredito] Error ${remisionId}:`, err.message);
+    }
+  }
+);

@@ -119,6 +119,22 @@
         { "fieldPath": "activo",  "order": "ASCENDING" },
         { "fieldPath": "nombre",  "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "visitas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aliasVendedor", "order": "ASCENDING" },
+        { "fieldPath": "timestamp",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visitas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

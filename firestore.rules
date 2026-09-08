@@ -123,11 +123,19 @@ service cloud.firestore {
     // ── /remisiones_credito ───────────────────────────────────────────────────
     match /remisiones_credito/{remisionId} {
       allow read: if cuentaActiva() && esRolConocido();
-      // Panel y admins pueden crear o reemplazar el documento completo
-      allow write: if cuentaActiva() && (esAdminOSuperior() || tieneFlag('PUEDE_REGISTRAR_REMISION'));
-      // APK (INGENIERO/RECUPERADOR) puede crear remisiones de campo y actualizar
-      // abonos e intereses (subirRemisiones + subirAbonos + subirInteresesCalculados)
-      allow create: if cuentaActiva() && miRol() in ['INGENIERO', 'RECUPERADOR'];
+
+      // Panel/admins pueden crear remisiones (sin restricción de campos)
+      allow create: if cuentaActiva() && (esAdminOSuperior() || tieneFlag('PUEDE_REGISTRAR_REMISION')
+                                          || miRol() in ['INGENIERO', 'RECUPERADOR']);
+
+      // Panel/admins pueden actualizar pero no pueden pisar el campo _origen
+      // (preserva la trazabilidad de qué entró por APK vs. panel)
+      allow update: if cuentaActiva()
+                    && (esAdminOSuperior() || tieneFlag('PUEDE_REGISTRAR_REMISION'))
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['_origen']);
+
+      // APK (INGENIERO/RECUPERADOR) puede actualizar abonos e intereses —
+      // lista blanca de campos para evitar sobrescritura accidental de campos del panel
       allow update: if cuentaActiva()
                     && miRol() in ['INGENIERO', 'RECUPERADOR']
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -139,6 +147,9 @@ service cloud.firestore {
                          'id','clienteId','remisionNumero','fechaVenta','fechaVencimiento',
                          'montoOriginal','saldoPendiente','vendedor','alias','_origen'
                        ]);
+
+      // Las remisiones de crédito no se eliminan desde el cliente
+      allow delete: if false;
     }
 
     // ── /abonos_remision ─────────────────────────────────────────────────────

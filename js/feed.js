@@ -80,6 +80,7 @@ function _html() {
         <option value="TODOS">Todos</option>
       </select>
       <div style="flex:1"></div>
+      <span id="feed-last-ts" style="font-size:11px;color:var(--text-sec);margin-right:6px"></span>
       <span id="feed-count" style="font-size:11px;color:var(--text-sec)">– eventos</span>
     </div>
 
@@ -153,6 +154,11 @@ function _renderFeed(snap) {
   // Contador
   const cntEl = document.getElementById("feed-count");
   if (cntEl) cntEl.textContent = `${docs.length} eventos`;
+  const tsEl = document.getElementById("feed-last-ts");
+  if (tsEl) {
+    const now = new Date();
+    tsEl.textContent = `Actualizado ${now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+  }
 
   if (docs.length === 0) {
     el.innerHTML = `

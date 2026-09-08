@@ -103,11 +103,12 @@ function _html() {
                 <th style="${_th('center')}">DÍAS MORA</th>
                 <th style="${_th('center')}">VENCE</th>
                 <th style="${_th('center')}">STATUS</th>
+                <th style="${_th('center')}">ORIGEN</th>
                 <th style="${_th('center')}">ACCIÓN</th>
               </tr>
             </thead>
             <tbody id="rst-tbody">
-              <tr><td colspan="12" style="padding:32px;text-align:center;color:var(--text-muted)">Cargando…</td></tr>
+              <tr><td colspan="13" style="padding:32px;text-align:center;color:var(--text-muted)">Cargando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -386,7 +387,7 @@ function _renderTabla() {
   if (!tbody) return;
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--text-muted)">
+    tbody.innerHTML = `<tr><td colspan="13" style="padding:32px;text-align:center;color:var(--text-muted)">
       Sin remisiones para este filtro.</td></tr>`;
     return;
   }
@@ -424,6 +425,13 @@ function _renderTabla() {
       <td style="padding:9px 14px;text-align:center">
         <span style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px;white-space:nowrap;
           background:${col.badge}22;color:${col.badge}">${r.status}</span>
+      </td>
+      <td style="padding:9px 14px;text-align:center">
+        ${r._origen === "apk"
+          ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;
+              background:#FEF3C7;color:#92400E;border:1px solid #F59E0B">APK</span>`
+          : `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;
+              background:#EFF6FF;color:#1E40AF;border:1px solid #93C5FD">Panel</span>`}
       </td>
       <td style="padding:9px 14px;text-align:center">
         <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap">
