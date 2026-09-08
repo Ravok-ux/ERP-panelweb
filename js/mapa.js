@@ -84,7 +84,7 @@ function _html() {
       </div>
 
       <!-- Buscador de ingenieros en mapa -->
-      <div style="position:absolute;top:12px;left:12px;z-index:5;display:flex;align-items:center;gap:6px">
+      <div style="position:absolute;top:12px;right:12px;z-index:5;display:flex;align-items:center;gap:6px">
         <input id="mapa-search" type="text" placeholder="🔍 Buscar ingeniero..."
           oninput="MapaBuscador.filtrar(this.value)"
           style="height:34px;padding:0 12px;border-radius:8px;border:1px solid #30363D;
