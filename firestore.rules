@@ -125,7 +125,9 @@ service cloud.firestore {
       allow read: if cuentaActiva() && esRolConocido();
       // Panel y admins pueden crear o reemplazar el documento completo
       allow write: if cuentaActiva() && (esAdminOSuperior() || tieneFlag('PUEDE_REGISTRAR_REMISION'));
-      // APK (INGENIERO/RECUPERADOR) puede actualizar abonos e intereses calculados
+      // APK (INGENIERO/RECUPERADOR) puede crear remisiones de campo y actualizar
+      // abonos e intereses (subirRemisiones + subirAbonos + subirInteresesCalculados)
+      allow create: if cuentaActiva() && miRol() in ['INGENIERO', 'RECUPERADOR'];
       allow update: if cuentaActiva()
                     && miRol() in ['INGENIERO', 'RECUPERADOR']
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -133,7 +135,9 @@ service cloud.firestore {
                          'abonos',
                          'status','interesGenerado','totalAPagar','xPagarVigente',
                          'masInteresTotal','interesPorDia','diasDeAtraso',
-                         'totalAbonado','ultimoRecalculoTs'
+                         'totalAbonado','ultimoRecalculoTs',
+                         'id','clienteId','remisionNumero','fechaVenta','fechaVencimiento',
+                         'montoOriginal','saldoPendiente','vendedor','alias','_origen'
                        ]);
     }
 
