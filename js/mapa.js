@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { db } from "./firebase-config.js";
+import { estaEnJornadaHoy } from "./app.js";
 import {
   collection, onSnapshot, query, orderBy, limit,
   getDocs
@@ -251,7 +252,8 @@ function _escucharUbicacionesMapa(map) {
       const lng = parseFloat(u.lng);
 
       if (!lat || !lng) return;
-      if (u.enJornada) enCampo++;
+      const enJornada = estaEnJornadaHoy(u);
+      if (enJornada) enCampo++;
 
       if (map) {
         // Google Maps marker
@@ -266,8 +268,8 @@ function _escucharUbicacionesMapa(map) {
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 8,
-              fillColor: u.enJornada ? "#4ADE80" : "#F87171",
-              fillOpacity: u.enJornada ? 1 : 0.75,
+              fillColor: enJornada ? "#4ADE80" : "#F87171",
+              fillOpacity: enJornada ? 1 : 0.75,
               strokeColor: "#fff",
               strokeWeight: 2
             }
@@ -276,13 +278,14 @@ function _escucharUbicacionesMapa(map) {
           // Tooltip on hover
           const _hoverIW = new google.maps.InfoWindow({ disableAutoPan: true });
           _markers[id].addListener("mouseover", () => {
-            const ts = u.timestamp?.toDate?.();
+            const ts = u.timestamp?.toDate?.() ?? (typeof u.timestamp === "number" ? new Date(u.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
+            const enJ = estaEnJornadaHoy(u);
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
                 <strong>${u.alias || id}</strong><br>
-                <span style="color:${u.enJornada ? "#22C55E" : "#F87171"}">
-                  ${u.enJornada ? "● En campo" : "○ Sin jornada"}</span><br>
+                <span style="color:${enJ ? "#22C55E" : "#F87171"}">
+                  ${enJ ? "● En campo" : "○ Sin jornada"}</span><br>
                 <span style="color:#6B7280">Última pos: ${hace}</span>
               </div>`
             );
@@ -292,10 +295,11 @@ function _escucharUbicacionesMapa(map) {
 
           // Click: InfoWindow con más detalle
           _markers[id].addListener("click", () => {
+            const enJ = estaEnJornadaHoy(u);
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
                 <strong>${u.alias || id}</strong><br>
-                ${u.enJornada ? "● En campo" : "○ Sin jornada"}<br>
+                ${enJ ? "● En campo" : "○ Sin jornada"}<br>
                 ${u.lat?.slice(0,8)}, ${u.lng?.slice(0,8)}
               </div>`
             }).open(map, _markers[id]);
@@ -310,8 +314,8 @@ function _escucharUbicacionesMapa(map) {
         _markers[id].setIcon({
           path: google.maps.SymbolPath.CIRCLE,
           scale: 8,
-          fillColor: u.enJornada ? "#4ADE80" : "#F87171",
-          fillOpacity: u.enJornada ? 1 : 0.75,
+          fillColor: enJornada ? "#4ADE80" : "#F87171",
+          fillOpacity: enJornada ? 1 : 0.75,
           strokeColor: "#fff",
           strokeWeight: 2
         });
@@ -322,9 +326,9 @@ function _escucharUbicacionesMapa(map) {
     if (!_autoFitDone && map && Object.keys(_markers).length > 0) {
       _autoFitDone = true;
       const bounds = new google.maps.LatLngBounds();
-      // Prioridad: ingenieros en jornada activa; fallback: todos los marcadores
+      // Prioridad: ingenieros en jornada activa hoy; fallback: todos los marcadores
       const enJornadaIds = snap.docs
-        .filter(d => d.data().enJornada && parseFloat(d.data().lat) && parseFloat(d.data().lng))
+        .filter(d => estaEnJornadaHoy(d.data()) && parseFloat(d.data().lat) && parseFloat(d.data().lng))
         .map(d => d.id);
       const idsParaBounds = enJornadaIds.length > 0 ? enJornadaIds : Object.keys(_markers);
       idsParaBounds.forEach(id => {
@@ -441,12 +445,6 @@ function _fmt(n) {
 }
 function _inicioDia() {
   const d = new Date(); d.setHours(0,0,0,0); return d;
-}
-function _tiempoRelativo(ts) {
-  const diff = Math.floor((Date.now() - ts.getTime()) / 1000);
-  if (diff < 60)  return "hace " + diff + "s";
-  if (diff < 3600) return "hace " + Math.floor(diff/60) + " min";
-  return "hace " + Math.floor(diff/3600) + "h";
 }
 function _tiempoRelativo(date) {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
