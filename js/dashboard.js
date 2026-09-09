@@ -1140,10 +1140,18 @@ function _escucharFeedDash() {
         </div>`;
     }).join("");
 
+    // Badge: sólo eventos más nuevos que la última vez que el usuario abrió el Feed
     const badge = document.getElementById("feed-badge");
     if (badge) {
-      badge.textContent = snap.size;
-      badge.classList.toggle("hidden", snap.size === 0);
+      let lastSeen = 0;
+      try { lastSeen = parseInt(localStorage.getItem("feed_last_seen") || "0", 10); } catch {}
+      const nuevos = snap.docs.filter(d => {
+        const ts = d.data().timestamp;
+        const ms = typeof ts === "number" ? ts : (ts?.toDate?.()?.getTime() ?? 0);
+        return ms > lastSeen;
+      }).length;
+      badge.textContent = nuevos;
+      badge.classList.toggle("hidden", nuevos === 0);
     }
   }, _logErr("feed-dash"));
 }

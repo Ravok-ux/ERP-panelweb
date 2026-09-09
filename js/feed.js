@@ -18,7 +18,8 @@ let _aliases = new Set();
 export const FeedModule = {
   mount(container) {
     container.innerHTML = _html();
-    // Limpiar badge de nav al entrar al feed
+    // Marcar "visto ahora" → el badge del dashboard solo contará eventos posteriores a este momento
+    try { localStorage.setItem("feed_last_seen", Date.now().toString()); } catch {}
     const badge = document.getElementById("feed-badge");
     if (badge) { badge.textContent = "0"; badge.classList.add("hidden"); }
     _bindFiltros();
