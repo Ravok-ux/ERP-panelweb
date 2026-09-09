@@ -61,14 +61,14 @@ export const ObservabilidadModule = {
       <!-- Histórico 7 días -->
       <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--text-sec);
         text-transform:uppercase;letter-spacing:.5px">Últimos 7 días</div>
-      <div style="overflow-x:auto;margin-bottom:24px">
-        <table class="data-table" id="obs-tabla-hist">
+      <div style="overflow-x:auto;margin-bottom:24px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px">
+        <table class="data-table" id="obs-tabla-hist" style="background:var(--surface,#fff)">
           <thead><tr>
             <th>Fecha</th><th>Pedidos</th><th>Visitas</th>
             <th>Abonos</th><th>Cotizaciones</th><th>Notificaciones</th>
           </tr></thead>
           <tbody id="obs-hist-body">
-            <tr><td colspan="6" style="padding:24px;text-align:center">Cargando…</td></tr>
+            <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-sec)">Cargando…</td></tr>
           </tbody>
         </table>
       </div>
@@ -118,8 +118,8 @@ async function _cargarMetricas() {
     const tbody = document.getElementById("obs-hist-body");
     if (!tbody) return;
     if (snap.empty) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-sec)">
-        Sin datos — las métricas se generan automáticamente a las 23:55</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--text-sec,#6B7280)">
+        📊 Sin datos — las métricas se generan automáticamente a las 23:55</td></tr>`;
       return;
     }
     tbody.innerHTML = snap.docs.map(d => {

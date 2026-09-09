@@ -1,7 +1,7 @@
 // Service Worker — N-10 ERP
 // Estrategia: Cache-first para assets estáticos, Network-first para index.html y datos dinámicos
 
-const CACHE_NAME = 'n10-erp-v122';
+const CACHE_NAME = 'n10-erp-v124';
 
 // index.html NUNCA se cachea aquí — siempre se sirve desde la red
 // para garantizar que cada deploy llegue sin necesitar cerrar tabs.
@@ -101,11 +101,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Firebase, googleapis, gstatic → siempre red (datos en tiempo real)
+  // Firebase, googleapis, gstatic, cloudfunctions → siempre red (datos en tiempo real)
   if (url.hostname.includes('firebase') ||
       url.hostname.includes('googleapis') ||
       url.hostname.includes('gstatic') ||
-      url.hostname.includes('firebaseapp')) {
+      url.hostname.includes('firebaseapp') ||
+      url.hostname.includes('cloudfunctions.net') ||
+      url.hostname.includes('run.app')) {
     return;
   }
 
