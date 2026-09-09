@@ -409,7 +409,7 @@ function _html() {
 
   <!-- Modal: nuevo usuario -->
   <div id="modal-nuevo-usuario" class="modal-overlay hidden">
-    <div class="modal">
+    <div class="modal" style="width:520px;max-width:95vw">
       <div class="modal-title">Nuevo usuario</div>
       <div class="form-group">
         <label class="form-label">Correo electrónico</label>
@@ -421,15 +421,15 @@ function _html() {
       </div>
       <div class="form-group">
         <label class="form-label">Rol</label>
-        <select id="nu-rol" class="form-input" onchange="UsuariosUI.previewPreset(this.value)">
-          <option value="RECUPERADOR">RECUPERADOR — cobranza y abonos</option>
-          <option value="INGENIERO" selected>INGENIERO — ventas y campo</option>
-          <option value="GERENTE_ZONA">GERENTE_ZONA — gestión de zona</option>
-          <option value="GERENTE">GERENTE — supervisión completa</option>
-          <option value="ADMINISTRADOR">ADMINISTRADOR — operaciones completas</option>
-          <option value="ALMACENISTA">ALMACENISTA — almacén y stock</option>
-          <option value="JURIDICO">JURIDICO — cobranza legal</option>
-          <option value="MESA_CONTROL">MESA_CONTROL — gestión de pedidos y cartera</option>
+        <select id="nu-rol" class="form-input" style="width:100%" onchange="UsuariosUI.previewPreset(this.value)">
+          <option value="RECUPERADOR">RECUPERADOR</option>
+          <option value="INGENIERO" selected>INGENIERO</option>
+          <option value="GERENTE_ZONA">GERENTE_ZONA</option>
+          <option value="GERENTE">GERENTE</option>
+          <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+          <option value="ALMACENISTA">ALMACENISTA</option>
+          <option value="JURIDICO">JURIDICO</option>
+          <option value="MESA_CONTROL">MESA_CONTROL</option>
           ${Sesion.esSuperAdmin() ? '<option value="SUPER_ADMIN">SUPER_ADMIN</option>' : ""}
         </select>
       </div>
