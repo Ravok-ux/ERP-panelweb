@@ -106,7 +106,14 @@ const PRESET = {
     PUEDE_ACCESO_STOCK:         true,
     PUEDE_CREAR_PEDIDOS:        true,
     PUEDE_VER_PEDIDOS:          true,
-    PUEDE_RUTA_OPTIMA:          true
+    PUEDE_RUTA_OPTIMA:          true,
+    PUEDE_REPORTES_CUSTOM:      false,
+    PUEDE_CONFIG_INTERESES:     false,
+    PUEDE_ACCESO_SMS:           false,
+    PUEDE_ACCESO_BI:            false,
+    PUEDE_ACCESO_GASTOS:        false,
+    PUEDE_VER_HISTORIAL:        false,
+    PUEDE_ACCESO_CAJA:          false
   },
   RECUPERADOR: {
     PUEDE_EDITAR_PRECIO:      false,
@@ -127,7 +134,14 @@ const PRESET = {
     PUEDE_VER_COMISIONES:     false,
     PUEDE_CONFIG_COMISIONES:  false,
     PUEDE_CARTERA_GLOBAL:     false,
-    PUEDE_MODULO_JURIDICO:    false
+    PUEDE_MODULO_JURIDICO:    false,
+    PUEDE_REPORTES_CUSTOM:    false,
+    PUEDE_CONFIG_INTERESES:   false,
+    PUEDE_ACCESO_SMS:         false,
+    PUEDE_ACCESO_BI:          false,
+    PUEDE_ACCESO_GASTOS:      false,
+    PUEDE_VER_HISTORIAL:      false,
+    PUEDE_ACCESO_CAJA:        false
   },
   ADMINISTRADOR: {
     PUEDE_EDITAR_PRECIO:        false,
@@ -187,7 +201,14 @@ const PRESET = {
     PUEDE_VER_COMISIONES:     false,
     PUEDE_CONFIG_COMISIONES:  false,
     PUEDE_CARTERA_GLOBAL:     false,
-    PUEDE_MODULO_JURIDICO:    false
+    PUEDE_MODULO_JURIDICO:    false,
+    PUEDE_REPORTES_CUSTOM:    false,
+    PUEDE_CONFIG_INTERESES:   false,
+    PUEDE_ACCESO_SMS:         false,
+    PUEDE_ACCESO_BI:          false,
+    PUEDE_ACCESO_GASTOS:      false,
+    PUEDE_VER_HISTORIAL:      false,
+    PUEDE_ACCESO_CAJA:        false
   },
   JURIDICO: {
     PUEDE_EDITAR_PRECIO:      false,
@@ -208,7 +229,14 @@ const PRESET = {
     PUEDE_VER_COMISIONES:     false,
     PUEDE_CONFIG_COMISIONES:  false,
     PUEDE_CARTERA_GLOBAL:     true,
-    PUEDE_MODULO_JURIDICO:    true
+    PUEDE_MODULO_JURIDICO:    true,
+    PUEDE_REPORTES_CUSTOM:    false,
+    PUEDE_CONFIG_INTERESES:   false,
+    PUEDE_ACCESO_SMS:         false,
+    PUEDE_ACCESO_BI:          false,
+    PUEDE_ACCESO_GASTOS:      false,
+    PUEDE_VER_HISTORIAL:      false,
+    PUEDE_ACCESO_CAJA:        false
   },
   GERENTE_ZONA: {
     PUEDE_EDITAR_PRECIO:      false,
@@ -229,7 +257,14 @@ const PRESET = {
     PUEDE_VER_COMISIONES:     true,
     PUEDE_CONFIG_COMISIONES:  false,
     PUEDE_CARTERA_GLOBAL:     true,
-    PUEDE_MODULO_JURIDICO:    false
+    PUEDE_MODULO_JURIDICO:    false,
+    PUEDE_REPORTES_CUSTOM:    false,
+    PUEDE_CONFIG_INTERESES:   false,
+    PUEDE_ACCESO_SMS:         false,
+    PUEDE_ACCESO_BI:          true,
+    PUEDE_ACCESO_GASTOS:      false,
+    PUEDE_VER_HISTORIAL:      true,
+    PUEDE_ACCESO_CAJA:        false
   },
   MESA_CONTROL: {
     PUEDE_EDITAR_PRECIO:      false,
@@ -252,7 +287,14 @@ const PRESET = {
     PUEDE_VER_COMISIONES:     false,
     PUEDE_CONFIG_COMISIONES:  false,
     PUEDE_CARTERA_GLOBAL:     false,
-    PUEDE_MODULO_JURIDICO:    false
+    PUEDE_MODULO_JURIDICO:    false,
+    PUEDE_REPORTES_CUSTOM:    false,
+    PUEDE_CONFIG_INTERESES:   false,
+    PUEDE_ACCESO_SMS:         true,
+    PUEDE_ACCESO_BI:          true,
+    PUEDE_ACCESO_GASTOS:      true,
+    PUEDE_VER_HISTORIAL:      true,
+    PUEDE_ACCESO_CAJA:        true
   }
 };
 
