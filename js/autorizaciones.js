@@ -164,10 +164,10 @@ export const AutorizacionesModule = {
 
 // ── Suscripciones ──────────────────────────────────────────────────────────────
 function _suscribirPendientes() {
+  // Sin orderBy en Firestore para evitar índice compuesto — se ordena en JS
   const q = query(
     collection(db, "pedidos"),
-    where("status", "==", STATUS_PENDIENTE),
-    orderBy("fechaPedido", "asc")   // más antiguos primero = más urgentes
+    where("status", "==", STATUS_PENDIENTE)
   );
   _unsubPendientes = onSnapshot(q, snap => {
     snap.docChanges().forEach(ch => {
@@ -184,15 +184,18 @@ function _suscribirPendientes() {
 
 function _suscribirHistorial() {
   const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  // Solo filtramos por status; el rango de fecha y ordenamiento se hacen en JS
   const q = query(
     collection(db, "pedidos"),
     where("status", "in", [STATUS_CONFIRMADO, STATUS_RECHAZADO]),
-    where("fechaAutorizacion", ">=", hace30),
-    orderBy("fechaAutorizacion", "desc"),
-    limit(50)
+    limit(200)
   );
   _unsubHistorial = onSnapshot(q, snap => {
-    _historial = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _historial = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => (p.fechaAutorizacion || 0) >= hace30)
+      .sort((a, b) => (b.fechaAutorizacion || 0) - (a.fechaAutorizacion || 0))
+      .slice(0, 50);
     _renderHistorial();
   }, err => {
     console.error("[Autorizaciones] historial:", err);
