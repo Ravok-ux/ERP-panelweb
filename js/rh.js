@@ -124,8 +124,10 @@ function _montarAsistencia() {
         value="${new Date().toISOString().slice(0,10)}">
       <input type="month" class="sel-sm hidden" id="asi-filtro-mes"
         value="${new Date().toISOString().slice(0,7)}">
-      <button class="btn-primary" id="asi-reg-btn">+ Registrar asistencia</button>
-      <button id="asi-xlsx-btn" style="padding:7px 12px;background:#16A34A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬇️ Excel</button>
+      <div style="display:flex;gap:8px;flex-shrink:0;margin-left:auto">
+        <button class="btn-primary" id="asi-reg-btn">+ Registrar asistencia</button>
+        <button id="asi-xlsx-btn" style="padding:7px 12px;background:#16A34A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬇️ Excel</button>
+      </div>
     </div>
 
     <!-- KPIs del día -->
@@ -150,7 +152,7 @@ function _montarAsistencia() {
     <table class="data-table">
       <thead>
         <tr>
-          <th>INGENIERO</th><th>FECHA</th><th>CHECK-IN</th>
+          <th data-diaria>INGENIERO</th><th>FECHA</th><th>CHECK-IN</th>
           <th>CHECK-OUT</th><th>HORAS</th><th>STATUS</th><th>NOTAS</th>
         </tr>
       </thead>
@@ -169,7 +171,10 @@ function _montarAsistencia() {
         <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
           <div class="form-group">
             <label class="form-label">Ingeniero</label>
-            <select class="form-input" id="asi-uid">${_optUsuarios()}</select>
+            <select class="form-input" id="asi-uid">
+              <option value="">— Selecciona un ingeniero —</option>
+              ${_usuarios.map(u => `<option value="${esc(u.uid)}">${esc(u.alias || u.uid)}</option>`).join("")}
+            </select>
           </div>
           <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="form-group">
@@ -297,6 +302,7 @@ function _renderResumenMensual(rows) {
   const tbody = document.getElementById("asi-body");
   const thead = tbody?.closest("table")?.querySelector("thead tr");
   if (thead) thead.innerHTML = `<th>INGENIERO</th><th>✅ Presentes</th><th>❌ Ausentes</th><th>⏰ Tardanzas</th><th>🟡 Permisos</th><th>🟣 Vacaciones</th><th>% Asistencia</th>`;
+  // (sin data-diaria → _renderAsistencia sabrá que necesita restaurar headers)
   if (tbody) tbody.innerHTML = filas;
 }
 
@@ -325,6 +331,12 @@ function _renderAsistencia(rows) {
   if (el("asi-kpi-pres"))  el("asi-kpi-pres").textContent  = presentes;
   if (el("asi-kpi-aus"))   el("asi-kpi-aus").textContent   = ausentes;
   if (el("asi-kpi-tard"))  el("asi-kpi-tard").textContent  = tardanzas;
+
+  // Restaurar encabezados en caso de que se haya cambiado a vista mensual antes
+  const thead = document.querySelector("#asi-body")?.closest("table")?.querySelector("thead tr");
+  if (thead && !thead.querySelector("th[data-diaria]")) {
+    thead.innerHTML = `<th data-diaria>INGENIERO</th><th>FECHA</th><th>CHECK-IN</th><th>CHECK-OUT</th><th>HORAS</th><th>STATUS</th><th>NOTAS</th>`;
+  }
 
   const STATUS_CLS = {
     PRESENTE: "badge-green", AUSENTE: "badge-red",
@@ -1767,7 +1779,7 @@ function _mostrarOnboarding() {
   const el = document.getElementById("rec-content");
   el.innerHTML = `
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
-      <select class="sel-sm" id="ob-uid">${_optUsuarios("", false)}</select>
+      <select class="sel-sm" id="ob-uid">${_optUsuarios()}</select>
       <button class="btn-primary" id="ob-crear-btn">+ Nuevo checklist</button>
     </div>
     <div id="ob-list"></div>`;
