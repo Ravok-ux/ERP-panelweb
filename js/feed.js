@@ -18,6 +18,9 @@ let _aliases = new Set();
 export const FeedModule = {
   mount(container) {
     container.innerHTML = _html();
+    // Limpiar badge de nav al entrar al feed
+    const badge = document.getElementById("feed-badge");
+    if (badge) { badge.textContent = "0"; badge.classList.add("hidden"); }
     _bindFiltros();
     _cargarIngenieros();
     _escucharFeed();

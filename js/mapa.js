@@ -11,6 +11,7 @@ import {
 
 let _map       = null;
 let _markers   = {};
+let _markerData = {};      // id → datos más recientes de ubicaciones (para closures de hover/click)
 let _unsubs    = [];
 let _mapsReady = false;
 let _autoFitDone = false;  // sólo auto-centrar una vez al primer snapshot
@@ -44,6 +45,7 @@ export const MapaModule = {
     _unsubs.forEach(fn => fn && fn());
     _unsubs = [];
     _markers = {};
+    _markerData = {};
     _map = null;
     _autoFitDone = false;
   }
@@ -266,6 +268,10 @@ function _escucharUbicacionesMapa(map) {
       const enJornada = estaEnJornadaHoy(u);
       if (enJornada) enCampo++;
 
+      // Siempre actualizar datos vivos (necesario para que los closures de hover/click
+      // lean el estado actual y no el de cuando se creó el marker)
+      _markerData[id] = u;
+
       if (map) {
         // Google Maps marker
         const pos = { lat, lng };
@@ -286,13 +292,14 @@ function _escucharUbicacionesMapa(map) {
             }
           });
 
-          // Tooltip on hover
+          // Tooltip on hover — lee _markerData[id] para tener datos siempre actualizados
           const _hoverIW = new google.maps.InfoWindow({ disableAutoPan: true });
           _markers[id].addListener("mouseover", () => {
-            const ts = u.timestamp?.toDate?.() ?? (typeof u.timestamp === "number" ? new Date(u.timestamp) : null);
+            const live = _markerData[id] || {};
+            const ts = live.timestamp?.toDate?.() ?? (typeof live.timestamp === "number" ? new Date(live.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
-            const enJ = estaEnJornadaHoy(u);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(u.alias||'').toLowerCase()] || u.alias || id;
+            const enJ = estaEnJornadaHoy(live);
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || live.alias || id;
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
                 <strong>${nombreMostrar}</strong><br>
@@ -305,15 +312,16 @@ function _escucharUbicacionesMapa(map) {
           });
           _markers[id].addListener("mouseout", () => _hoverIW.close());
 
-          // Click: InfoWindow con más detalle
+          // Click: InfoWindow con más detalle — también usa datos vivos
           _markers[id].addListener("click", () => {
-            const enJ = estaEnJornadaHoy(u);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(u.alias||'').toLowerCase()] || u.alias || id;
+            const live = _markerData[id] || {};
+            const enJ = estaEnJornadaHoy(live);
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || live.alias || id;
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
                 <strong>${nombreMostrar}</strong><br>
                 ${enJ ? "● En campo" : "○ Sin jornada"}<br>
-                ${u.lat?.slice(0,8)}, ${u.lng?.slice(0,8)}
+                ${live.lat?.slice(0,8)}, ${live.lng?.slice(0,8)}
               </div>`
             }).open(map, _markers[id]);
           });
