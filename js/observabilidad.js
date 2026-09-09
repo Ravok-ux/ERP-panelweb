@@ -77,9 +77,9 @@ export const ObservabilidadModule = {
       <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--text-sec);
         text-transform:uppercase;letter-spacing:.5px">Último backup manifesto</div>
       <div id="obs-backup-panel" style="
-        background:var(--surface2);border:1px solid var(--border);
-        border-radius:8px;padding:16px">
-        <div style="color:var(--text-sec);font-size:13px">Cargando…</div>
+        background:var(--surface,#fff);border:1px solid var(--border);
+        border-radius:8px;overflow:hidden">
+        <div style="padding:16px;color:var(--text-sec);font-size:13px">Cargando…</div>
       </div>
     </div>`;
 
@@ -152,26 +152,37 @@ async function _cargarBackup() {
       return;
     }
     const b = snap.docs[0].data();
-    const colRows = Object.entries(b.conteos || {}).map(([col, count]) =>
-      `<div style="display:flex;justify-content:space-between;padding:4px 0;
-        border-bottom:1px solid var(--border);font-size:12px">
-        <span style="color:var(--text-sec)">${esc(col)}</span>
-        <span style="font-variant-numeric:tabular-nums;font-weight:600">${fmtNum(count)}</span>
-      </div>`
-    ).join("");
+    const entries = Object.entries(b.conteos || {});
+    const colRows = entries.map(([col, count], i) => {
+      const bg = i % 2 === 0 ? "background:var(--surface,#fff)" : "background:var(--surface-2,#F9FAFB)";
+      const countColor = count === 0 ? "color:#9CA3AF" : count > 100 ? "color:#2563EB" : "color:var(--text-primary)";
+      const badge = count === 0
+        ? `<span style="font-size:10px;background:#F3F4F6;color:#9CA3AF;border-radius:4px;padding:1px 6px;font-weight:600">vacío</span>`
+        : `<span style="font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;${countColor}">${fmtNum(count)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;
+        padding:7px 12px;${bg}">
+        <span style="font-size:12px;color:var(--text-sec);font-family:monospace">${esc(col)}</span>
+        ${badge}
+      </div>`;
+    }).join("");
 
     panel.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div>
-          <div style="font-size:14px;font-weight:700">📦 ${esc(b.fecha)}</div>
-          <div style="font-size:11px;color:var(--text-sec)">Generado: ${fmtFecha(b._ts)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        padding:14px 16px;border-bottom:2px solid var(--border);margin-bottom:0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#3B82F6,#6366F1);
+            display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div>
+          <div>
+            <div style="font-size:14px;font-weight:700">${esc(b.fecha)}</div>
+            <div style="font-size:11px;color:var(--text-sec)">Generado: ${fmtFecha(b._ts)}</div>
+          </div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:800">${fmtNum(b.totalDocs)}</div>
-          <div style="font-size:11px;color:var(--text-sec)">docs totales</div>
+          <div style="font-size:24px;font-weight:800;color:#2563EB;font-variant-numeric:tabular-nums">${fmtNum(b.totalDocs)}</div>
+          <div style="font-size:11px;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px">docs totales</div>
         </div>
       </div>
-      <div>${colRows}</div>`;
+      <div style="border-radius:0 0 8px 8px;overflow:hidden">${colRows}</div>`;
   } catch (e) {
     panel.innerHTML = `<div style="color:#DC2626;font-size:13px">Error: ${esc(e.message)}</div>`;
   }
