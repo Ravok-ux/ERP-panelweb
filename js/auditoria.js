@@ -42,6 +42,9 @@ const TIPOS = {
   ROL_CAMBIADO:           { icon: "🔑", sev: "alta",  label: "Rol cambiado"           },
   CONFIG_MODIFICADA:      { icon: "⚙️", sev: "media", label: "Configuración modificada"},
   PEDIDO_CANCELADO:       { icon: "❌", sev: "media", label: "Pedido rechazado"       },
+  PEDIDO_APROBADO:        { icon: "✅", sev: "alta",  label: "Pedido aprobado"        },
+  PEDIDO_RECHAZADO:       { icon: "🚫", sev: "alta",  label: "Pedido rechazado"       },
+  PEDIDO_INFO_REQUERIDA:  { icon: "💬", sev: "media", label: "Info solicitada"        },
   // Almacén
   STOCK_ENTRADA:          { icon: "📥", sev: "media", label: "Entrada de stock"       },
   STOCK_SALIDA:           { icon: "📤", sev: "media", label: "Salida de stock"        },
@@ -79,7 +82,13 @@ export const AuditoriaModule = {
     _escuchar();
     return () => this.destroy();
   },
-  destroy() { _unsub?.(); _unsub = null; _rows = []; }
+  destroy() {
+    _unsub?.();  _unsub  = null;
+    _unsubA?.(); _unsubA = null;
+    _unsubB?.(); _unsubB = null;
+    _rows = []; _rowsRaw = [];
+    _mapaAmbasA = {}; _mapaAmbasB = {};
+  }
 };
 
 function _puedeVer() {
@@ -88,20 +97,21 @@ function _puedeVer() {
 
 async function _cargarIngenieros() {
   try {
+    // Sin orderBy para evitar índice compuesto; sort en JS
     const snap = await getDocs(query(
       collection(db, "usuarios"),
-      where("activo", "==", true),
-      orderBy("alias")
+      where("activo", "==", true)
     ));
     _ings = snap.docs
-      .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol))
-      .map(d => ({ uid: d.id, alias: d.data().alias }));
+      .map(d => ({ uid: d.id, ...d.data() }))
+      .filter(d => d.alias)
+      .sort((a, b) => (a.alias || "").localeCompare(b.alias || ""));
     const sel = document.getElementById("aud-ingeniero");
     if (sel) {
-      sel.innerHTML = `<option value="">Todos los ingenieros</option>` +
-        _ings.map(i => `<option value="${esc(i.alias)}">${esc(i.alias)}</option>`).join("");
+      sel.innerHTML = `<option value="">Todos los usuarios</option>` +
+        _ings.map(i => `<option value="${esc(i.alias)}">${esc(i.alias)} (${esc(i.rol || "–")})</option>`).join("");
     }
-  } catch(e) { /* silencioso */ }
+  } catch(e) { console.error("[Auditoria] cargarIngenieros:", e); }
 }
 
 // ── HTML ─────────────────────────────────────────────────────
@@ -164,6 +174,11 @@ function _html() {
         <div class="kpi-val" id="aud-kpi-stock">–</div>
         <div class="kpi-label">Mov. almacén</div>
       </div>
+      <div class="kpi-card" style="border-left-color:#10B981">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-val" id="aud-kpi-users">–</div>
+        <div class="kpi-label">Usuarios activos</div>
+      </div>
     </div>
 
     <!-- Gráfica de barras por día -->
@@ -204,9 +219,24 @@ function _bindUI() {
 
 // ── Consulta Firestore ────────────────────────────────────────
 let _rowsRaw = [];
+let _unsubA = null;
+let _unsubB = null;
+let _mapaAmbasA = {};
+let _mapaAmbasB = {};
+
+function _mergeAmbas() {
+  _rowsRaw = [
+    ...Object.values(_mapaAmbasA),
+    ...Object.values(_mapaAmbasB),
+  ].sort((a, b) => (b._ts || 0) - (a._ts || 0));
+  _aplicarFiltrosCliente();
+}
 
 async function _escuchar() {
-  _unsub?.(); _unsub = null;
+  _unsub?.();  _unsub  = null;
+  _unsubA?.(); _unsubA = null;
+  _unsubB?.(); _unsubB = null;
+  _mapaAmbasA = {}; _mapaAmbasB = {};
 
   const fuente  = document.getElementById("aud-fuente")?.value || "audit";
   const desde   = document.getElementById("aud-desde")?.value;
@@ -220,42 +250,61 @@ async function _escuchar() {
   const tbody = document.getElementById("aud-body");
   if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center">Cargando…</td></tr>`;
 
+  // Sin orderBy — Firestore no requiere índice compuesto; sort en JS
   const _buildQ = col => query(
     collection(db, col),
     where("_ts", ">=", desdeTs),
     where("_ts", "<=", hastaTs),
-    orderBy("_ts", "desc"),
     limit(500)
   );
 
+  const _onErr = err => {
+    console.error("[Auditoria]", err);
+    if (err.code === "failed-precondition") return; // índice pendiente, silencioso
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:#DC2626;padding:16px;text-align:center">
+      Error: ${esc(err.message)}</td></tr>`;
+  };
+
+  const _prevSize = _rowsRaw.length;
+
   if (fuente === "ambas") {
-    // Dos getDocs en paralelo, sin listener en tiempo real
-    try {
-      const [s1, s2] = await Promise.all([
-        getDocs(_buildQ("audit_log")),
-        getDocs(_buildQ("log_actividades"))
-      ]);
-      _rowsRaw = [
-        ...s1.docs.map(d => ({ id: d.id, _fuente: "audit_log",       ...d.data() })),
-        ...s2.docs.map(d => ({ id: d.id, _fuente: "log_actividades",  ...d.data() })),
-      ].sort((a, b) => (b._ts || 0) - (a._ts || 0));
-      _aplicarFiltrosCliente();
-    } catch(err) {
-      console.error("[Auditoria]", err);
-      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:#DC2626;padding:16px;text-align:center">
-        Error: ${esc(err.message)}</td></tr>`;
-    }
+    _unsubA = onSnapshot(_buildQ("audit_log"), snap => {
+      snap.docChanges().forEach(ch => {
+        if (ch.type === "removed") delete _mapaAmbasA[ch.doc.id];
+        else _mapaAmbasA[ch.doc.id] = { id: ch.doc.id, _fuente: "audit_log", ...ch.doc.data() };
+      });
+      _alertarNuevos(snap, _prevSize);
+      _mergeAmbas();
+    }, _onErr);
+    _unsubB = onSnapshot(_buildQ("log_actividades"), snap => {
+      snap.docChanges().forEach(ch => {
+        if (ch.type === "removed") delete _mapaAmbasB[ch.doc.id];
+        else _mapaAmbasB[ch.doc.id] = { id: ch.doc.id, _fuente: "log_actividades", ...ch.doc.data() };
+      });
+      _mergeAmbas();
+    }, _onErr);
   } else {
     const col = fuente === "actividades" ? "log_actividades" : "audit_log";
     _unsub = onSnapshot(_buildQ(col), snap => {
-      _rowsRaw = snap.docs.map(d => ({ id: d.id, _fuente: col, ...d.data() }));
+      _rowsRaw = snap.docs
+        .map(d => ({ id: d.id, _fuente: col, ...d.data() }))
+        .sort((a, b) => (b._ts || 0) - (a._ts || 0));
+      _alertarNuevos(snap, _prevSize);
       _aplicarFiltrosCliente();
-    }, err => {
-      console.error("[Auditoria]", err);
-      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:#DC2626;padding:16px;text-align:center">
-        Error: ${esc(err.message)}</td></tr>`;
-    });
+    }, _onErr);
   }
+}
+
+function _alertarNuevos(snap, prevSize) {
+  if (prevSize === 0) return; // carga inicial, no alertar
+  snap.docChanges().forEach(ch => {
+    if (ch.type !== "added") return;
+    const d = ch.doc.data();
+    const cfg = TIPOS[d.tipo];
+    if (cfg?.sev === "alta") {
+      window.toast?.(`🔴 Evento crítico: ${cfg.label} — ${d.alias || d.quien || ""}`, "error");
+    }
+  });
 }
 
 function _aplicarFiltrosCliente() {
@@ -329,12 +378,14 @@ function _renderTabla(rows) {
   const alta  = rows.filter(r => (TIPOS[r.tipo]?.sev || "baja") === "alta").length;
   const media = rows.filter(r => (TIPOS[r.tipo]?.sev || "baja") === "media").length;
   const stock = rows.filter(r => ["STOCK_ENTRADA","STOCK_SALIDA","AJUSTE_INVENTARIO"].includes(r.tipo)).length;
+  const usuarios = new Set(rows.map(r => r.alias || r.usuario || r.quien || "").filter(Boolean)).size;
 
   const el = id => document.getElementById(id);
   if (el("aud-kpi-alta"))  el("aud-kpi-alta").textContent  = alta;
   if (el("aud-kpi-media")) el("aud-kpi-media").textContent = media;
   if (el("aud-kpi-total")) el("aud-kpi-total").textContent = rows.length;
   if (el("aud-kpi-stock")) el("aud-kpi-stock").textContent = stock;
+  if (el("aud-kpi-users")) el("aud-kpi-users").textContent = usuarios;
 
   const tbody = document.getElementById("aud-body");
   if (!tbody) return;
@@ -346,7 +397,7 @@ function _renderTabla(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.map(r => {
+  tbody.innerHTML = rows.map((r, idx) => {
     const cfg  = TIPOS[r.tipo] || { icon: "•", sev: "baja", label: r.tipo || "Evento" };
     const ts   = r._ts || r.timestamp?.toMillis?.() || 0;
     const desc = _descripcion(r);
@@ -354,7 +405,7 @@ function _renderTabla(rows) {
     const rowBg = cfg.sev === "alta" ? "background:rgba(220,38,38,.04)"
                 : cfg.sev === "media" ? "background:rgba(245,158,11,.02)" : "";
 
-    return `<tr style="${rowBg}">
+    return `<tr style="${rowBg};cursor:pointer" onclick="window._audDetalle(${idx})" title="Ver detalle">
       <td style="white-space:nowrap;font-size:12px;color:var(--text-sec)">${fmtFecha(ts)}</td>
       <td>
         <span style="font-size:14px">${cfg.icon}</span>
@@ -386,6 +437,12 @@ function _descripcion(r) {
       return `${r.folio || "–"} · $${Number(r.total || 0).toLocaleString("es-MX")} · ${r.clienteNombre || "–"}`;
     case "PEDIDO_CANCELADO":
       return `${r.folio || "–"} rechazado · ${r.motivoRechazo || "–"}`;
+    case "PEDIDO_APROBADO":
+      return `${r.folio || "–"} · ${r.clienteNombre || "–"} · $${Number(r.total || 0).toLocaleString("es-MX")}`;
+    case "PEDIDO_RECHAZADO":
+      return `${r.folio || "–"} · ${r.motivo || r.motivoRechazo || "Sin motivo"}`;
+    case "PEDIDO_INFO_REQUERIDA":
+      return `${r.folio || "–"} · se solicitó información adicional`;
     case "ABONO_REGISTRADO":
       return `$${Number(r.monto || 0).toLocaleString("es-MX")} → ${r.remision || r.remisionId || "–"}`;
     case "ABONO_CONCILIADO":
@@ -404,6 +461,54 @@ function _descripcion(r) {
       return r.descripcion || r.detalle || r.notas || "–";
   }
 }
+
+// ── Modal de detalle ──────────────────────────────────────────
+window._audDetalle = function(idx) {
+  const r = _rows[idx];
+  if (!r) return;
+  const cfg = TIPOS[r.tipo] || { icon: "•", sev: "baja", label: r.tipo || "Evento" };
+  const ts  = r._ts || r.timestamp?.toMillis?.() || 0;
+
+  // Campos técnicos omitidos del detalle visual
+  const omit = new Set(["id", "_fuente"]);
+  const campos = Object.entries(r)
+    .filter(([k]) => !omit.has(k))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const filas = campos.map(([k, v]) => {
+    let val = v;
+    if (k === "_ts" && typeof v === "number") val = fmtFecha(v);
+    else if (v && typeof v === "object" && typeof v.toMillis === "function") val = fmtFecha(v.toMillis());
+    else if (typeof v === "object") val = JSON.stringify(v, null, 2);
+    return `<tr>
+      <td style="font-size:11px;color:var(--text-sec);white-space:nowrap;padding:5px 8px;vertical-align:top">${esc(k)}</td>
+      <td style="font-size:12px;padding:5px 8px;word-break:break-all"><pre style="margin:0;font-family:monospace;white-space:pre-wrap">${esc(String(val ?? "–"))}</pre></td>
+    </tr>`;
+  }).join("");
+
+  const html = `
+    <div style="font-size:12px;color:var(--text-sec);margin-bottom:8px">
+      ${cfg.icon} <strong>${esc(cfg.label)}</strong> ·
+      <span class="badge ${SEV_CLS[cfg.sev] || "badge-gray"}">${cfg.sev.toUpperCase()}</span> ·
+      ${fmtFecha(ts)} · fuente: <code>${esc(r._fuente || "–")}</code>
+    </div>
+    <div style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="font-size:11px;text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Campo</th>
+          <th style="font-size:11px;text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Valor</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+
+  window.modal?.({
+    title: `Detalle de evento — ${esc(r.folio || r.id || "")}`,
+    message: html,
+    confirmLabel: "Cerrar",
+    danger: false,
+  });
+};
 
 // ── Exportar Excel ────────────────────────────────────────────
 function _exportarExcel() {
