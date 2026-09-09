@@ -13,6 +13,7 @@ let _unsubPolizas    = null;
 let _unsubFacturas   = null;
 let _unsubPresupuesto = null;
 let _unsubCCLista    = null;
+let _cuentasCache    = [];
 
 const TABS = [
   { id: 'gl',           icon: '📒', label: 'Contabilidad GL'    },
@@ -43,7 +44,7 @@ function hoy() { return new Date().toISOString().slice(0,10); }
 
 // ─── CSS inyectado una sola vez ───────────────────────────────────────────────
 const FIN_CSS = `
-/* ── Fin module scoped styles ── */
+/* ── Finanzas module styles ── */
 #fin-wrap { font-family: inherit; }
 
 /* Tabs */
@@ -304,8 +305,8 @@ function _activarTab(id) {
 }
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
-function _kpiBar(items, cols = 4) {
-  return `<div class="fin-kpis" style="grid-template-columns:repeat(${cols},1fr)">
+function _kpiBar(items) {
+  return `<div class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
     ${items.map(([l,v,color]) => `
       <div class="fin-kpi" style="--kpi-color:${color}">
         <div class="fin-kpi-label">${l}</div>
@@ -389,6 +390,7 @@ function _glCargarCuentas() {
   const q = query(collection(db,'cuentas_contables'), orderBy('codigo'));
   const unsub = onSnapshot(q, snap => {
     const cuentas = snap.docs.map(d => ({id:d.id,...d.data()}));
+    _cuentasCache = cuentas;
     const sel = el('gl-cuenta-sel');
     if (sel) {
       const prev = sel.value;
@@ -419,11 +421,12 @@ function _glCargarCuentas() {
         </tr>`;
       }).join('')}</tbody></table>`;
     window._glEditCuenta = (id) => _glModalCuenta(cuentas.find(c=>c.id===id));
-    window._glDelCuenta  = async (id,nombre) => {
-      if (!confirm(`¿Eliminar cuenta "${nombre}"?`)) return;
-      await deleteDoc(doc(db,'cuentas_contables',id));
+    window._glDelCuenta  = (id,nombre) => {
+      window.modal(`¿Eliminar cuenta "${nombre}"?`, async () => {
+        await deleteDoc(doc(db,'cuentas_contables',id));
+      });
     };
-  });
+  }, e => console.error('[finanzas] cuentas_contables:', e));
   _unsubs.push(unsub);
 }
 
@@ -463,11 +466,12 @@ function _glCargarPolizas() {
         </tr>`;
       }).join('')}</tbody></table>`;
     window._glVerPoliza  = (id) => _glModalPoliza(polizas.find(p=>p.id===id), true);
-    window._glDelPoliza  = async (id) => {
-      if (!confirm('¿Eliminar póliza?')) return;
-      await deleteDoc(doc(db,'polizas',id));
+    window._glDelPoliza  = (id) => {
+      window.modal('¿Eliminar póliza?', async () => {
+        await deleteDoc(doc(db,'polizas',id));
+      });
     };
-  });
+  }, e => console.error('[finanzas] polizas:', e));
   _unsubPolizas = unsub;
   _unsubs.push(unsub);
 }
@@ -545,7 +549,7 @@ function _glModalCuenta(cuenta) {
       tipo:        el('mc-tipo').value,
       descripcion: el('mc-desc').value.trim(),
     };
-    if (!data.codigo||!data.nombre) return alert('Código y nombre son requeridos');
+    if (!data.codigo||!data.nombre) { window.toast('Código y nombre son requeridos', 'error'); return; }
     if (id) await updateDoc(doc(db,'cuentas_contables',id), data);
     else await addDoc(collection(db,'cuentas_contables'), {...data, saldo:0, creadoEn:serverTimestamp()});
     el('modal-cuenta').remove();
@@ -599,9 +603,9 @@ function _glModalPoliza(poliza, soloVer=false) {
     });
     const data = {
       tipo:       el('mp-tipo').value,
-      fecha:      Timestamp.fromDate(new Date(el('mp-fecha').value)),
+      fecha:      Timestamp.fromDate(new Date(el('mp-fecha').value + 'T12:00:00')),
       concepto:   el('mp-concepto').value.trim(),
-      movimientos, total, usuario: Sesion.uid||'',
+      movimientos, total, usuario: Sesion.alias||Sesion.uid||'',
     };
     if (id) await updateDoc(doc(db,'polizas',id), data);
     else await addDoc(collection(db,'polizas'), {...data, creadoEn:serverTimestamp()});
@@ -610,8 +614,13 @@ function _glModalPoliza(poliza, soloVer=false) {
 }
 
 function _glLineaPoliza(l, i, disabled) {
+  const opts = _cuentasCache.map(c =>
+    `<option value="${c.id}"${c.id===l.cuentaId?' selected':''}>${c.codigo} — ${c.nombre}</option>`
+  ).join('');
   return `<div class="mp-linea" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:6px;margin-bottom:4px">
-    <input class="input mp-cuenta" style="font-size:12px" placeholder="ID cuenta" value="${l.cuentaId||''}" ${disabled?'disabled':''}>
+    <select class="input mp-cuenta" style="font-size:12px" ${disabled?'disabled':''}>
+      <option value="">— Cuenta —</option>${opts}
+    </select>
     <input type="number" class="input mp-cargo" style="font-size:12px" placeholder="Cargo" value="${l.cargo||''}" ${disabled?'disabled':''}>
     <input type="number" class="input mp-abono" style="font-size:12px" placeholder="Abono" value="${l.abono||''}" ${disabled?'disabled':''}>
     ${disabled?'<span></span>':`<button class="fin-btn-icon" style="margin-top:0" title="Eliminar" onclick="this.parentElement.remove()">✕</button>`}
@@ -624,7 +633,7 @@ function _glLineaPoliza(l, i, disabled) {
 function _montarAP() {
   const c = el('fin-content');
   c.innerHTML = `
-    <div id="ap-kpis" class="fin-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div id="ap-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="fin-card">
         ${_secHead('Facturas de Proveedores')}
@@ -698,7 +707,11 @@ function _apCargarFacturas() {
     if (cal) {
       const proximas = facturas
         .filter(f => f.estado!=='PAGADA' && f.fechaVencimiento)
-        .sort((a,b) => a.fechaVencimiento.seconds - b.fechaVencimiento.seconds)
+        .sort((a,b) => {
+          const ta = a.fechaVencimiento?.toDate?.()?.getTime() ?? a.fechaVencimiento?.seconds*1000 ?? 0;
+          const tb = b.fechaVencimiento?.toDate?.()?.getTime() ?? b.fechaVencimiento?.seconds*1000 ?? 0;
+          return ta - tb;
+        })
         .slice(0,10);
       if (!proximas.length) { cal.innerHTML = '<div class="fin-empty">Sin vencimientos próximos</div>'; }
       else cal.innerHTML = proximas.map(f => {
@@ -744,11 +757,12 @@ function _apCargarFacturas() {
       }).join('')}</tbody>
     </table></div>`;
     window._apPagar   = (id) => _apModalPago(facturas.find(f=>f.id===id));
-    window._apDelFact = async (id) => {
-      if (!confirm('¿Eliminar factura?')) return;
-      await deleteDoc(doc(db,'facturas_proveedor',id));
+    window._apDelFact = (id) => {
+      window.modal('¿Eliminar factura?', async () => {
+        await deleteDoc(doc(db,'facturas_proveedor',id));
+      });
     };
-  });
+  }, e => console.error('[finanzas] facturas_proveedor:', e));
   _unsubFacturas = unsub;
   _unsubs.push(unsub);
 }
@@ -791,12 +805,12 @@ function _apModalFactura(factura) {
       proveedor: el('ap-prov').value.trim(),
       rfc:       el('ap-rfc').value.trim().toUpperCase(),
       folio:     el('ap-folio').value.trim(),
-      fechaEmision:     Timestamp.fromDate(new Date(el('ap-emision').value)),
-      fechaVencimiento: Timestamp.fromDate(new Date(el('ap-vencimiento').value)),
+      fechaEmision:     Timestamp.fromDate(new Date(el('ap-emision').value + 'T12:00:00')),
+      fechaVencimiento: Timestamp.fromDate(new Date(el('ap-vencimiento').value + 'T12:00:00')),
       concepto:  el('ap-concepto').value.trim(),
       subtotal, iva, retIsr, retIva, total, estado:'PENDIENTE', pagado:0,
     };
-    if (!data.proveedor||!data.total) return alert('Proveedor y total son requeridos');
+    if (!data.proveedor||!data.total) { window.toast('Proveedor y total son requeridos', 'error'); return; }
     if (id) await updateDoc(doc(db,'facturas_proveedor',id), data);
     else await addDoc(collection(db,'facturas_proveedor'), {...data, creadoEn:serverTimestamp()});
     el('modal-ap').remove();
@@ -991,9 +1005,9 @@ async function _concProcesar(texto) {
       banco, mes, movsBanco:movsBanco.length, conciliados:conciliados.length,
       sinMatch:sinMatch.length, noEnBanco:noEnBanco.length,
       saldoInicial:saldoIni, totalBanco, diferencia,
-      usuario:Sesion.uid||'', creadoEn:serverTimestamp(),
+      usuario:Sesion.alias||Sesion.uid||'', creadoEn:serverTimestamp(),
     });
-    alert('Conciliación guardada.');
+    window.toast('Conciliación guardada', 'success');
   };
 }
 
@@ -1007,7 +1021,7 @@ function _concCargarHistorial() {
     div.innerHTML = `<div style="overflow-x:auto"><table class="fin-tbl">
       <thead><tr>
         <th>Banco</th><th>Mes</th><th class="r">Mov.</th><th class="r">Conciliados</th>
-        <th class="r">Sin match</th><th class="r">Diferencia</th><th>Usuario</th><th>Registrado</th>
+        <th class="r">Sin match</th><th class="r">Diferencia</th><th>Guardado por</th><th>Registrado</th>
       </tr></thead>
       <tbody>${rows.map(r => {
         const difOk = Math.abs(r.diferencia||0)<1;
@@ -1023,7 +1037,7 @@ function _concCargarHistorial() {
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
-  });
+  }, e => console.error('[finanzas] conciliaciones_bancarias:', e));
   _unsubs.push(unsub);
 }
 
@@ -1154,7 +1168,7 @@ function _montarPresupuesto() {
       <input type="month" id="pres-mes" class="input" style="font-size:13px" value="${hoy().slice(0,7)}" onchange="window._presCargar()">
       <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._presNueva()">+ Partida</button>
     </div>
-    <div id="pres-kpis" class="fin-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div id="pres-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
       <div class="fin-card" id="pres-tabla-wrap"><div class="fin-loading">Cargando…</div></div>
       <div class="fin-card">
@@ -1172,7 +1186,9 @@ function _presCargar() {
   if (_unsubPresupuesto) { _unsubPresupuesto(); _unsubPresupuesto = null; }
   const mes = el('pres-mes')?.value||hoy().slice(0,7);
   const q   = query(collection(db,'presupuestos'), where('mes','==',mes), orderBy('categoria'));
-  const unsub = onSnapshot(q, snap => _presRenderizar(snap.docs.map(d=>({id:d.id,...d.data()})), mes));
+  const unsub = onSnapshot(q,
+    snap => _presRenderizar(snap.docs.map(d=>({id:d.id,...d.data()})), mes),
+    e => console.error('[finanzas] presupuestos:', e));
   _unsubPresupuesto = unsub;
   _unsubs.push(unsub);
 }
@@ -1226,7 +1242,7 @@ function _presRenderizar(partidas, mes) {
           }).join('')}</tbody>
         </table></div>`;
       window._presEditP = (id) => _presModal(partidas.find(p=>p.id===id));
-      window._presDelP  = async (id) => { if (confirm('¿Eliminar partida?')) await deleteDoc(doc(db,'presupuestos',id)); };
+      window._presDelP  = (id) => { window.modal('¿Eliminar partida?', async () => { await deleteDoc(doc(db,'presupuestos',id)); }); };
     }
   }
 
@@ -1288,7 +1304,7 @@ function _presModal(partida) {
       presupuesto: parseFloat(el('pm-pres').value)||0,
       real:        parseFloat(el('pm-real').value)||0,
     };
-    if (!data.categoria) return alert('Categoría requerida');
+    if (!data.categoria) { window.toast('Categoría requerida', 'error'); return; }
     if (id) await updateDoc(doc(db,'presupuestos',id), data);
     else await addDoc(collection(db,'presupuestos'), {...data, creadoEn:serverTimestamp()});
     el('modal-pres').remove();
@@ -1369,11 +1385,12 @@ function _ccCargarLista() {
     if (sel) sel.innerHTML = '<option value="">Seleccionar…</option>' +
       ccs.map(cc=>`<option value="${cc.id}">${cc.codigo} — ${cc.nombre}</option>`).join('');
     window._ccEdit = (id) => _ccModal(ccs.find(c=>c.id===id));
-    window._ccDel  = async (id,nombre) => {
-      if (!confirm(`¿Eliminar CC "${nombre}"?`)) return;
-      await deleteDoc(doc(db,'centros_costo',id));
+    window._ccDel  = (id,nombre) => {
+      window.modal(`¿Eliminar CC "${nombre}"?`, async () => {
+        await deleteDoc(doc(db,'centros_costo',id));
+      });
     };
-  });
+  }, e => console.error('[finanzas] centros_costo:', e));
   _unsubs.push(unsub);
 }
 
@@ -1444,14 +1461,15 @@ async function _ccImputar() {
   const concepto = el('imp-concepto')?.value.trim();
   const monto   = parseFloat(el('imp-monto')?.value)||0;
   const fecha   = el('imp-fecha')?.value;
-  if (!ccId||!monto||!concepto) return alert('Centro, concepto y monto son requeridos');
+  if (!ccId||!monto||!concepto) { window.toast('Centro, concepto y monto son requeridos', 'error'); return; }
   await addDoc(collection(db,'movimientos_cc'), {
     centroId:ccId, tipo, concepto, monto,
-    fecha:Timestamp.fromDate(new Date(fecha)),
-    usuario:Sesion.uid||'', creadoEn:serverTimestamp(),
+    fecha:Timestamp.fromDate(new Date(fecha + 'T12:00:00')),
+    usuario:Sesion.alias||Sesion.uid||'', creadoEn:serverTimestamp(),
   });
   el('imp-concepto').value = '';
   el('imp-monto').value    = '';
+  window.toast('Movimiento registrado', 'success');
 }
 
 function _ccModal(cc) {
@@ -1483,7 +1501,7 @@ function _ccModal(cc) {
       descripcion: el('cc-desc').value.trim(),
       responsable: el('cc-resp').value.trim(),
     };
-    if (!data.codigo||!data.nombre) return alert('Código y nombre requeridos');
+    if (!data.codigo||!data.nombre) { window.toast('Código y nombre requeridos', 'error'); return; }
     if (id) await updateDoc(doc(db,'centros_costo',id), data);
     else await addDoc(collection(db,'centros_costo'), {...data, creadoEn:serverTimestamp()});
     el('modal-cc').remove();
