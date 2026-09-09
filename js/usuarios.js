@@ -421,15 +421,17 @@ function _html() {
       </div>
       <div class="form-group">
         <label class="form-label">Rol</label>
-        <select id="nu-rol" class="form-input" style="width:100%" onchange="UsuariosUI.previewPreset(this.value)">
-          <option value="RECUPERADOR">RECUPERADOR</option>
-          <option value="INGENIERO" selected>INGENIERO</option>
-          <option value="GERENTE_ZONA">GERENTE_ZONA</option>
-          <option value="GERENTE">GERENTE</option>
-          <option value="ADMINISTRADOR">ADMINISTRADOR</option>
-          <option value="ALMACENISTA">ALMACENISTA</option>
-          <option value="JURIDICO">JURIDICO</option>
-          <option value="MESA_CONTROL">MESA_CONTROL</option>
+        <select id="nu-rol" class="form-input" size="${Sesion.esSuperAdmin() ? 9 : 8}"
+          style="width:100%;height:auto;border-radius:8px;padding:4px 0"
+          onchange="UsuariosUI.previewPreset(this.value)">
+          <option value="RECUPERADOR">RECUPERADOR — cobranza y abonos</option>
+          <option value="INGENIERO" selected>INGENIERO — ventas y campo</option>
+          <option value="GERENTE_ZONA">GERENTE_ZONA — gestión de zona</option>
+          <option value="GERENTE">GERENTE — supervisión completa</option>
+          <option value="ADMINISTRADOR">ADMINISTRADOR — operaciones</option>
+          <option value="ALMACENISTA">ALMACENISTA — almacén y stock</option>
+          <option value="JURIDICO">JURIDICO — cobranza legal</option>
+          <option value="MESA_CONTROL">MESA_CONTROL — pedidos y cartera</option>
           ${Sesion.esSuperAdmin() ? '<option value="SUPER_ADMIN">SUPER_ADMIN</option>' : ""}
         </select>
       </div>
