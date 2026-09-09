@@ -239,7 +239,12 @@ function _crearMapa() {
 
   // Cargar nombres reales desde usuarios para mostrar en tooltip
   getDocs(collection(db, "usuarios")).then(snap => {
-    snap.forEach(d => { if (d.data().nombre) _nombres[d.id] = d.data().nombre; });
+    snap.forEach(d => {
+      const data = d.data();
+      if (!data.nombre) return;
+      _nombres[d.id.toLowerCase()] = data.nombre;
+      if (data.alias) _nombres[data.alias.toLowerCase()] = data.nombre;
+    });
   }).catch(() => {});
 
   _escucharUbicacionesMapa(_map);
@@ -287,7 +292,7 @@ function _escucharUbicacionesMapa(map) {
             const ts = u.timestamp?.toDate?.() ?? (typeof u.timestamp === "number" ? new Date(u.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
             const enJ = estaEnJornadaHoy(u);
-            const nombreMostrar = _nombres[id] || _nombres[u.alias] || u.alias || id;
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(u.alias||'').toLowerCase()] || u.alias || id;
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
                 <strong>${nombreMostrar}</strong><br>
@@ -303,7 +308,7 @@ function _escucharUbicacionesMapa(map) {
           // Click: InfoWindow con más detalle
           _markers[id].addListener("click", () => {
             const enJ = estaEnJornadaHoy(u);
-            const nombreMostrar = _nombres[id] || _nombres[u.alias] || u.alias || id;
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(u.alias||'').toLowerCase()] || u.alias || id;
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
                 <strong>${nombreMostrar}</strong><br>
