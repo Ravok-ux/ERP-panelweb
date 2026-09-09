@@ -165,10 +165,12 @@ function _escuchar() {
     _remisiones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     await cargarNombres();
 
-    // Poblar selector de alias con quienes hicieron abonos
-    const aliases = [...new Set(
-      _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
-    )].filter(Boolean).sort();
+    // Poblar selector de alias con quienes hicieron abonos (deduplicar case-insensitive)
+    const _seenAlias = new Map();
+    _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
+      .filter(Boolean)
+      .forEach(a => { const k = a.toLowerCase(); if (!_seenAlias.has(k)) _seenAlias.set(k, a); });
+    const aliases = [..._seenAlias.values()].sort();
 
     const sel = document.getElementById("cob-sel-alias");
     if (sel) {
@@ -235,7 +237,7 @@ function _renderTabla() {
     const s = a.fecha?.includes("T") ? a.fecha : (a.fecha + "T12:00:00");
     return new Date(s).getTime() >= desde;
   });
-  if (_filtroAlias !== "TODOS") lista = lista.filter(a => a.ingenieroAlias === _filtroAlias);
+  if (_filtroAlias !== "TODOS") lista = lista.filter(a => a.ingenieroAlias?.toLowerCase() === _filtroAlias.toLowerCase());
 
   // KPIs
   const totalCobrado    = lista.reduce((s, a) => s + a.monto,        0);
