@@ -480,7 +480,7 @@ function _escucharKPIs() {
         vendido += (p.total || 0);
       if (["CONFIRMADO","EN_RUTA","ENTREGADO"].includes(p.status)) activos++;
     });
-    _renderKPI(0, "💰", "Vendido hoy",     _fmt(vendido),   "+18%", "up",  "#16A34A");
+    _renderKPI(0, "💰", "Vendido hoy",     "$" + Math.round(vendido).toLocaleString("es-MX"),   "+18%", "up",  "#16A34A");
     _renderKPI(2, "🛒", "Pedidos activos", String(activos),
       `${activos} en curso`, "nt", "#D97706");
   }, _logErr("KPIs-pedidos"));
@@ -505,39 +505,52 @@ function _escucharCotizacionesKPI() {
   }, _logErr("kpi-cotizaciones"));
 }
 
-// ── KPI: Cobranza vencida ────────────────────────────────────
+// ── KPI: Cobranza vencida + Interés en riesgo ─────────────────
+// Lee directamente remisiones_credito — semaforoColor y totalAPagarTotal
+// NUNCA se escriben a Firestore, solo existen como cómputo local en Cartera.
 function _escucharCobranzaKPI() {
-  const q = query(
-    collection(db, "clientes"),
-    where("semaforoColor", "in", ["CRÍTICO","GRAVE","MODERADO","LEVE"])
-  );
-  return onSnapshot(q, snap => {
-    let totalAPagar = 0, interes = 0;
+  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  return onSnapshot(remQ, snap => {
+    const ahora = new Date();
+    let totalVencido = 0, clientesVencidos = new Set();
     snap.forEach(d => {
-      const c = d.data();
-      totalAPagar += (c.totalAPagarTotal ?? c.saldoPendiente ?? 0);
-      interes     += (c.interesTotal ?? 0);
+      const r = d.data();
+      const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
+      if (!venc || venc >= ahora) return; // no vencida
+      const saldo = Math.max(0, (r.montoOriginal || 0) - (r.totalAbonado || 0));
+      if (saldo <= 0) return;
+      totalVencido += saldo;
+      clientesVencidos.add(r.clienteId || r.clienteNombre || d.id);
     });
-    const sub = interes > 0
-      ? `${snap.size} clientes · +${_fmt(interes)} interés`
-      : `${snap.size} clientes`;
-    _renderKPI2(1, "💸", "Cartera vencida", _fmt(totalAPagar),
-      sub, snap.size > 0 ? "dn" : "nt", "#DC2626");
+    const n = clientesVencidos.size;
+    _renderKPI2(1, "💸", "Cartera vencida", _fmt(totalVencido),
+      `${n} cliente${n !== 1 ? "s" : ""}`, n > 0 ? "dn" : "nt", "#DC2626");
   }, _logErr("kpi-cobranza"));
 }
 
 // ── KPI: Interés en riesgo ────────────────────────────────────
+// Lee remisiones_credito: cuentas con >42 días de atraso (GRAVE o CRÍTICO).
 function _escucharInteresKPI() {
-  const q = query(
-    collection(db, "clientes"),
-    where("semaforoColor", "in", ["CRÍTICO","GRAVE"])
-  );
-  return onSnapshot(q, snap => {
-    let interesRiesgo = 0;
-    snap.forEach(d => { interesRiesgo += (d.data().interesTotal ?? 0); });
-    _renderKPI(1, "📈", "Interés en riesgo", _fmt(interesRiesgo),
-      snap.size > 0 ? `${snap.size} cuentas críticas` : "Sin mora crítica",
-      snap.size > 0 ? "dn" : "nt", "#DC2626");
+  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  return onSnapshot(remQ, snap => {
+    const ahora = new Date();
+    let cuentasCriticas = 0, interesEstimado = 0;
+    snap.forEach(d => {
+      const r = d.data();
+      const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
+      if (!venc) return;
+      const dias = Math.floor((ahora - venc) / 86400000);
+      if (dias <= 42) return; // solo GRAVE y CRÍTICO
+      const saldo = Math.max(0, (r.montoOriginal || 0) - (r.totalAbonado || 0));
+      if (saldo <= 0) return;
+      cuentasCriticas++;
+      // Interés estimado: tasa mensual de intereses moratorios (2% por mes)
+      const meses = dias / 30;
+      interesEstimado += saldo * 0.02 * meses;
+    });
+    _renderKPI(1, "📈", "Interés en riesgo", _fmt(interesEstimado),
+      cuentasCriticas > 0 ? `${cuentasCriticas} cuentas críticas` : "Sin mora crítica",
+      cuentasCriticas > 0 ? "dn" : "nt", "#DC2626");
   }, _logErr("kpi-interes-riesgo"));
 }
 
@@ -617,7 +630,7 @@ function _escucharFilaTres() {
   }, _logErr("fila3-metas"));
 
   // --- Gastos del día aprobados ---
-  const gastosQ = query(collection(db, "gastos_empleado"), limit(300));
+  const gastosQ = query(collection(db, "gastos_empleado"), where("_ts", ">=", Timestamp.fromDate(hoyInicio)), limit(300));
   gastosUnsub = onSnapshot(gastosQ, snap => {
     gastosHoy = snap.docs.filter(d => {
       const g  = d.data();
@@ -653,29 +666,63 @@ function _renderFilaTres(cobHoy, cobMes, meta, gastos) {
 }
 
 // ── Clientes Snapshot: semáforo + nuevos + sin visita + top deudores ──
+// El semáforo y deudores se calculan desde remisiones_credito (fuente de verdad).
+// Los clientes solo aportan el conteo total y los nuevos del mes.
 function _escucharClientesSnapshot() {
-  // 1. Semáforo distribution + nuevos + top deudores
+  const mesInicio = _inicioMes();
+
+  // Estado compartido entre los dos listeners
+  let totalClientes = 0, nuevos = 0;
+  let remDist = { CRÍTICO: 0, GRAVE: 0, MODERADO: 0, LEVE: 0, POR_VENCER: 0 };
+  let top5Deudores = [];
+
+  // 1. Clientes → conteo total + nuevos este mes
   const cliUnsub = onSnapshot(collection(db, "clientes"), snap => {
-    const dist = { CRÍTICO: 0, GRAVE: 0, MODERADO: 0, LEVE: 0, POR_VENCER: 0 };
-    const mesInicio = _inicioMes();
-    let nuevos = 0;
-    const conDeuda = [];
-
+    totalClientes = snap.size;
+    nuevos = 0;
     snap.forEach(d => {
-      const c = d.data();
-      if (dist[c.semaforoColor] !== undefined) dist[c.semaforoColor]++;
-      const ts = c._ts?.toDate?.() ?? (c._ts ? new Date(c._ts) : null);
+      const ts = d.data()._ts?.toDate?.() ?? (d.data()._ts ? new Date(d.data()._ts) : null);
       if (ts && ts >= mesInicio) nuevos++;
-      if ((c.totalAPagarTotal || 0) > 0)
-        conDeuda.push({ nombre: c.nombre || d.id, total: c.totalAPagarTotal || 0, sem: c.semaforoColor || "" });
     });
-
-    const top5 = conDeuda.sort((a,b) => b.total - a.total).slice(0,5);
-    _renderSemaforoChips(dist, nuevos, snap.size);
-    _renderTopDeudores(top5);
+    _renderSemaforoChips(remDist, nuevos, totalClientes);
   }, _logErr("clientes-snapshot"));
 
-  // 2. Clientes sin visita reciente — desde config_dashboard o umbral fijo 30d
+  // 2. Remisiones activas → semáforo calculado + top deudores (tiempo real)
+  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  const remUnsub = onSnapshot(remQ, snap => {
+    const ahora = new Date();
+    // Agrupar por clienteId: acumular saldo y máximo días de atraso
+    const porCliente = {};
+    snap.forEach(d => {
+      const r = d.data();
+      const cid = r.clienteId || r.clienteNombre || d.id;
+      const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
+      const diasAtraso = venc ? Math.floor((ahora - venc) / 86400000) : 0;
+      const saldo = Math.max(0, (r.montoOriginal || 0) - (r.totalAbonado || 0));
+      if (!porCliente[cid]) porCliente[cid] = { nombre: r.clienteNombre || cid, saldo: 0, diasMax: 0 };
+      porCliente[cid].saldo   += saldo;
+      porCliente[cid].diasMax  = Math.max(porCliente[cid].diasMax, diasAtraso);
+    });
+
+    // Calcular semáforo por días de atraso
+    remDist = { CRÍTICO: 0, GRAVE: 0, MODERADO: 0, LEVE: 0, POR_VENCER: 0 };
+    const conDeuda = [];
+    Object.values(porCliente).forEach(c => {
+      const sem = c.diasMax > 60 ? "CRÍTICO"
+                : c.diasMax > 42 ? "GRAVE"
+                : c.diasMax > 28 ? "MODERADO"
+                : c.diasMax > 14 ? "LEVE"
+                                 : "POR_VENCER";
+      if (remDist[sem] !== undefined) remDist[sem]++;
+      if (c.saldo > 0) conDeuda.push({ nombre: c.nombre, total: c.saldo, sem });
+    });
+
+    top5Deudores = conDeuda.sort((a, b) => b.total - a.total).slice(0, 5);
+    _renderSemaforoChips(remDist, nuevos, totalClientes);
+    _renderTopDeudores(top5Deudores);
+  }, _logErr("remisiones-semaforo"));
+
+  // 3. Clientes sin visita reciente
   let umbraldias = 30;
   getDoc(doc(db, "config_dashboard", "default")).then(d => {
     if (d.exists()) umbraldias = d.data().diasSinVisita || 30;
@@ -701,7 +748,7 @@ function _escucharClientesSnapshot() {
     if (chip) chip.textContent = `📍 ${sinVisita} sin visita +${umbraldias}d`;
   }, _logErr("sin-visita"));
 
-  return () => { cliUnsub(); sinVisUnsub(); };
+  return () => { cliUnsub(); remUnsub(); sinVisUnsub(); };
 }
 
 function _renderSemaforoChips(dist, nuevos, total) {
@@ -851,134 +898,137 @@ function _semanaIdx(ts) {
 }
 
 // ── Ranking ───────────────────────────────────────────────────
+// 5 listeners planos con estado compartido — sin anidamiento ni getDocs
 function _escucharRanking() {
-  const hoyInicio  = _inicioDia();
-  const mesInicio  = _inicioMes();
+  const hoyInicio = _inicioDia();
+  const mesInicio = _inicioMes();
 
-  return onSnapshot(collection(db, "ubicaciones"), snap => {
-    const enCampo = {};
-    snap.forEach(d => {
-      const u = d.data();
-      if (estaEnJornadaHoy(u)) enCampo[u.alias] = true;
-    });
+  let enCampo = {}, totales = {}, visitasHoy = {}, cobMes = {}, metaIng = {};
 
-    const n = Object.keys(enCampo).length;
+  function _reRenderRanking() {
+    // KPI "En campo"
+    const n  = Object.keys(enCampo).length;
     const cc = document.getElementById("chip-count");
     const lc = document.getElementById("live-count");
     if (cc) cc.textContent = n;
     if (lc) lc.textContent = n;
-
     _renderKPI(3, "👷", "En campo", n + " activos",
       n < 5 ? "Bajo equipo" : "Jornada activa", n < 5 ? "dn" : "nt", "#7C3AED");
-
     const stC = document.getElementById("st-campo");
     if (stC) stC.innerHTML = `<span class="st-dot" style="background:#4ADE80"></span> ${n} en campo`;
 
-    // Pedidos de hoy para vendido
-    const pedHoyQ = query(
-      collection(db, "pedidos"),
-      where("fechaPedido", ">=", Timestamp.fromDate(hoyInicio)),
-      orderBy("fechaPedido", "desc")
-    );
+    // Tabla de ranking
+    const ranking = Object.entries(totales).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const tbody = document.getElementById("ranking-body");
+    if (!tbody) return;
+    if (ranking.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7">
+        <div class="empty-state" style="padding:20px">
+          <div class="empty-state-icon">📊</div>
+          <div class="empty-state-title">Sin ventas hoy aún</div>
+        </div></td></tr>`;
+      return;
+    }
+    const META_DIA = 30000;
+    tbody.innerHTML = ranking.map(([alias, total], i) => {
+      const meta = metaIng[alias] || META_DIA;
+      const pct  = Math.min(Math.round((total / meta) * 100), 100);
+      const bar  = pct >= 70 ? "#16A34A" : pct >= 40 ? "#D97706" : "#DC2626";
+      const est  = enCampo[alias]
+        ? `<span class="pill pill-campo">● En campo</span>`
+        : `<span class="pill pill-off">○ Sin campo</span>`;
+      const vis = visitasHoy[alias] || 0;
+      const cob = cobMes[alias] || 0;
+      return `<tr>
+        <td class="rank-num">${i+1}</td>
+        <td><span class="rank-name">${esc(alias)}</span></td>
+        <td class="rank-money">${_fmt(total)}</td>
+        <td>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${bar}"></div></div>
+          <div class="bar-pct">${pct}%</div>
+        </td>
+        <td style="text-align:center;font-size:12px">${vis}</td>
+        <td class="rank-money" style="font-size:11px">${cob > 0 ? _fmt(cob) : "–"}</td>
+        <td>${est}</td>
+      </tr>`;
+    }).join("");
+  }
 
-    onSnapshot(pedHoyQ, psnap => {
-      const totales = {}, conteo = {};
-      psnap.forEach(d => {
-        const p = d.data();
-        const alias = p.vendedor || p.ingenieroAlias || p.alias || "–";
-        if (["CONFIRMADO","EN_RUTA","ENTREGADO","FACTURADO"].includes(p.status)) {
-          totales[alias] = (totales[alias] || 0) + (p.total || 0);
-        }
-        conteo[alias] = (conteo[alias] || 0) + 1;
+  // 1. Ubicaciones → estado "en campo"
+  const ubUnsub = onSnapshot(collection(db, "ubicaciones"), snap => {
+    enCampo = {};
+    snap.forEach(d => { const u = d.data(); if (estaEnJornadaHoy(u)) enCampo[u.alias] = true; });
+    _reRenderRanking();
+  }, _logErr("ranking-ubicaciones"));
+
+  // 2. Pedidos de hoy → totales de venta por vendedor
+  const pedHoyQ = query(
+    collection(db, "pedidos"),
+    where("fechaPedido", ">=", Timestamp.fromDate(hoyInicio)),
+    orderBy("fechaPedido", "desc")
+  );
+  const pedUnsub = onSnapshot(pedHoyQ, snap => {
+    totales = {};
+    snap.forEach(d => {
+      const p = d.data();
+      const alias = p.vendedor || p.ingenieroAlias || p.alias || "–";
+      if (["CONFIRMADO","EN_RUTA","ENTREGADO","FACTURADO"].includes(p.status))
+        totales[alias] = (totales[alias] || 0) + (p.total || 0);
+    });
+    _reRenderRanking();
+  }, _logErr("ranking-pedidos"));
+
+  // 3. Visitas de hoy → conteo por alias (tiempo real)
+  // Solo filtra por tipo para evitar requerir índice compuesto; el filtro de fecha va client-side.
+  const visQ = query(
+    collection(db, "log_actividades"),
+    where("tipo", "==", "VISITA_REGISTRADA"),
+    limit(300)
+  );
+  const visUnsub = onSnapshot(visQ, snap => {
+    visitasHoy = {};
+    snap.forEach(d => {
+      const v = d.data();
+      const ts = v.timestamp?.toDate?.() ?? (v.timestamp ? new Date(v.timestamp) : null);
+      if (!ts || ts < hoyInicio) return;
+      const alias = v.alias || "–";
+      visitasHoy[alias] = (visitasHoy[alias] || 0) + 1;
+    });
+    _reRenderRanking();
+  }, _logErr("ranking-visitas"));
+
+  // 4. Cobrado del mes por ingeniero (tiempo real)
+  const remMesQ = query(
+    collection(db, "remisiones_credito"),
+    where("_tsUltimoAbono", ">=", Timestamp.fromDate(mesInicio)),
+    limit(500)
+  );
+  const cobUnsub = onSnapshot(remMesQ, snap => {
+    cobMes = {};
+    snap.forEach(d => {
+      (d.data().abonos || []).forEach(a => {
+        const ts = a.fecha?.toDate?.() ?? (a.fecha ? new Date(a.fecha) : null);
+        if (!ts || ts < mesInicio) return;
+        const c = a.cobrador || a.alias || "–";
+        cobMes[c] = (cobMes[c] || 0) + (a.monto || 0);
       });
+    });
+    _reRenderRanking();
+  }, _logErr("ranking-cobros"));
 
-      // Visitas de hoy por ingeniero
-      const visitasHoyQ = query(
-        collection(db, "log_actividades"),
-        where("tipo", "==", "VISITA_REGISTRADA"),
-        where("timestamp", ">=", Timestamp.fromDate(hoyInicio))
-      );
-      getDocs(visitasHoyQ).then(vsnap => {
-        const visitasHoy = {};
-        vsnap.forEach(d => {
-          const alias = d.data().alias || "–";
-          visitasHoy[alias] = (visitasHoy[alias] || 0) + 1;
-        });
+  // 5. Metas individuales (tiempo real)
+  const metaUnsub = onSnapshot(collection(db, "metas"), snap => {
+    const mes = new Date().getMonth();
+    metaIng = {};
+    snap.forEach(d => {
+      const m = d.data();
+      const alias = m.alias || m.ingeniero || d.id;
+      metaIng[alias] = Array.isArray(m.metas) ? (m.metas[mes] || 30000) : (m.metaMensual || m.meta || 30000);
+    });
+    _reRenderRanking();
+  }, _logErr("ranking-metas"));
 
-        // Cobrado del mes por ingeniero (desde remisiones abonos[].cobrador)
-        const remMesQ = query(
-          collection(db, "remisiones_credito"),
-          where("_tsUltimoAbono", ">=", Timestamp.fromDate(mesInicio)),
-          limit(500)
-        );
-        getDocs(remMesQ).then(rsnap => {
-          const cobMes = {};
-          rsnap.forEach(d => {
-            const abonos = d.data().abonos || [];
-            abonos.forEach(a => {
-              const ts = a.fecha?.toDate?.() ?? (a.fecha ? new Date(a.fecha) : null);
-              if (!ts || ts < mesInicio) return;
-              const cobrador = a.cobrador || a.alias || "–";
-              cobMes[cobrador] = (cobMes[cobrador] || 0) + (a.monto || 0);
-            });
-          });
-
-          // Metas individuales
-          getDocs(collection(db, "metas")).then(msnap => {
-            const metaIng = {};
-            const mes = new Date().getMonth();
-            msnap.forEach(d => {
-              const m = d.data();
-              const alias = m.alias || m.ingeniero || d.id;
-              if (Array.isArray(m.metas)) metaIng[alias] = m.metas[mes] || 30000;
-              else metaIng[alias] = m.metaMensual || m.meta || 30000;
-            });
-
-            const ranking = Object.entries(totales)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 8);
-
-            const tbody = document.getElementById("ranking-body");
-            if (!tbody) return;
-
-            if (ranking.length === 0) {
-              tbody.innerHTML = `<tr><td colspan="7">
-                <div class="empty-state" style="padding:20px">
-                  <div class="empty-state-icon">📊</div>
-                  <div class="empty-state-title">Sin ventas hoy aún</div>
-                </div></td></tr>`;
-              return;
-            }
-
-            const META_DIA = 30000;
-            tbody.innerHTML = ranking.map(([alias, total], i) => {
-              const meta   = metaIng[alias] || META_DIA;
-              const pct    = Math.min(Math.round((total / meta) * 100), 100);
-              const bar    = pct >= 70 ? "#16A34A" : pct >= 40 ? "#D97706" : "#DC2626";
-              const est    = enCampo[alias]
-                ? `<span class="pill pill-campo">● En campo</span>`
-                : `<span class="pill pill-off">○ Sin campo</span>`;
-              const vis    = visitasHoy[alias] || 0;
-              const cob    = cobMes[alias] || 0;
-              return `
-                <tr>
-                  <td class="rank-num">${i+1}</td>
-                  <td><span class="rank-name">${esc(alias)}</span></td>
-                  <td class="rank-money">${_fmt(total)}</td>
-                  <td>
-                    <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${bar}"></div></div>
-                    <div class="bar-pct">${pct}%</div>
-                  </td>
-                  <td style="text-align:center;font-size:12px">${vis}</td>
-                  <td class="rank-money" style="font-size:11px">${cob > 0 ? _fmt(cob) : "–"}</td>
-                  <td>${est}</td>
-                </tr>`;
-            }).join("");
-          }).catch(() => {});
-        }).catch(() => {});
-      }).catch(() => {});
-    }, _logErr("ranking-pedidos"));
-  }, _logErr("ubicaciones"));
+  return () => { ubUnsub(); pedUnsub(); visUnsub(); cobUnsub(); metaUnsub(); };
 }
 
 function _escucharUbicaciones() {
