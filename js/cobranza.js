@@ -31,7 +31,6 @@ let _filtroAlias   = "TODOS";
 
 export const CobranzaModule = {
   mount(container) {
-    cargarNombres();
     container.innerHTML = _html();
     _bindUI();
     _escuchar();
@@ -162,8 +161,9 @@ function _escuchar() {
     orderBy("fechaCreacion", "desc"),
     limit(500)
   );
-  _unsub = onSnapshot(q, snap => {
+  _unsub = onSnapshot(q, async snap => {
     _remisiones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    await cargarNombres();
 
     // Poblar selector de alias con quienes hicieron abonos
     const aliases = [...new Set(
