@@ -47,7 +47,12 @@ const ADMIN_FLAGS = [
   { key:"PUEDE_CARTERA_GLOBAL",      label:"Cartera global (admin)", icon:"💰" },
   { key:"PUEDE_MODULO_JURIDICO",     label:"Módulo jurídico",        icon:"⚖️" },
   { key:"PUEDE_CONFIG_INTERESES",    label:"Config. intereses",      icon:"📈" },
-  { key:"PUEDE_REPORTES_CUSTOM",     label:"Reportes custom",        icon:"📉" }
+  { key:"PUEDE_REPORTES_CUSTOM",     label:"Reportes custom",        icon:"📉" },
+  { key:"PUEDE_ACCESO_SMS",          label:"Módulo SMS",             icon:"📱" },
+  { key:"PUEDE_ACCESO_BI",           label:"BI Analytics",           icon:"📊" },
+  { key:"PUEDE_ACCESO_GASTOS",       label:"Módulo gastos",          icon:"🧾" },
+  { key:"PUEDE_VER_HISTORIAL",       label:"Historial ventas",       icon:"📅" },
+  { key:"PUEDE_ACCESO_CAJA",         label:"Cortes de caja",         icon:"🏦" }
 ];
 
 const TODOS_FLAGS = [...PRIVILEGIOS, ...MODULOS];
@@ -75,7 +80,12 @@ const PRESET = {
     PUEDE_ACCESO_STOCK:         true,
     PUEDE_CREAR_PEDIDOS:        true,
     PUEDE_VER_PEDIDOS:          true,
-    PUEDE_RUTA_OPTIMA:          true
+    PUEDE_RUTA_OPTIMA:          true,
+    PUEDE_ACCESO_SMS:           true,
+    PUEDE_ACCESO_BI:            true,
+    PUEDE_ACCESO_GASTOS:        true,
+    PUEDE_VER_HISTORIAL:        true,
+    PUEDE_ACCESO_CAJA:          true
   },
   INGENIERO: {
     PUEDE_EDITAR_PRECIO:        false,
@@ -149,7 +159,12 @@ const PRESET = {
     PUEDE_CARTERA_GLOBAL:       true,
     PUEDE_MODULO_JURIDICO:      false,
     PUEDE_CONFIG_INTERESES:     true,
-    PUEDE_REPORTES_CUSTOM:      true
+    PUEDE_REPORTES_CUSTOM:      true,
+    PUEDE_ACCESO_SMS:           false,
+    PUEDE_ACCESO_BI:            true,
+    PUEDE_ACCESO_GASTOS:        true,
+    PUEDE_VER_HISTORIAL:        true,
+    PUEDE_ACCESO_CAJA:          true
   },
   ALMACENISTA: {
     PUEDE_EDITAR_PRECIO:      false,

@@ -984,8 +984,10 @@ function _aplicarVisibilidadSidebar() {
   const vis = {
     // Principal: todos
     dashboard:  true,
-    mapa:       true,
-    feed:       true,
+    mapa:          true,
+    feed:          true,
+    mapa_clientes: pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
+    proveedores:   pv("GERENTE","ALMACENISTA","ADMINISTRADOR"),
     // Campo
     ingenieros:  pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
     clientes:    pvF("PUEDE_CREAR_CLIENTES","GERENTE","MESA_CONTROL","RECUPERADOR","INGENIERO","JURIDICO","ADMINISTRADOR"),
@@ -1009,12 +1011,12 @@ function _aplicarVisibilidadSidebar() {
     rh:          pvF("PUEDE_VER_RH","GERENTE","ADMINISTRADOR"),
     crm:         pv("GERENTE","MESA_CONTROL","JURIDICO","ADMINISTRADOR"),
     asistencia:  pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
-    sms:         pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
+    sms:         pvF("PUEDE_ACCESO_SMS","GERENTE","MESA_CONTROL","ADMINISTRADOR"),
     logistica:   pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
     agroquimico: pv("GERENTE","MESA_CONTROL","INGENIERO","ADMINISTRADOR"),
     integraciones: SA,  // solo SUPER_ADMIN puede gestionar — los demás ven estado en readonly via el módulo
     finanzas:      pv("GERENTE","ADMINISTRADOR"),
-    juridico:        pv("GERENTE","JURIDICO","RECUPERADOR","ADMINISTRADOR"),
+    juridico:        pvF("PUEDE_MODULO_JURIDICO","GERENTE","JURIDICO","RECUPERADOR","ADMINISTRADOR"),
     observabilidad:  pv("GERENTE","ADMINISTRADOR"),
     mi_rh:           pv("INGENIERO","RECUPERADOR","ALMACENISTA"),
     // Admin — Control
@@ -1032,10 +1034,11 @@ function _aplicarVisibilidadSidebar() {
     config_intereses: SA,  // solo SUPER_ADMIN
     reportes:         pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
     reportes_custom:  pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
-    caja:             pv("GERENTE","MESA_CONTROL","ADMINISTRADOR"),
-    gastos:           pv("GERENTE","ADMINISTRADOR","MESA_CONTROL"),
-    historial_ventas: pv("GERENTE","ADMINISTRADOR","MESA_CONTROL"),
-    bi_analytics:     pv("GERENTE","ADMINISTRADOR","MESA_CONTROL"),
+    caja:             pvF("PUEDE_ACCESO_CAJA","GERENTE","MESA_CONTROL","ADMINISTRADOR"),
+    gastos:           pvF("PUEDE_ACCESO_GASTOS","GERENTE","ADMINISTRADOR","MESA_CONTROL"),
+    historial_ventas: pvF("PUEDE_VER_HISTORIAL","GERENTE","ADMINISTRADOR","MESA_CONTROL"),
+    bi_analytics:     pvF("PUEDE_ACCESO_BI","GERENTE","ADMINISTRADOR","MESA_CONTROL"),
+    reabasto:         pv("GERENTE","ALMACENISTA","ADMINISTRADOR","MESA_CONTROL"),
     blacklist:        pv("GERENTE","ADMINISTRADOR","MESA_CONTROL","INGENIERO","RECUPERADOR","JURIDICO","VENDEDOR"),
   };
 
