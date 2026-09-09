@@ -1130,7 +1130,7 @@ function _aplicarVisibilidadSidebar() {
     wrap.appendChild(dd);
 
     // ── Lógica ────────────────────────────────────────────────
-    const open  = () => { wrap.classList.add("open"); _render(inp.value); };
+    const open  = () => { wrap.classList.add("open"); inp.select(); _render(""); };
     const close = () => { wrap.classList.remove("open"); _syncLabel(); };
 
     function _render(term) {
