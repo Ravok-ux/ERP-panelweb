@@ -19,8 +19,9 @@ import {
 
 const fmt   = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
 const fmtDt = iso => {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" });
+  // Añadir hora local noon para evitar parse UTC en fechas sin tiempo
+  const s = iso?.includes("T") ? iso : (iso + "T12:00:00");
+  return new Date(s).toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" });
 };
 
 let _unsub         = null;
@@ -65,7 +66,7 @@ function _html() {
     </div>
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
       ${[
         ["cob-k-abonos",   "ABONOS",          "💳", "var(--text-primary)"],
         ["cob-k-total",    "TOTAL COBRADO",    "💵", "#16A34A"],
@@ -231,8 +232,8 @@ function _aplanarAbonos() {
 function _renderTabla() {
   const { desde } = _rango();
   let lista = _aplanarAbonos().filter(a => {
-    const ts = new Date(a.fecha).getTime();
-    return ts >= desde;
+    const s = a.fecha?.includes("T") ? a.fecha : (a.fecha + "T12:00:00");
+    return new Date(s).getTime() >= desde;
   });
   if (_filtroAlias !== "TODOS") lista = lista.filter(a => a.ingenieroAlias === _filtroAlias);
 
@@ -241,7 +242,6 @@ function _renderTabla() {
   const totalCapital    = lista.reduce((s, a) => s + a.capitalAbono,  0);
   const totalInteres    = lista.reduce((s, a) => s + a.interesAbono,  0);
   const liquidaciones   = lista.filter(a => a.esLiquidacion).length;
-  const recuperadores   = new Set(lista.map(a => a.ingenieroAlias).filter(a => a !== "–"));
 
   _set("cob-k-abonos",    String(lista.length));
   _set("cob-k-total",     fmt.format(totalCobrado));
@@ -333,7 +333,8 @@ function _rango() {
     return { desde: m.getTime() };
   }
   const s = new Date();
-  s.setDate(s.getDate() - s.getDay() + 1); s.setHours(0,0,0,0);
+  const dow = s.getDay() || 7; // 1=lun … 7=dom (semana ISO: lunes a domingo)
+  s.setDate(s.getDate() - dow + 1); s.setHours(0,0,0,0);
   return { desde: s.getTime() };
 }
 
