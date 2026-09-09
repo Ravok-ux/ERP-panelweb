@@ -165,18 +165,22 @@ function _escuchar() {
     _remisiones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     await cargarNombres();
 
-    // Poblar selector de alias con quienes hicieron abonos (deduplicar case-insensitive)
-    const _seenAlias = new Map();
+    // Poblar selector — deduplicar por nombre resuelto (varios aliases pueden ser el mismo usuario)
+    const _seenNombre = new Set();
+    const nombresUnicos = [];
     _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
       .filter(Boolean)
-      .forEach(a => { const k = a.toLowerCase(); if (!_seenAlias.has(k)) _seenAlias.set(k, a); });
-    const aliases = [..._seenAlias.values()].sort();
+      .forEach(a => {
+        const n = resolverNombre(a);
+        if (!_seenNombre.has(n)) { _seenNombre.add(n); nombresUnicos.push(n); }
+      });
+    nombresUnicos.sort();
 
     const sel = document.getElementById("cob-sel-alias");
     if (sel) {
       const prev = sel.value;
       sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
-        aliases.map(a => `<option value="${esc(a)}"${a === prev?" selected":""}>${esc(resolverNombre(a))}</option>`).join("");
+        nombresUnicos.map(n => `<option value="${esc(n)}"${n === prev?" selected":""}>${esc(n)}</option>`).join("");
     }
 
     _renderTabla();
@@ -237,7 +241,7 @@ function _renderTabla() {
     const s = a.fecha?.includes("T") ? a.fecha : (a.fecha + "T12:00:00");
     return new Date(s).getTime() >= desde;
   });
-  if (_filtroAlias !== "TODOS") lista = lista.filter(a => a.ingenieroAlias?.toLowerCase() === _filtroAlias.toLowerCase());
+  if (_filtroAlias !== "TODOS") lista = lista.filter(a => resolverNombre(a.ingenieroAlias) === _filtroAlias);
 
   // KPIs
   const totalCobrado    = lista.reduce((s, a) => s + a.monto,        0);
