@@ -6,6 +6,7 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, addDoc, updateDoc, onSnapshot,
   query, orderBy, where, getDocs, serverTimestamp, limit
@@ -32,6 +33,7 @@ const MOTIVOS = [
 
 export const DevolucionesModule = {
   mount(container) {
+    cargarNombres();
     container.innerHTML = _html();
     document.getElementById("dev-body").innerHTML = window.skeleton?.(5, 6) ?? "";
     _bindFiltros();
@@ -202,7 +204,7 @@ function _renderTabla(devs) {
     return `<tr>
       <td><b>${esc(d.folio || d.id.slice(-6).toUpperCase())}</b></td>
       <td>${esc(d.clienteNombre || "–")}</td>
-      <td>${esc(d.ingenieroAlias || "–")}</td>
+      <td>${esc(resolverNombre(d.ingenieroAlias))}</td>
       <td>${esc(d.motivo || "–")}</td>
       <td>${fmtMXN(d.monto)}</td>
       <td><span class="badge ${st.cls}">${st.label}</span></td>
@@ -400,7 +402,7 @@ function _abrirDetalle(dev) {
       <div><span class="badge ${st.cls}">${st.label}</span></div>
       <table class="det-table">
         <tr><th>Cliente</th><td>${esc(dev.clienteNombre)}</td></tr>
-        <tr><th>Ingeniero</th><td>${esc(dev.ingenieroAlias)}</td></tr>
+        <tr><th>Ingeniero</th><td>${esc(resolverNombre(dev.ingenieroAlias))}</td></tr>
         <tr><th>Folio ref.</th><td>${esc(dev.folioRef)}</td></tr>
         <tr><th>Productos</th><td>${esc(dev.productos)}</td></tr>
         <tr><th>Monto</th><td><b>${fmtMXN(dev.monto)}</b></td></tr>

@@ -7,6 +7,7 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, query, where, orderBy, limit,
   onSnapshot, addDoc, updateDoc, setDoc, getDocs, serverTimestamp
@@ -189,6 +190,7 @@ export const CrmModule = {
       </div>
     </div>`;
 
+    cargarNombres();
     _cargarIngenieros().then(() => _iniciarListeners());
     _bindUI();
     return () => this.destroy();
@@ -383,7 +385,7 @@ function _renderTabla(rows) {
           <div style="font-size:11px;color:var(--text-sec)">${esc(r.giro||"")}</div>
         </td>
         <td style="font-size:12px">${esc(r.telefono||"–")}</td>
-        <td style="font-size:12px">${esc(r.ingenieroAlias||"Sin asignar")}</td>
+        <td style="font-size:12px">${esc(resolverNombre(r.ingenieroAlias) || "Sin asignar")}</td>
         <td><span class="badge" style="background:${e.bg};color:${e.color}">${e.label}</span></td>
         <td style="font-size:11px;color:var(--text-sec);max-width:200px">${esc((r.notas||"").slice(0,80))}</td>
         <td style="font-size:11px;color:var(--text-sec)">${fmtFecha(r._ts)}</td>
@@ -432,7 +434,7 @@ function _renderKanban(rows) {
           <div class="crm-card" data-id="${r.id}">
             <div style="font-weight:700;font-size:13px">${esc(r.nombre||"–")}</div>
             <div style="font-size:11px;color:var(--text-sec)">${esc(r.giro||"")}</div>
-            <div style="font-size:11px;margin-top:6px">👷 ${esc(r.ingenieroAlias||"Sin asignar")}</div>
+            <div style="font-size:11px;margin-top:6px">👷 ${esc(resolverNombre(r.ingenieroAlias) || "Sin asignar")}</div>
             <div style="font-size:10px;color:var(--text-sec);margin-top:4px">${fmtFecha(r._ts)}</div>
           </div>`).join("")}
       </div>
@@ -460,7 +462,7 @@ function _abrirPanel(id) {
       <div><span>Giro</span><span>${esc(r.giro||"–")}</span></div>
       <div><span>Teléfono</span><span>${esc(r.telefono||"–")}</span></div>
       <div><span>Dirección</span><span>${esc(r.direccion||"–")}</span></div>
-      <div><span>Ingeniero</span><span>${esc(r.ingenieroAlias||"Sin asignar")}</span></div>
+      <div><span>Ingeniero</span><span>${esc(resolverNombre(r.ingenieroAlias) || "Sin asignar")}</span></div>
       <div><span>Registrado</span><span>${fmtFecha(r._ts)}</span></div>
       <div><span>Registró</span><span>${esc(r.creadoPor||"–")}</span></div>
     </div>

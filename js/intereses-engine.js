@@ -74,14 +74,13 @@ export function calcularRemision(r, hoy = new Date()) {
     ? Math.round(tasaDiaria * r.montoOriginal * 100) / 100 : 0;
 
   // Status
-  let status = "FUTURA";
+  let status = "POR_VENCER"; // default: no vencida aún (diasAtraso > 14)
   if (r.status === "PAGADO") {
     status = "PAGADO";
   } else {
     for (const u of STATUS_UMBRALES) {
       if (diasAtraso <= u.max) { status = u.status; break; }
     }
-    if (status === "FUTURA" && diasAtraso > 14) status = "FUTURA"; // aún lejos
   }
 
   return {
@@ -162,7 +161,7 @@ export function enriquecerRemisiones(remisiones, hoy = new Date()) {
  * @returns {object} Totales
  */
 export function resumenCartera(remisiones) {
-  const activas  = remisiones.filter(r => r.status !== "PAGADO" && r.status !== "FUTURA");
+  const activas  = remisiones.filter(r => r.status !== "PAGADO");
   const criticas = remisiones.filter(r => r.status === "CRÍTICO");
   const vencidas = remisiones.filter(r => ["CRÍTICO","GRAVE","MODERADO","LEVE"].includes(r.status));
 

@@ -10,6 +10,7 @@
 import { db }    from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, logAudit }   from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import { calcularRemision } from "./intereses-engine.js";
 import {
   collection, query, orderBy, limit, onSnapshot,
@@ -29,6 +30,7 @@ let _filtroAlias   = "TODOS";
 
 export const CobranzaModule = {
   mount(container) {
+    cargarNombres();
     container.innerHTML = _html();
     _bindUI();
     _escuchar();
@@ -171,7 +173,7 @@ function _escuchar() {
     if (sel) {
       const prev = sel.value;
       sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
-        aliases.map(a => `<option value="${esc(a)}"${a === prev?" selected":""}>${esc(a)}</option>`).join("");
+        aliases.map(a => `<option value="${esc(a)}"${a === prev?" selected":""}>${esc(resolverNombre(a))}</option>`).join("");
     }
 
     _renderTabla();
@@ -259,7 +261,7 @@ function _renderTabla() {
           const pct = Math.round((monto / maxVal) * 100);
           return `<div style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-              <span style="font-weight:600">${i+1}. ${esc(alias)}</span>
+              <span style="font-weight:600">${i+1}. ${esc(resolverNombre(alias))}</span>
               <span style="font-weight:700;font-variant-numeric:tabular-nums">${fmt.format(monto)}</span>
             </div>
             <div style="height:5px;background:var(--border);border-radius:3px">
@@ -303,7 +305,7 @@ function _renderTabla() {
         ${esc(a.clienteNombre)}</td>
       <td style="padding:8px 14px;font-family:monospace;font-weight:700;font-size:11px;color:var(--text-muted)">
         ${esc(a.folio)}</td>
-      <td style="padding:8px 14px">${esc(a.ingenieroAlias)}</td>
+      <td style="padding:8px 14px">${esc(resolverNombre(a.ingenieroAlias))}</td>
       <td style="padding:8px 14px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:#22C55E">
         ${fmt.format(a.monto)}</td>
       <td style="padding:8px 14px;text-align:right;font-variant-numeric:tabular-nums;

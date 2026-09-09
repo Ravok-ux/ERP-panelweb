@@ -13,6 +13,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getIngenieros } from "./erp-cache.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 
 const fmtMXN   = v => Number(v || 0).toLocaleString("es-MX", { style:"currency", currency:"MXN" });
 const fmtFecha = ts => ts
@@ -33,6 +34,7 @@ let _ings      = []; // aliases de ingenieros para el filtro
 
 export const JuridicoModule = {
   mount(container) {
+    cargarNombres();
     container.innerHTML = `
     <div class="mod-wrap">
       <div class="mod-topbar">
@@ -192,7 +194,7 @@ function _render() {
         <div style="font-weight:700">${esc(c.nombre || "—")}</div>
         <div style="font-size:11px;color:var(--text-sec)">${esc(c.email || c.rfc || "")}</div>
       </td>
-      <td style="font-size:12px">${esc(c.ingenieroAlias || "Sin asignar")}</td>
+      <td style="font-size:12px">${esc(resolverNombre(c.ingenieroAlias))}</td>
       <td style="font-weight:700;color:${color};text-align:right;font-variant-numeric:tabular-nums">
         ${fmtMXN(c.saldoPendiente || 0)}
       </td>
@@ -243,7 +245,7 @@ async function _abrirPanel(clienteId) {
     <!-- Resumen cliente -->
     <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(c.nombre)}</div>
-      <div style="font-size:12px;color:var(--text-sec);margin-bottom:8px">${esc(c.ingenieroAlias || "Sin ingeniero")}</div>
+      <div style="font-size:12px;color:var(--text-sec);margin-bottom:8px">${esc(resolverNombre(c.ingenieroAlias))}</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <div><div style="font-size:11px;color:var(--text-sec)">Saldo</div>
           <div style="font-weight:700;color:${color}">${fmtMXN(c.saldoPendiente || 0)}</div></div>

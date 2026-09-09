@@ -549,9 +549,32 @@ function _navigate(viewId) {
   if (mod?.mount) {
     const unsub = mod.mount(el);
     if (typeof unsub === "function") _unsubscribers.push(unsub);
+    // Aplica dual-scroll inmediatamente y también cuando el módulo cargue datos async
+    setTimeout(() => _initDualScroll(el), 80);
+    const mo = new MutationObserver(() => _initDualScroll(el));
+    mo.observe(el, { childList: true, subtree: true });
+    setTimeout(() => mo.disconnect(), 15000); // deja de observar tras 15s
   }
 
   vistaActual = viewId;
+}
+
+// ── Dual-scroll (barra superior + inferior en tablas anchas) ────
+function _initDualScroll(root) {
+  root.querySelectorAll("div").forEach(div => {
+    if (div.style.overflowX !== "auto" || !div.querySelector("table") || div.dataset.dualDone) return;
+    div.dataset.dualDone = "1";
+    const mirror = document.createElement("div");
+    mirror.style.cssText = "overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:2px;scrollbar-width:thin";
+    const inner = document.createElement("div");
+    inner.style.cssText = "height:1px;pointer-events:none";
+    mirror.appendChild(inner);
+    div.parentNode.insertBefore(mirror, div);
+    div.addEventListener("scroll",   () => { mirror.scrollLeft = div.scrollLeft; },    { passive: true });
+    mirror.addEventListener("scroll", () => { div.scrollLeft    = mirror.scrollLeft; }, { passive: true });
+    const ro = new ResizeObserver(() => { inner.style.width = div.scrollWidth + "px"; });
+    ro.observe(div);
+  });
 }
 
 // ── Skeleton helpers (globales para todos los módulos) ──────────

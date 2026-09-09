@@ -11,6 +11,7 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, query, where, orderBy, limit,
   onSnapshot, addDoc, updateDoc, getDocs, setDoc, serverTimestamp
@@ -38,6 +39,7 @@ let _ingenieros = [];
 
 export const LogisticaModule = {
   mount(container) {
+    cargarNombres();
     container.innerHTML = `
     <div class="mod-wrap">
       <div class="mod-topbar">
@@ -282,7 +284,7 @@ function _renderVisitas(rows) {
   tbody.innerHTML = rows.map(r => {
     const isPend = r.status === "PENDIENTE";
     return `<tr>
-      <td style="font-weight:600">${esc(r.ingenieroAlias||"–")}</td>
+      <td style="font-weight:600">${esc(resolverNombre(r.ingenieroAlias))}</td>
       <td>
         <div style="font-weight:700">${esc(r.clienteNombre||"–")}</div>
         <div style="font-size:11px;color:var(--text-sec)">${esc(r.clienteDireccion||"")}</div>
@@ -367,7 +369,7 @@ function _renderClientesFrecuencia(rows) {
 
     return `<tr>
       <td style="font-weight:700">${esc(r.nombre||"–")}</td>
-      <td style="font-size:12px">${esc(r.ingenieroAlias||"Sin asignar")}</td>
+      <td style="font-size:12px">${esc(resolverNombre(r.ingenieroAlias))}</td>
       <td><span class="badge badge-gray" style="font-size:10px">${esc(FREQ_LABEL[r.frecuenciaVisita]||r.frecuenciaVisita)}</span></td>
       <td style="font-size:11px;color:var(--text-sec)">${ultima ? fmtFecha(ultima) : "Nunca"}</td>
       <td style="font-size:11px">${fmtFecha(proxTs)}</td>
@@ -625,7 +627,7 @@ async function _cargarAtrasados() {
     const renderFila = c => `
       <tr>
         <td style="font-weight:700">${esc(c.nombre||"–")}</td>
-        <td style="font-size:12px">${esc(c.ingenieroAlias||"Sin asignar")}</td>
+        <td style="font-size:12px">${esc(resolverNombre(c.ingenieroAlias))}</td>
         <td><span class="badge badge-gray" style="font-size:10px">${esc(FREQ_LABEL[c.frecuenciaVisita]||c.frecuenciaVisita)}</span></td>
         <td style="font-size:11px;color:var(--text-sec)">${c.ultimaVisita ? fmtFecha(c.ultimaVisita) : "Nunca"}</td>
         <td style="font-weight:800;color:${color(c.retraso)}">⚠️ ${c.retraso} día${c.retraso!==1?"s":""}</td>
@@ -1332,7 +1334,7 @@ function _montarEntregas() {
       }
       tbody.innerHTML = rows.map(r => `<tr>
         <td style="font-size:11px;white-space:nowrap">${fmtFecha(r._ts)}</td>
-        <td style="font-size:12px">${esc(r.ingenieroAlias||"–")}</td>
+        <td style="font-size:12px">${esc(resolverNombre(r.ingenieroAlias))}</td>
         <td style="font-weight:600">${esc(r.clienteNombre||"–")}</td>
         <td style="font-size:11px;max-width:200px">
           ${(r.productos||[]).map(p =>

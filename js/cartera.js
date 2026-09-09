@@ -5,6 +5,7 @@
 import { db }    from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, query, onSnapshot,
   getDoc, updateDoc, setDoc, serverTimestamp, limit
@@ -41,6 +42,7 @@ const _puedeDesbloquear = () =>
 export const CarteraModule = {
   mount(container) {
     _fColor = "TODOS"; _fBusq = ""; _tabActiva = "aging";
+    cargarNombres();
     _cargarConfig().then(() => {
       container.innerHTML = _html();
       _bindUI(container);
@@ -337,7 +339,7 @@ function _renderTabla(filtrados) {
     return `<tr>
       <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${esc(c.nombre || c.id)}</td>
-      <td style="color:#9CA3AF;font-size:12px">${esc(c.vendedor || "—")}</td>
+      <td style="color:#9CA3AF;font-size:12px">${esc(resolverNombre(c.vendedor) || "—")}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:#9CA3AF">${fmt.format(capital)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:${interes>0?"#D97706":"#9CA3AF"}">
         ${interes > 0 ? fmt.format(interes) : "—"}</td>
@@ -419,7 +421,7 @@ function _bindUI(container) {
       `<div class="cart-dd-item" data-nombre="${esc(c.nombre)}"
         style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary)">
         <span style="font-weight:600">${esc(c.nombre)}</span>
-        ${c.vendedor ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.vendedor)}</span>` : ""}
+        ${c.vendedor ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(resolverNombre(c.vendedor))}</span>` : ""}
       </div>`).join("");
     cartSearchDd.style.display = "block";
     cartSearchDd.querySelectorAll(".cart-dd-item").forEach(el =>

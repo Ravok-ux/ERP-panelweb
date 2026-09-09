@@ -7,6 +7,7 @@
 
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, updateDoc, getDocs,
   onSnapshot, query, where, orderBy, limit,
@@ -44,6 +45,7 @@ export const AutorizacionesModule = {
   },
 
   render(container) {
+    cargarNombres();
     container.innerHTML = `
       <div class="aut-shell">
         <div class="aut-header">
@@ -195,7 +197,7 @@ function _renderPendientes() {
         <div>
           <div class="aut-folio">${esc(p.folio || p.id)}</div>
           <div class="aut-meta">
-            👤 ${esc(p.ingenieroAlias || "–")} &nbsp;·&nbsp;
+            👤 ${esc(resolverNombre(p.ingenieroAlias))} &nbsp;·&nbsp;
             🏭 ${esc(p.clienteNombre || "–")} &nbsp;·&nbsp;
             📅 ${_fmtFecha(p.fechaPedido)} &nbsp;·&nbsp;
             ${esc(p.tipoVenta || "CONTADO")} · ${esc(p.tipoPedido || "VENTA_RUTA")}
@@ -236,7 +238,7 @@ function _renderHistorial() {
         <div class="aut-card-top">
           <div>
             <div class="aut-folio">${esc(p.folio || p.id)}</div>
-            <div class="aut-meta">👤 ${esc(p.ingenieroAlias || "–")} · 🏭 ${esc(p.clienteNombre || "–")} · 📅 ${_fmtFecha(p.fechaPedido)}</div>
+            <div class="aut-meta">👤 ${esc(resolverNombre(p.ingenieroAlias))} · 🏭 ${esc(p.clienteNombre || "–")} · 📅 ${_fmtFecha(p.fechaPedido)}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <span class="aut-total">${_fmtMXN(p.total)}</span>

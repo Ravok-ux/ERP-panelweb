@@ -7,6 +7,7 @@ import { Sesion } from "./auth.js";
 import {
   collection, query, where, getDocs, orderBy, Timestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 
 let _periodo      = "semana";
 let _tipo         = "comisiones"; // cartera | visitas | comisiones | ventas | productos
@@ -19,6 +20,7 @@ function _setMeta(v) { const n = Number(v); if (n > 0) localStorage.setItem(META
 
 export const ReportesModule = {
   mount(container) {
+    cargarNombres();
     _periodo    = "semana";
     _tipo       = "comisiones";
     _fechaDesde = null;
@@ -223,7 +225,7 @@ async function _cargarComisiones() {
 
     const stats = {};
     pedidosSnap.forEach(d => {
-      const p = d.data(), alias = p.vendedor || p.alias || "–";
+      const p = d.data(), alias = resolverNombre(p.vendedor || p.alias);
       if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
       stats[alias].vendido  += p.total || 0;
       stats[alias].pedidos  += 1;
@@ -310,7 +312,7 @@ async function _cargarVentasEjecutivas() {
     const stats = {};
     pedSnap.forEach(d => {
       const p = d.data();
-      const alias = p.vendedor || p.alias || p.ingenieroAlias || "–";
+      const alias = resolverNombre(p.vendedor || p.alias || p.ingenieroAlias);
       if (!stats[alias]) stats[alias] = { pedidos:0, vendido:0, zona: p.zona || p.zonaAsignada || "–", cots:0, convertidas:0 };
       stats[alias].pedidos++;
       stats[alias].vendido += p.total || 0;
@@ -319,7 +321,7 @@ async function _cargarVentasEjecutivas() {
     // Cotizaciones
     cotSnap.forEach(d => {
       const c = d.data();
-      const alias = c.ingenieroAlias || "–";
+      const alias = resolverNombre(c.ingenieroAlias);
       if (!stats[alias]) stats[alias] = { pedidos:0, vendido:0, zona:"–", cots:0, convertidas:0 };
       stats[alias].cots++;
       if (c.status === "CONVERTIDA") stats[alias].convertidas++;
@@ -670,7 +672,7 @@ async function _cargarTendencia() {
         diasMap[key].pedidos++;
         diasMap[key].vendido += p.total || 0;
       }
-      const alias = p.vendedor || p.ingenieroAlias || "–";
+      const alias = resolverNombre(p.vendedor || p.ingenieroAlias);
       ingMap[alias] = (ingMap[alias] || 0) + (p.total || 0);
     });
 

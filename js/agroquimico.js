@@ -9,6 +9,7 @@
 
 import { db } from "./firebase-config.js";
 import { esc } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, where, orderBy, limit, getDocs, addDoc,
   doc, setDoc, deleteDoc, onSnapshot,
@@ -208,6 +209,7 @@ export const AgroquimicoModule = { mount, destroy };
 
 function mount(container) {
   _container = container;
+  cargarNombres();
 
   // Inyectar CSS
   if (!document.getElementById("aq-styles")) {
@@ -1118,7 +1120,7 @@ function _montarTrazabilidad() {
         const c = etapaColor(r.etapa||"");
         return `<tr>
           <td style="white-space:nowrap">${fmt(r.fechaTs)}</td>
-          <td>${esc(r.ingenieroAlias||"–")}</td>
+          <td>${esc(resolverNombre(r.ingenieroAlias))}</td>
           <td>
             <div style="font-weight:700">${esc(r.clienteNombre||"–")}</div>
             ${r.parcela?`<div style="font-size:10px;color:var(--text-sec)">${esc(r.parcela)}</div>`:""}

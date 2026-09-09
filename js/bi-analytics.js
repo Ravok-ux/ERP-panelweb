@@ -4,6 +4,7 @@ import { db } from "./firebase-config.js";
 import {
   collection, getDocs, query, where, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 
 // ── Estado ────────────────────────────────────────────────────────
 let _container = null;
@@ -48,7 +49,7 @@ async function _cargar() {
       monto:     Number(r.monto || r.total || 0),
       fecha,
       zona:      r.zona      || "Sin zona",
-      ingeniero: r.ingenieroAlias || r.alias || r.ingeniero || "Desconocido",
+      ingeniero: resolverNombre(r.ingenieroAlias || r.alias || r.ingeniero) || "Desconocido",
       cliente:   r.clienteNombre  || r.cliente || "Desconocido",
       clienteId: r.clienteId || "",
       productos: Array.isArray(r.productos) ? r.productos : [],
@@ -503,6 +504,7 @@ function _render() {
 // ── Exports ───────────────────────────────────────────────────────
 export const BiAnalyticsModule = {
   async mount(container) {
+    await cargarNombres();
     _container = container;
     _destroyed  = false;
     _tab        = "dashboard";

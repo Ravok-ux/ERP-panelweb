@@ -6,6 +6,7 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, where, orderBy, limit,
   getDocs, onSnapshot, startAfter
@@ -52,6 +53,7 @@ export const HistorialVentasModule = {
     _filtroIng   = "";
     _filtroCult  = "";
 
+    cargarNombres();
     container.innerHTML = _html();
     _bindUI();
     _cargarClientes();
@@ -406,7 +408,7 @@ function _cardVenta(v) {
       <div>
         <div style="font-size:12.5px;font-weight:700;color:var(--text-primary)">${fmtFecha(v._ts)}</div>
         <div style="font-size:11px;color:#9CA3AF;margin-top:2px">
-          👤 ${esc(v.ingenieroAlias || "–")}
+          👤 ${esc(resolverNombre(v.ingenieroAlias))}
           ${v.metodoPago ? `· <span style="color:#FBBF24">${esc(v.metodoPago)}</span>` : ""}
         </div>
       </div>
@@ -437,7 +439,7 @@ function _exportarExcel() {
       rows.push([
         v._fecha || fmtFecha(v._ts),
         v.clienteNombre || _clienteSel?.nombre || "–",
-        v.ingenieroAlias || "–",
+        resolverNombre(v.ingenieroAlias),
         ctx.cultivo || "–",
         ctx.etapaFenologica || "–",
         ctx.enfermedad || "–",

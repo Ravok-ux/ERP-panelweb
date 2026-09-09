@@ -9,6 +9,7 @@ import {
   calcularRemision, calcularAbono, enriquecerRemisiones,
   resumenCartera, STATUS_COLOR, TASA_SEMANAL_DEFAULT, DIAS_GRACIA_DEFAULT
 } from "./intereses-engine.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, orderBy, limit, onSnapshot,
   doc, getDoc, setDoc, updateDoc, serverTimestamp
@@ -34,6 +35,7 @@ export const RemisionesModule = {
   mount(container) {
     container.innerHTML = _html();
     _bindUI();
+    cargarNombres().then(() => _renderTabla());
     _cargarConfig().then(() => _escuchar());
     return () => this.destroy();
   },
@@ -93,6 +95,7 @@ function _html() {
             <thead>
               <tr style="background:var(--surface-2);border-bottom:1px solid var(--border)">
                 <th style="${_th()}">FOLIO</th>
+                <th style="${_th('center')}">EMITIDO</th>
                 <th style="${_th()}">CLIENTE</th>
                 <th style="${_th()}">INGENIERO</th>
                 <th style="${_th('right')}">MONTO ORIG.</th>
@@ -108,7 +111,7 @@ function _html() {
               </tr>
             </thead>
             <tbody id="rst-tbody">
-              <tr><td colspan="13" style="padding:32px;text-align:center;color:var(--text-muted)">Cargando…</td></tr>
+              <tr><td colspan="14" style="padding:32px;text-align:center;color:var(--text-muted)">Cargando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -387,7 +390,7 @@ function _renderTabla() {
   if (!tbody) return;
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" style="padding:32px;text-align:center;color:var(--text-muted)">
+    tbody.innerHTML = `<tr><td colspan="14" style="padding:32px;text-align:center;color:var(--text-muted)">
       Sin remisiones para este filtro.</td></tr>`;
     return;
   }
@@ -402,9 +405,11 @@ function _renderTabla() {
     return `<tr style="border-bottom:1px solid var(--border);${pagado ? "opacity:.6" : ""}">
       <td style="padding:9px 14px;font-weight:700;font-family:monospace;white-space:nowrap">
         ${esc(r.folio || r.id)}</td>
+      <td style="padding:9px 14px;text-align:center;color:var(--text-muted);white-space:nowrap;font-size:11px">
+        ${fmtDia(r.fechaCreacion)}</td>
       <td style="padding:9px 14px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${esc(r.clienteNombre || "–")}</td>
-      <td style="padding:9px 14px;color:var(--text-muted)">${esc(r.ingenieroAlias || "–")}</td>
+      <td style="padding:9px 14px;color:var(--text-muted)">${esc(resolverNombre(r.ingenieroAlias))}</td>
       <td style="padding:9px 14px;text-align:right;font-variant-numeric:tabular-nums">
         ${fmt.format(r.montoOriginal ?? 0)}</td>
       <td style="padding:9px 14px;text-align:right;font-variant-numeric:tabular-nums;

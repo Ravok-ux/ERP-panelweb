@@ -11,6 +11,7 @@ import {
 import { registrarVentaN10, revertirVentaN10 } from "./comisiones-n10-engine.js";
 import { getIngenieros } from "./erp-cache.js";
 import { logAudit, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 
 let _escFn = null;
 const _regEsc   = fn => { _unregEsc(); _escFn = e => { if (e.key === "Escape") fn(); }; document.addEventListener("keydown", _escFn); };
@@ -31,6 +32,7 @@ const fmtDt = d => new Date(d?.toDate?.() ?? d).toLocaleDateString("es-MX", { da
 
 export const PedidosModule = {
   mount(container) {
+    cargarNombres();
     container.innerHTML = _html();
     document.getElementById("pd-tbody").innerHTML = window.skeleton?.(6, 7) ?? "";
     _bindUI();
@@ -194,7 +196,7 @@ function _escuchar() {
     if (sel) {
       const prev = sel.value;
       sel.innerHTML = `<option value="TODOS">Todos los ingenieros</option>` +
-        aliases.map(a => `<option value="${a}"${a === prev ? " selected" : ""}>${a}</option>`).join("");
+        aliases.map(a => `<option value="${a}"${a === prev ? " selected" : ""}>${esc(resolverNombre(a))}</option>`).join("");
     }
 
     _renderTabla();
@@ -229,7 +231,7 @@ function _renderTabla() {
     return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" data-id="${esc(p.id)}">
       <td style="padding:10px 14px;font-weight:700;font-variant-numeric:tabular-nums">${esc(p.folio || p.id)}</td>
       <td style="padding:10px 14px">${esc(p.clienteNombre || p.clienteId || "–")}</td>
-      <td style="padding:10px 14px">${esc(p.ingenieroAlias || p.vendedor || "–")}</td>
+      <td style="padding:10px 14px">${esc(resolverNombre(p.ingenieroAlias || p.vendedor))}</td>
       <td style="padding:10px 14px;color:var(--text-sec)">${p.fechaPedido ? fmtDt(p.fechaPedido) : "–"}</td>
       <td style="padding:10px 14px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">
         ${fmt.format(p.total || 0)}</td>
@@ -311,7 +313,7 @@ function _renderTabla() {
     <span><strong>Folio:</strong> ${esc(ped.folio || ped.id)}</span>
     <span><strong>Cliente:</strong> ${esc(ped.cliente || ped.clienteNombre || "–")}</span>
     <span><strong>Total:</strong> $${(ped.total||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
-    <span><strong>Ingeniero:</strong> ${esc(ped.ingeniero || ped.ingenieroAlias || "–")}</span>
+    <span><strong>Ingeniero:</strong> ${esc(resolverNombre(ped.ingeniero || ped.ingenieroAlias))}</span>
     ${ped.notas ? `<span><strong>Notas:</strong> ${esc(ped.notas)}</span>` : ""}
   </div>
   ${itmsHtml}

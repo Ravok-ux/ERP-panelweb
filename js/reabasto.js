@@ -4,6 +4,7 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, where, orderBy, onSnapshot,
   doc, updateDoc, getDoc, getDocs, setDoc, limit,
@@ -47,6 +48,7 @@ const TABS = [
 
 // ── Mount / Destroy ───────────────────────────────────────────
 export function mount(container) {
+  cargarNombres();
   _container = container;
   _container.innerHTML = _html();
   _bindTabs();
@@ -209,7 +211,7 @@ function _cardSolicitud(s) {
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px;color:var(--text-primary)">
-          ${esc(s.ingenieroAlias || "–")}
+          ${esc(resolverNombre(s.ingenieroAlias))}
           ${alerta?`<span style="margin-left:8px;font-size:10px;background:#FEE2E2;color:#DC2626;
             padding:2px 7px;border-radius:9px;font-weight:700">⚠ ${sinStock} sin stock</span>`:""}
         </div>
@@ -290,7 +292,7 @@ function _htmlDetalle(s) {
         border-radius:6px;background:transparent;color:var(--text-primary);font-size:12px;cursor:pointer">✕ Cerrar</button>
       <div style="flex:1">
         <div style="font-size:15px;font-weight:800;color:var(--text-primary)">
-          Solicitud — ${esc(s.ingenieroAlias||"–")}
+          Solicitud — ${esc(resolverNombre(s.ingenieroAlias))}
         </div>
         <div style="font-size:11px;color:#9CA3AF">${fecha} · Zona: ${esc(s.zona||"–")}</div>
       </div>
@@ -582,7 +584,7 @@ function _cardStockIngeniero(ing, ahora, DIAS_40) {
       <div style="width:36px;height:36px;border-radius:50%;background:#EDE9FE;
         display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🚛</div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:13px;color:var(--text-primary)">${esc(ing.ingenieroAlias||"–")}</div>
+        <div style="font-weight:700;font-size:13px;color:var(--text-primary)">${esc(resolverNombre(ing.ingenieroAlias))}</div>
         <div style="font-size:11px;color:#6B7280">
           ${totalItems} producto${totalItems!==1?"s":""}
           ${estancados.length ? `· <span style="color:#DC2626;font-weight:600">${estancados.length} estancado${estancados.length!==1?"s":""}</span>` : ""}

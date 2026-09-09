@@ -2,6 +2,7 @@
 import { db } from './firebase-config.js';
 import { Sesion } from './auth.js';
 import { esc, logAudit, norm } from './app.js';
+import { cargarNombres, resolverNombre } from './nombres-cache.js';
 import {
   collection, doc, addDoc, updateDoc, setDoc, getDoc,
   onSnapshot, query, orderBy, where, getDocs,
@@ -236,6 +237,7 @@ export const CotizacionesPanelModule = (() => {
       </div>
     </div>`;
 
+    cargarNombres();
     _bindUI(container);
     _escuchar();
   }
@@ -312,7 +314,7 @@ export const CotizacionesPanelModule = (() => {
         <td><span class="cot-folio">${esc(c.folio||'—')}</span></td>
         <td style="font-weight:500;max-width:180px;overflow:hidden;
           text-overflow:ellipsis;white-space:nowrap">${esc(c.clienteNombre||'—')}</td>
-        <td style="color:#9CA3AF;font-size:12px">${esc(c.ingenieroAlias||'—')}</td>
+        <td style="color:#9CA3AF;font-size:12px">${esc(resolverNombre(c.ingenieroAlias) || '—')}</td>
         <td class="cot-monto">${fmtMoneda(c.total, c.moneda)}</td>
         <td style="font-size:12px;color:#9CA3AF;white-space:nowrap">${fmtFecha(c.creadaEn)}</td>
         <td class="${venceCls}" style="font-size:12px;white-space:nowrap">${venceTxt}</td>
@@ -379,7 +381,7 @@ export const CotizacionesPanelModule = (() => {
         </div>
         <div class="cot-det-field">
           <span class="cot-det-lbl">Ingeniero</span>
-          <span class="cot-det-val">${esc(c.ingenieroAlias||'—')}</span>
+          <span class="cot-det-val">${esc(resolverNombre(c.ingenieroAlias) || '—')}</span>
         </div>
         <div class="cot-det-field">
           <span class="cot-det-lbl">Creada</span>

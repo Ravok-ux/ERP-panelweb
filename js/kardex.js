@@ -5,6 +5,7 @@
 import { db }    from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, norm } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, orderBy, limit, where,
   onSnapshot, getDocs, updateDoc, serverTimestamp
@@ -63,6 +64,7 @@ export const KardexModule = {
         🔒 Acceso restringido</div>`;
       return;
     }
+    cargarNombres();
     _filtroTipo = ""; _filtroProd = ""; _movimientos = [];
     container.innerHTML = _html();
     _bindUI(container);
@@ -305,7 +307,7 @@ function _renderTabla() {
       <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${fmtNum(m.stockDespues)}</td>
       <td style="color:#9CA3AF;max-width:180px;overflow:hidden;text-overflow:ellipsis;
         white-space:nowrap" title="${ref}">${ref}</td>
-      <td style="color:#9CA3AF;white-space:nowrap">${esc(m.quienRegistro || m.ingenieroAlias || m.alias || "—")}</td>
+      <td style="color:#9CA3AF;white-space:nowrap">${esc(resolverNombre(m.quienRegistro || m.ingenieroAlias || m.alias) || "—")}</td>
       <td style="color:#9CA3AF;white-space:nowrap;font-size:11.5px">${fmtTs(m)}</td>
     </tr>`;
   }).join("");
