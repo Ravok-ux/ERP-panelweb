@@ -468,7 +468,6 @@ async function _cargarCartera() {
     const snap = await getDocs(query(
       collection(db,"remisiones_credito"),
       where("status","in",["ACTIVA","VENCIDA"]),
-      orderBy("clienteNombre"),
       limit(500)
     ));
 

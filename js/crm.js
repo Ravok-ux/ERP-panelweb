@@ -201,14 +201,15 @@ export const CrmModule = {
 // ── Cargar ingenieros ─────────────────────────────────────────
 async function _cargarIngenieros() {
   const [ingSnap, segSnap, prodSnap] = await Promise.all([
-    getDocs(query(collection(db,"usuarios"), where("activo","==",true), orderBy("alias"))),
+    getDocs(query(collection(db,"usuarios"), where("activo","==",true))),
     getDocs(query(collection(db,"segmentos"), orderBy("nombre"))),
     getDocs(query(collection(db,"productos"),  orderBy("nombre")))
   ]);
 
   _ingenieros = ingSnap.docs
     .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol))
-    .map(d => ({ uid: d.id, ...d.data() }));
+    .map(d => ({ uid: d.id, ...d.data() }))
+    .sort((a, b) => (a.alias||"").localeCompare(b.alias||""));
 
   const opts = _ingenieros.map(u => `<option value="${esc(u.uid)}">${esc(u.alias||u.uid)}</option>`).join("");
   document.getElementById("crm-filtro-ing")?.insertAdjacentHTML("beforeend", opts);

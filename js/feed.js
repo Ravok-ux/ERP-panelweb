@@ -4,7 +4,7 @@
 
 import { db } from "./firebase-config.js";
 import {
-  collection, query, orderBy, limit, where, onSnapshot
+  collection, query, orderBy, limit, where, onSnapshot, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -19,6 +19,7 @@ export const FeedModule = {
   mount(container) {
     container.innerHTML = _html();
     _bindFiltros();
+    _cargarIngenieros();
     _escucharFeed();
     return () => this.destroy();
   },
@@ -105,6 +106,24 @@ function _bindFiltros() {
       _renderFeed(_ultimoSnap);
     }
   };
+}
+
+// ── Ingenieros ────────────────────────────────────────────────
+async function _cargarIngenieros() {
+  try {
+    const snap = await getDocs(query(
+      collection(db, "usuarios"),
+      where("rol", "in", ["INGENIERO", "RECUPERADOR"]),
+      where("activo", "==", true)
+    ));
+    snap.forEach(d => {
+      const alias = d.data().alias;
+      if (alias) _aliases.add(alias);
+    });
+    _updateAliasSelect();
+  } catch (e) {
+    console.warn("[Feed] No se pudieron cargar ingenieros:", e);
+  }
 }
 
 // ── Listener ──────────────────────────────────────────────────

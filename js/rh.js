@@ -93,10 +93,11 @@ function _activarTab(tab) {
 // ── Cargar lista de usuarios ──────────────────────────────────
 async function _cargarUsuarios() {
   try {
-    const snap = await getDocs(query(collection(db, "usuarios"), where("activo", "==", true), orderBy("alias")));
+    const snap = await getDocs(query(collection(db, "usuarios"), where("activo", "==", true)));
     _usuarios = snap.docs
       .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol))
-      .map(d => ({ uid: d.id, ...d.data() }));
+      .map(d => ({ uid: d.id, ...d.data() }))
+      .sort((a, b) => (a.alias||"").localeCompare(b.alias||""));
   } catch(e) { _usuarios = []; }
 }
 
@@ -969,14 +970,23 @@ async function _calcularNomina() {
     ));
     const asiRows = asiSnap.docs.map(d => d.data());
 
-    // 2. Anticipos APROBADOS/DESCONTADOS + adeudos de inventario del período
+    // 2. Anticipos APROBADOS + adeudos de inventario activos (sin límite de período para adeudos)
     const antSnap = await getDocs(query(
       collection(db,"rh_anticipos"),
       where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
-      where("status","in",["APROBADO","DESCONTADO","ADEUDO"]),
+      where("status","in",["APROBADO","DESCONTADO"]),
       orderBy("_ts","asc"), limit(500)
     ));
     const antRows = antSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Adeudos de inventario ACTIVOS (todos, no solo del período — persisten semana a semana)
+    const adeudoSnap = await getDocs(query(
+      collection(db,"rh_anticipos"),
+      where("tipo","==","ADEUDO_INVENTARIO"),
+      where("status","==","ADEUDO"),
+      limit(500)
+    ));
+    const adeudosActivos = adeudoSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // Agrupar por usuario
     const porUid = {};
@@ -988,22 +998,27 @@ async function _calcularNomina() {
       };
     }
     asiRows.forEach(r => { if (porUid[r.uid]) porUid[r.uid].asistencias.push(r); });
-    antRows.forEach(r => {
-      if (!porUid[r.uid]) return;
-      if (r.tipo === "ADEUDO_INVENTARIO") porUid[r.uid].adeudos.push(r);
-      else porUid[r.uid].anticipos.push(r);
-    });
+    antRows.forEach(r => { if (porUid[r.uid]) porUid[r.uid].anticipos.push(r); });
+    adeudosActivos.forEach(r => { if (porUid[r.uid]) porUid[r.uid].adeudos.push(r); });
 
     _nominaData = Object.values(porUid).map(u => {
-      const presentes  = u.asistencias.filter(a => ["PRESENTE","TARDANZA"].includes(a.status)).length;
-      const ausencias  = u.asistencias.filter(a => a.status === "AUSENTE").length;
-      const salario    = u.salarioSemanal;
-      const valorDia   = diasPeriodo > 0 ? salario / diasPeriodo : 0;
-      const descAus    = ausencias * valorDia;
-      const descAnt    = u.anticipos.reduce((s,a) => s + (a.monto||0), 0);
-      const descAdeudo = u.adeudos.filter(a => a.status === "ADEUDO").reduce((s,a) => s + (a.monto||0), 0);
-      const neto       = Math.max(0, salario - descAus - descAnt - descAdeudo);
-      return { ...u, presentes, ausencias, salario, valorDia, descAus, descAnt, descAdeudo, neto };
+      const presentes      = u.asistencias.filter(a => ["PRESENTE","TARDANZA"].includes(a.status)).length;
+      const ausencias      = u.asistencias.filter(a => a.status === "AUSENTE").length;
+      const salario        = u.salarioSemanal;
+      const valorDia       = diasPeriodo > 0 ? salario / diasPeriodo : 0;
+      const descAus        = ausencias * valorDia;
+      const descAnt        = u.anticipos.reduce((s,a) => s + (a.monto||0), 0);
+      // Adeudos: saldo pendiente total (montoOriginal - montoAbonado)
+      const saldoAdeudos   = u.adeudos.reduce((s,a) => {
+        const original = a.montoOriginal ?? a.monto ?? 0;
+        const abonado  = a.montoAbonado ?? 0;
+        return s + Math.max(0, original - abonado);
+      }, 0);
+      // El abono de esta semana lo ingresa el admin en la UI — no se descuenta automáticamente
+      const abonoSemana    = u.adeudos.reduce((s,a) => s + (a._abonoSemana || 0), 0);
+      const descAdeudo     = abonoSemana; // solo el abono confirmado por el admin
+      const neto           = Math.max(0, salario - descAus - descAnt - descAdeudo);
+      return { ...u, presentes, ausencias, salario, valorDia, descAus, descAnt, descAdeudo, saldoAdeudos, neto };
     });
 
     _renderNomina(_nominaData);
@@ -1022,10 +1037,34 @@ function _renderNomina(rows) {
   }
   tbody.innerHTML = rows.map(r => {
     const sinSalario = r.salario <= 0;
-    const adeudoCell = r.descAdeudo > 0
-      ? `<span style="color:#DC2626;font-weight:700">${fmtMXN(r.descAdeudo)}</span>
-         <span style="font-size:9px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:1px 4px;margin-left:4px">⚠️ ${r.adeudos.filter(a=>a.status==="ADEUDO").length}</span>`
-      : `<span style="color:var(--text-sec)">—</span>`;
+    // Celda de adeudos: muestra saldo + input de abono
+    const tieneAdeudos = r.saldoAdeudos > 0;
+    // Mínimo de abono = 20% del monto original del adeudo más grande activo
+    const montoOriginalTotal = r.adeudos.reduce((s,a) => s + (a.montoOriginal ?? a.monto ?? 0), 0);
+    const minAbono = Math.ceil(montoOriginalTotal * 0.20 * 100) / 100;
+    const adeudoCell = tieneAdeudos
+      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+           <div>
+             <span style="color:#DC2626;font-weight:700">${fmtMXN(r.saldoAdeudos)}</span>
+             <span style="font-size:9px;background:#FEE2E2;color:#991B1B;border-radius:4px;
+               padding:1px 5px;margin-left:5px">⚠️ saldo</span>
+           </div>
+           <div style="display:flex;align-items:center;gap:4px">
+             <span style="font-size:10px;color:var(--text-sec)">Abono:</span>
+             <input type="number" min="${minAbono}" step="0.01"
+               placeholder="mín ${fmtMXN(minAbono)}"
+               data-uid="${r.uid}" data-min="${minAbono}" data-saldo="${r.saldoAdeudos}"
+               class="nom-abono-inp"
+               style="width:100px;padding:3px 6px;border:1px solid #FCA5A5;border-radius:5px;
+                 font-size:11px;text-align:right;background:var(--surface);color:var(--text-primary)">
+           </div>
+           <div style="font-size:9px;color:#9CA3AF">Mín 20% del total: ${fmtMXN(minAbono)}</div>
+         </div>
+         <button class="btn-sm" data-uid="${r.uid}" data-alias="${esc(r.alias)}" data-act="nuevo-adeudo"
+           style="margin-top:4px;font-size:9px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5">+ Nuevo adeudo</button>`
+      : `<span style="color:var(--text-sec)">—</span>
+         <button class="btn-sm" data-uid="${r.uid}" data-alias="${esc(r.alias)}" data-act="nuevo-adeudo"
+           style="margin-left:4px;font-size:9px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">+ Adeudo</button>`;
     return `<tr style="${sinSalario ? "opacity:.55" : ""}">
       <td style="font-weight:700">${esc(r.alias)}</td>
       <td style="text-align:right">
@@ -1039,12 +1078,42 @@ function _renderNomina(rows) {
       <td style="text-align:right;color:#DC2626">${fmtMXN(r.descAus)}</td>
       <td style="text-align:right;color:#D97706">${fmtMXN(r.descAnt)}</td>
       <td style="text-align:right">${adeudoCell}</td>
-      <td style="text-align:right;font-weight:800;font-size:15px;color:${r.neto>0?"var(--primary)":"#DC2626"}">${fmtMXN(r.neto)}</td>
+      <td style="text-align:right;font-weight:800;font-size:15px;color:${r.neto>0?"var(--primary)":"#DC2626"}"
+          class="nom-neto-cell" data-uid="${r.uid}">${fmtMXN(r.neto)}</td>
       <td>
-        ${r.neto > 0 ? `<button class="btn-sm btn-green" data-uid="${r.uid}" data-act="pagar">✓ Registrar pago</button>` : "–"}
+        <button class="btn-sm btn-green" data-uid="${r.uid}" data-act="pagar"
+          ${r.salario <= 0 ? "disabled style='opacity:.4;cursor:not-allowed'" : ""}>✓ Registrar pago</button>
       </td>
     </tr>`;
   }).join("");
+
+  // Listener inputs de abono: recalcula neto en tiempo real
+  tbody.querySelectorAll(".nom-abono-inp").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const uid    = inp.dataset.uid;
+      const row    = _nominaData.find(r => r.uid === uid);
+      if (!row) return;
+      const abono  = parseFloat(inp.value) || 0;
+      // Guardar el abono provisional en el dato de fila
+      row.adeudos.forEach(a => { a._abonoSemana = 0; });
+      // Distribuir abono entre adeudos activos (de mayor a menor antigüedad)
+      let restante = abono;
+      for (const a of row.adeudos) {
+        const saldo = Math.max(0, (a.montoOriginal ?? a.monto ?? 0) - (a.montoAbonado ?? 0));
+        const aplicar = Math.min(saldo, restante);
+        a._abonoSemana = aplicar;
+        restante -= aplicar;
+        if (restante <= 0) break;
+      }
+      row.descAdeudo = row.adeudos.reduce((s,a) => s + (a._abonoSemana||0), 0);
+      row.neto = Math.max(0, row.salario - row.descAus - row.descAnt - row.descAdeudo);
+      const netoCell = tbody.querySelector(`.nom-neto-cell[data-uid="${uid}"]`);
+      if (netoCell) {
+        netoCell.textContent = fmtMXN(row.neto);
+        netoCell.style.color = row.neto > 0 ? "var(--primary)" : "#DC2626";
+      }
+    });
+  });
 
   tbody.querySelectorAll("[data-act='editar-sal']").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1055,13 +1124,88 @@ function _renderNomina(rows) {
     });
   });
 
+  tbody.querySelectorAll("[data-act='nuevo-adeudo']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.dataset.uid;
+      const alias = btn.dataset.alias;
+      // Modal de captura usando el sistema de modales del ERP
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center";
+      overlay.innerHTML = `
+        <div style="background:var(--bg-card,#fff);border-radius:12px;padding:28px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+          <h3 style="margin:0 0 16px;font-size:16px">Registrar adeudo de inventario</h3>
+          <p style="margin:0 0 16px;font-size:13px;color:var(--text-sec)">Ingeniero: <b>${alias}</b></p>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Monto del adeudo (MXN)</label>
+          <input id="adeudo-monto" type="number" min="1" step="0.01" value="2500"
+            style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:14px;margin-bottom:14px">
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Descripción / motivo</label>
+          <textarea id="adeudo-motivo" rows="3"
+            style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:13px;margin-bottom:20px;resize:vertical">Productos faltantes de inventario</textarea>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button id="adeudo-cancel" class="btn-sm btn-outline" style="padding:8px 16px">Cancelar</button>
+            <button id="adeudo-save" class="btn-sm btn-red" style="padding:8px 16px;background:#DC2626;color:#fff;border:none;border-radius:6px;cursor:pointer">Registrar adeudo</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.getElementById("adeudo-monto").focus();
+      document.getElementById("adeudo-cancel").onclick = () => overlay.remove();
+      document.getElementById("adeudo-save").onclick = async () => {
+        const monto = parseFloat(document.getElementById("adeudo-monto").value || "0");
+        const motivo = document.getElementById("adeudo-motivo").value.trim() || "Productos faltantes de inventario";
+        if (!monto || monto <= 0) { window.toast?.("Ingresa un monto válido", "error"); return; }
+        overlay.remove();
+        try {
+          await addDoc(collection(db, "rh_anticipos"), {
+            uid, alias,
+            tipo: "ADEUDO_INVENTARIO",
+            monto,
+            montoOriginal: monto,
+            montoAbonado:  0,
+            motivo,
+            status: "ADEUDO",
+            creadoPor: Sesion.alias,
+            timestamp: Date.now(), _ts: Date.now()
+          });
+          window.toast?.(`Adeudo de ${fmtMXN(monto)} registrado para ${alias}`, "success");
+          document.getElementById("nom-calcular")?.click();
+        } catch(e) {
+          window.toast?.("Error: " + e.message, "error");
+        }
+      };
+    });
+  });
+
   tbody.querySelectorAll("[data-act='pagar']").forEach(btn => {
     btn.addEventListener("click", async () => {
       const row = _nominaData.find(r => r.uid === btn.dataset.uid);
-      if (!row) return;
-      if (!await window.modal({ title: "Registrar pago", message: `¿Registrar pago de ${fmtMXN(row.neto)} para ${row.alias}?`, confirmLabel: "Registrar" })) return;
+      if (!row || row.salario <= 0) return;
+
+      // Validar abono si hay adeudos activos
+      if (row.saldoAdeudos > 0) {
+        const montoOriginalTotal = row.adeudos.reduce((s,a) => s + (a.montoOriginal ?? a.monto ?? 0), 0);
+        const minAbono = Math.ceil(montoOriginalTotal * 0.20 * 100) / 100;
+        const abonoIngresado = row.adeudos.reduce((s,a) => s + (a._abonoSemana||0), 0);
+        if (abonoIngresado <= 0) {
+          window.toast?.(`Ingresa el abono al adeudo (mín ${fmtMXN(minAbono)})`, "error");
+          return;
+        }
+        if (abonoIngresado < minAbono - 0.01) {
+          window.toast?.(`El abono mínimo es ${fmtMXN(minAbono)} (20% del total del adeudo)`, "error");
+          return;
+        }
+      }
+
+      const resumen = row.saldoAdeudos > 0
+        ? `\n• Abono a adeudo: ${fmtMXN(row.descAdeudo)}\n• Saldo restante adeudo: ${fmtMXN(Math.max(0, row.saldoAdeudos - row.descAdeudo))}`
+        : "";
+      if (!await window.modal({
+        title: "Registrar pago de nómina",
+        message: `Confirmar pago para ${row.alias}:\n• Salario: ${fmtMXN(row.salario)}\n• Desc. ausencias: ${fmtMXN(row.descAus)}\n• Desc. anticipos: ${fmtMXN(row.descAnt)}${resumen}\n• NETO A PAGAR: ${fmtMXN(row.neto)}`,
+        confirmLabel: "Registrar pago"
+      })) return;
+
       try {
-        const desde = document.getElementById("nom-desde")?.value;
+        const desde  = document.getElementById("nom-desde")?.value;
         const hasta  = document.getElementById("nom-hasta")?.value;
         const periodo = `${desde} al ${hasta}`;
         const ahora   = Date.now();
@@ -1070,13 +1214,13 @@ function _renderNomina(rows) {
           uid: row.uid, alias: row.alias,
           desde, hasta,
           salarioSemanal: row.salario,
-          descAusencias: row.descAus,
-          descAnticipos: row.descAnt,
-          neto: row.neto,
-          pagadoPor: Sesion.alias, _ts: ahora
+          descAusencias:  row.descAus,
+          descAnticipos:  row.descAnt,
+          descAdeudos:    row.descAdeudo || 0,
+          neto:           row.neto,
+          pagadoPor:      Sesion.alias, _ts: ahora
         });
 
-        // Recibo individual visible en "Mis recibos" del empleado
         await addDoc(collection(db,"rh_nomina"), {
           uid:                row.uid,
           alias:              row.alias,
@@ -1096,20 +1240,38 @@ function _renderNomina(rows) {
 
         // Marcar anticipos del período como DESCONTADO
         for (const ant of row.anticipos.filter(a => a.status === "APROBADO")) {
-          await updateDoc(doc(db,"rh_anticipos",ant.id || ""), {
+          await updateDoc(doc(db,"rh_anticipos", ant.id), {
             status:"DESCONTADO", descontadoPor: Sesion.alias
           }).catch(() => {});
         }
-        // Marcar adeudos de inventario del período como PAGADO (descontados vía nómina)
+
+        // Actualizar saldo de adeudos de inventario con el abono de esta semana
         for (const ade of row.adeudos.filter(a => a.status === "ADEUDO")) {
-          await updateDoc(doc(db,"rh_anticipos",ade.id || ""), {
-            status:"PAGADO", pagadoPor: Sesion.alias, pagadoEn: Date.now(),
-            nota: `Descontado vía nómina ${periodo}`
-          }).catch(() => {});
+          const abono       = ade._abonoSemana || 0;
+          if (abono <= 0) continue;
+          const original    = ade.montoOriginal ?? ade.monto ?? 0;
+          const yaAbonado   = ade.montoAbonado ?? 0;
+          const nuevoAbonado = Math.min(original, yaAbonado + abono);
+          const liquidado   = nuevoAbonado >= original - 0.01;
+          const updateData  = {
+            montoOriginal: original,
+            montoAbonado:  nuevoAbonado,
+            ultimoAbono:   abono,
+            ultimoAbonoPor: Sesion.alias,
+            ultimoAbonoEn: ahora,
+          };
+          if (liquidado) {
+            updateData.status    = "PAGADO";
+            updateData.pagadoPor = Sesion.alias;
+            updateData.pagadoEn  = ahora;
+            updateData.nota      = `Liquidado vía nómina ${periodo}`;
+          }
+          await updateDoc(doc(db,"rh_anticipos", ade.id), updateData).catch(() => {});
         }
-        window.toast?.(`Pago registrado para ${row.alias}`,"success");
+
+        window.toast?.(`Pago registrado para ${row.alias}`, "success");
         _calcularNomina();
-      } catch(e) { window.toast?.(e.message,"error"); }
+      } catch(e) { window.toast?.(e.message, "error"); }
     });
   });
 }

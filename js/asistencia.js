@@ -61,8 +61,10 @@ function _html() {
     <div class="asi-hor-panel">
       <div class="asi-hor-form">
         <h3>Configurar horario</h3>
-        <label class="asi-label">Empleado (alias)</label>
-        <input id="hor-alias" type="text" placeholder="alias del empleado" style="${estiloInput};width:100%;box-sizing:border-box;margin-bottom:.75rem" />
+        <label class="asi-label">Empleado</label>
+        <select id="hor-alias" style="${estiloInput};width:100%;box-sizing:border-box;margin-bottom:.75rem">
+          <option value="">— Seleccionar empleado —</option>
+        </select>
         <label class="asi-label">Hora entrada esperada</label>
         <input id="hor-entrada" type="time" value="08:00" style="${estiloInput};margin-bottom:.75rem" />
         <label class="asi-label">Hora salida esperada</label>
@@ -122,7 +124,7 @@ function _bindEvents() {
       _container.querySelectorAll(".asi-tab").forEach(b => b.classList.toggle("asi-tab-active", b === btn));
       _container.querySelector("#tab-asistencia").style.display = btn.dataset.tab === "asistencia" ? "block" : "none";
       _container.querySelector("#tab-horarios").style.display   = btn.dataset.tab === "horarios"   ? "block" : "none";
-      if (btn.dataset.tab === "horarios") _cargarHorarios();
+      if (btn.dataset.tab === "horarios") { _cargarEmpleadosSelect(); _cargarHorarios(); }
     });
   });
 }
@@ -208,6 +210,26 @@ function _retardoMin(d, horario) {
 }
 
 // ─── Horarios ─────────────────────────────────────────────────────────────────
+
+async function _cargarEmpleadosSelect() {
+  const sel = _container?.querySelector("#hor-alias");
+  if (!sel || sel.options.length > 1) return; // ya poblado
+  try {
+    const snap = await getDocs(query(collection(db, "usuarios"), where("activo", "==", true)));
+    const EXCLUIR = ["SUPER_ADMIN"];
+    const empleados = snap.docs
+      .filter(d => !EXCLUIR.includes(d.data().rol))
+      .map(d => d.data().alias)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    empleados.forEach(alias => {
+      const opt = document.createElement("option");
+      opt.value = alias;
+      opt.textContent = alias;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn("[Asistencia] No se pudieron cargar empleados:", e); }
+}
 
 async function _cargarHorarios() {
   const snap = await getDocs(collection(db, "horarios_empleado"));

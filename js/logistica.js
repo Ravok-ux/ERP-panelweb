@@ -36,6 +36,7 @@ const STATUS_BADGE = {
 
 let _unsubs     = [];
 let _ingenieros = [];
+let _ingPromise = null;
 
 export const LogisticaModule = {
   mount(container) {
@@ -45,6 +46,7 @@ export const LogisticaModule = {
       <div class="mod-topbar">
         <h2 class="mod-title">🚗 Logística de visitas</h2>
         <div class="mod-actions">
+          <button class="btn-outline" id="log-seed-btn" style="border-color:#7C3AED;color:#7C3AED">🧪 Datos de prueba</button>
           <button class="btn-outline" id="log-gen-semana-btn">📅 Generar semana</button>
           <button class="btn-primary" id="log-gen-btn">⚡ Generar visitas del día</button>
         </div>
@@ -171,7 +173,8 @@ export const LogisticaModule = {
 
     </div>`;
 
-    _cargarIngenieros().then(() => {
+    _ingPromise = _cargarIngenieros();
+    _ingPromise.then(() => {
       _escucharVisitas();
       _escucharClientes();
     });
@@ -182,14 +185,21 @@ export const LogisticaModule = {
 };
 
 async function _cargarIngenieros() {
-  const snap = await getDocs(query(collection(db,"usuarios"), where("activo","==",true), orderBy("alias")));
+  // Sin orderBy para evitar índice compuesto — ordenar client-side
+  const snap = await getDocs(query(collection(db,"usuarios"), where("activo","==",true)));
   _ingenieros = snap.docs
     .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol))
-    .map(d => ({ uid: d.id, ...d.data() }));
+    .map(d => ({ uid: d.id, ...d.data() }))
+    .sort((a, b) => (a.alias||"").localeCompare(b.alias||""));
+  _poblarSelectsIng();
+}
+
+function _poblarSelectsIng() {
   const opts = _ingenieros.map(u => `<option value="${esc(u.uid)}">${esc(u.alias||u.uid)}</option>`).join("");
-  ["log-filtro-ing","log-clientes-ing"].forEach(id => {
-    document.getElementById(id)?.insertAdjacentHTML("beforeend", opts);
-  });
+  const filtro = document.getElementById("log-filtro-ing");
+  if (filtro) filtro.innerHTML = `<option value="">Todos los ingenieros</option>${opts}`;
+  const clientes = document.getElementById("log-clientes-ing");
+  if (clientes) clientes.innerHTML = `<option value="">Todos los ingenieros</option>${opts}`;
 }
 
 function _bindUI() {
@@ -200,6 +210,7 @@ function _bindUI() {
   document.getElementById("log-clientes-frec")?.addEventListener("change", _escucharClientes);
   document.getElementById("log-gen-btn")?.addEventListener("click", _generarVisitasDelDia);
   document.getElementById("log-gen-semana-btn")?.addEventListener("click", _generarVisitasSemana);
+  document.getElementById("log-seed-btn")?.addEventListener("click", _sembrarDatosPrueba);
 
   // Tabs
   document.querySelectorAll(".log-tab").forEach(btn => {
@@ -243,19 +254,22 @@ function _escucharVisitas() {
   const desdeTs = new Date(y,m-1,d,0,0,0).getTime();
   const hastaTs = new Date(y,m-1,d,23,59,59).getTime();
 
+  // Solo filtra por rango de fecha (+ ingeniero si aplica) para evitar índice compuesto.
+  // El status se filtra client-side para no requerir índice adicional.
   let constraints = [
     where("fechaTs",">=",desdeTs), where("fechaTs","<=",hastaTs),
     orderBy("fechaTs","asc"), limit(500)
   ];
-  if (ingId)  constraints = [where("ingenieroId","==",ingId), ...constraints];
-  if (status) constraints = [where("status","==",status), ...constraints];
+  if (ingId) constraints = [where("ingenieroId","==",ingId), ...constraints];
   const q = query(collection(db,"visitas_programadas"), ...constraints);
 
   const tbody = document.getElementById("log-body");
   if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center">Cargando…</td></tr>`;
 
   const unsub = onSnapshot(q, snap => {
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Filtrar status client-side
+    if (status) rows = rows.filter(r => r.status === status);
     _renderVisitas(rows);
   }, err => console.error("[Logistica]", err));
   unsub._tag = "visitas";
@@ -335,15 +349,16 @@ function _escucharClientes() {
   const ingId = document.getElementById("log-clientes-ing")?.value || "";
   const frec  = document.getElementById("log-clientes-frec")?.value || "";
 
-  let constraints = [where("activo","==",true), orderBy("nombre"), limit(500)];
-  if (ingId) constraints = [where("ingenieroId","==",ingId), ...constraints];
-  if (frec)  constraints = [where("frecuenciaVisita","==",frec), ...constraints];
-  const q = query(collection(db,"clientes"), ...constraints);
+  // Traer todos los clientes sin orderBy ni where compuesto — ordenar y filtrar client-side
+  const q = query(collection(db,"clientes"), limit(600));
 
   const tbody = document.getElementById("log-clientes-body");
   _clientesUnsub = onSnapshot(q, snap => {
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(r => r.frecuenciaVisita); // solo clientes con frecuencia asignada
+    if (ingId) rows = rows.filter(r => r.ingenieroId === ingId || r.ingenieroAlias === ingId);
+    if (frec)  rows = rows.filter(r => r.frecuenciaVisita === frec);
+    rows.sort((a, b) => (a.nombre||"").localeCompare(b.nombre||""));
     _renderClientesFrecuencia(rows);
   }, err => console.error("[Logistica-Clientes]", err));
   _unsubs.push(_clientesUnsub);
@@ -470,7 +485,9 @@ async function _cargarVistaSemana() {
   wrap.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-sec)">Cargando semana…</div>`;
 
   try {
-    const dias   = _diasSemana();
+    const fechaInput = document.getElementById("log-fecha")?.value;
+    const refDate = fechaInput ? new Date(fechaInput + "T12:00:00") : new Date();
+    const dias   = _diasSemana(refDate);
     const desde  = dias[0].getTime();
     const hasta  = dias[6].getTime() + 86_399_999;
 
@@ -785,6 +802,7 @@ async function _generarVisitasSemana() {
 async function _montarRutas() {
   const wrap = document.getElementById("log-rutas-content");
   if (!wrap) return;
+  if (!_ingenieros.length && _ingPromise) await _ingPromise;
   const hoy = new Date().toISOString().slice(0,10);
   wrap.innerHTML = `
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
@@ -820,15 +838,15 @@ async function _calcularRutaOptima(ingId, fecha) {
     const [y,m,d] = fecha.split("-").map(Number);
     const desdeTs = new Date(y,m-1,d,0,0,0).getTime();
     const hastaTs = new Date(y,m-1,d,23,59,59).getTime();
-
-    // Visitas pendientes del día para el ingeniero
+    // Solo filtra por rango de fecha sin orderBy para evitar índice compuesto
     const vSnap = await getDocs(query(
       collection(db,"visitas_programadas"),
-      where("ingenieroId","==",ingId),
       where("fechaTs",">=",desdeTs), where("fechaTs","<=",hastaTs),
-      orderBy("fechaTs","asc"), limit(200)
+      limit(500)
     ));
-    const visitas = vSnap.docs.map(d2 => ({ id: d2.id, ...d2.data() }));
+    const visitas = vSnap.docs
+      .map(d2 => ({ id: d2.id, ...d2.data() }))
+      .filter(v => v.ingenieroId === ingId);
     if (!visitas.length) {
       res.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-sec)">Sin visitas programadas para ese día</div>`;
       return;
@@ -966,9 +984,10 @@ async function _calcularRutaOptima(ingId, fecha) {
 // Colección: entregas_campo
 // Al registrar, crea AJUSTE_SALIDA en movimientos_stock
 // ══════════════════════════════════════════════════════════════
-function _montarEntregas() {
+async function _montarEntregas() {
   const wrap = document.getElementById("log-entregas-content");
   if (!wrap) return;
+  if (!_ingenieros.length && _ingPromise) await _ingPromise;
   const hoy    = new Date().toISOString().slice(0,10);
   const hace7  = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
   wrap.innerHTML = `
@@ -1083,9 +1102,7 @@ function _montarEntregas() {
   let _cataloEnt = [];
   async function _cargarCatalogoEnt() {
     if (_cataloEnt.length) return;
-    const { getDocs: gd2, collection: col2, orderBy: ob2, query: q2 } =
-      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    const snap = await gd2(q2(col2(db,"inventario"), ob2("nombre")));
+    const snap = await getDocs(query(collection(db,"productos"), orderBy("nombre")));
     _cataloEnt = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
@@ -1310,17 +1327,19 @@ function _montarEntregas() {
     const desdeTs = desde ? new Date(dy,dm-1,dd,0,0,0).getTime() : Date.now()-7*86400000;
     const hastaTs = hasta ? new Date(hy,hm-1,hd,23,59,59).getTime() : Date.now();
 
-    let cs = [where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
-      orderBy("_ts","desc"), limit(300)];
-    if (ingId) cs = [where("ingenieroId","==",ingId), ...cs];
-    const q = query(collection(db,"entregas_campo"), ...cs);
+    // Sin filtro de ingeniero en Firestore para evitar índice compuesto (filtrar client-side)
+    const q = query(collection(db,"entregas_campo"),
+      where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
+      orderBy("_ts","desc"), limit(300));
 
     const tbody = document.getElementById("ent-body");
     const fmtMXN = v => Number(v||0).toLocaleString("es-MX",{style:"currency",currency:"MXN"});
 
     _entUnsub = onSnapshot(q, snap => {
-      const rows = snap.docs.map(d2 => ({ id: d2.id, ...d2.data() }));
-      const unidades = rows.reduce((s,r) => s + r.productos.reduce((s2,p) => s2+p.cantidad,0), 0);
+      let rows = snap.docs.map(d2 => ({ id: d2.id, ...d2.data() }));
+      // Filtrar por ingeniero client-side
+      if (ingId) rows = rows.filter(r => r.ingenieroId === ingId);
+      const unidades = rows.reduce((s,r) => s + (r.productos||[]).reduce((s2,p) => s2+p.cantidad,0), 0);
       const importe  = rows.reduce((s,r) => s + (r.importe||0), 0);
       const el = id => document.getElementById(id);
       if (el("ent-kpi-total"))    el("ent-kpi-total").textContent    = rows.length;
@@ -1351,6 +1370,91 @@ function _montarEntregas() {
   document.getElementById("ent-filtrar")?.addEventListener("click", _cargarEntregas);
   document.getElementById("ent-filtro-ing")?.addEventListener("change", _cargarEntregas);
   _cargarEntregas();
+}
+
+// ══════════════════════════════════════════════════════════════
+// 🧪 DATOS DE PRUEBA — crea clientes y visitas programadas ficticias
+// Se eliminan automáticamente a las 24h (campo _test: true)
+// ══════════════════════════════════════════════════════════════
+async function _sembrarDatosPrueba() {
+  if (!await window.modal?.({
+    title: "🧪 Datos de prueba",
+    message: "Crea 3 clientes de prueba con frecuencias distintas y 3 visitas programadas para hoy.\n\nSe marcan con _test:true para identificarlos. ¿Continuar?",
+    confirmLabel: "Crear datos de prueba"
+  })) return;
+
+  const btn = document.getElementById("log-seed-btn");
+  btn.disabled = true; btn.textContent = "Creando…";
+
+  try {
+    const hoy      = new Date().toISOString().slice(0,10);
+    const [y,m,d]  = hoy.split("-").map(Number);
+    const hoyTs    = new Date(y,m-1,d,0,0,0).getTime();
+    const ahora    = Date.now();
+
+    // Ingeniero de prueba: primero de la lista o "TEST"
+    const ing     = _ingenieros[0];
+    const ingId   = ing?.uid   || "test-uid";
+    const ingAlias= ing?.alias || "Test Ingeniero";
+
+    const CLIENTES_TEST = [
+      { nombre:"Cliente Prueba Semanal",    frecuenciaVisita:"SEMANAL",    lat:19.432608, lng:-99.133209 },
+      { nombre:"Cliente Prueba Quincenal",  frecuenciaVisita:"QUINCENAL",  lat:19.450000, lng:-99.140000 },
+      { nombre:"Cliente Prueba Mensual",    frecuenciaVisita:"MENSUAL",    lat:19.420000, lng:-99.120000 },
+    ];
+
+    const creados = [];
+    for (const c of CLIENTES_TEST) {
+      // Verificar si ya existe
+      const ex = await getDocs(query(collection(db,"clientes"), where("nombre","==",c.nombre), limit(1)));
+      let cliId;
+      if (!ex.empty) {
+        cliId = ex.docs[0].id;
+      } else {
+        const ref = await addDoc(collection(db,"clientes"), {
+          nombre: c.nombre,
+          frecuenciaVisita: c.frecuenciaVisita,
+          ingenieroId: ingId,
+          ingenieroAlias: ingAlias,
+          lat: c.lat, lng: c.lng,
+          activo: true, _test: true, _ts: ahora
+        });
+        cliId = ref.id;
+      }
+
+      // Visita programada para hoy
+      const exV = await getDocs(query(
+        collection(db,"visitas_programadas"),
+        where("clienteId","==",cliId),
+        where("fechaTs",">=",hoyTs), where("fechaTs","<=",hoyTs+86399999),
+        limit(1)
+      ));
+      if (exV.empty) {
+        await addDoc(collection(db,"visitas_programadas"), {
+          clienteId: cliId,
+          clienteNombre: c.nombre,
+          clienteDireccion: "Dirección de prueba",
+          ingenieroId: ingId,
+          ingenieroAlias: ingAlias,
+          frecuencia: c.frecuenciaVisita,
+          fecha: hoy, fechaTs: hoyTs,
+          ultimaVisita: ahora - (FRECUENCIA_DIAS[c.frecuenciaVisita] || 30) * 86400000,
+          status: "PENDIENTE",
+          generadoEn: ahora, _ts: ahora, _test: true
+        });
+      }
+      creados.push(c.nombre);
+    }
+
+    window.toast?.(`✅ ${creados.length} clientes y visitas de prueba creados para hoy`, "success");
+    _escucharVisitas();
+    _escucharClientes();
+  } catch(e) {
+    window.toast?.("Error: " + e.message, "error");
+    console.error("[Seed]", e);
+  } finally {
+    btn.disabled = false; btn.textContent = "🧪 Datos de prueba";
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1404,10 +1508,9 @@ async function _calcularCumplimiento() {
       const alias = v.ingenieroAlias || v.ingenieroId || "Sin asignar";
       if (!porIng[alias]) porIng[alias] = { total:0, comp:0, omit:0, pend:0 };
       porIng[alias].total++;
-      if (v.status === "COMPLETADA") porIng[alias].comp++;
-      else if (v.status === "OMITIDA") porIng[alias].pend++;
-      else porIng[alias].pend++;
-      if (v.status === "OMITIDA") porIng[alias].omit++;
+      if      (v.status === "COMPLETADA") porIng[alias].comp++;
+      else if (v.status === "OMITIDA")    porIng[alias].omit++;
+      else                                porIng[alias].pend++;
     });
 
     const ings = Object.entries(porIng).sort((a,b) => {
