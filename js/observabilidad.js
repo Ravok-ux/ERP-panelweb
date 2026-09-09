@@ -61,7 +61,7 @@ export const ObservabilidadModule = {
       <!-- Histórico 7 días -->
       <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--text-sec);
         text-transform:uppercase;letter-spacing:.5px">Últimos 7 días</div>
-      <div style="overflow-x:auto;margin-bottom:24px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px">
+      <div style="overflow-x:auto;margin-bottom:24px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;flex-shrink:0">
         <table class="data-table" id="obs-tabla-hist" style="background:var(--surface,#fff)">
           <thead><tr>
             <th>Fecha</th><th>Pedidos</th><th>Visitas</th>
@@ -78,7 +78,7 @@ export const ObservabilidadModule = {
         text-transform:uppercase;letter-spacing:.5px">Último backup manifesto</div>
       <div id="obs-backup-panel" style="
         background:var(--surface,#fff);border:1px solid var(--border);
-        border-radius:8px;overflow:hidden">
+        border-radius:8px;overflow:hidden;flex-shrink:0">
         <div style="padding:16px;color:var(--text-sec);font-size:13px">Cargando…</div>
       </div>
     </div>`;
