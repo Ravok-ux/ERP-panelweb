@@ -277,11 +277,11 @@ function _escucharUbicacionesMapa(map) {
         const pos = { lat, lng };
         if (_markers[id]) {
           _markers[id].setPosition(pos);
-          _markers[id].setTitle(u.alias || id);
+          _markers[id].setTitle(resolverNombre(u.alias || id));
         } else {
           _markers[id] = new google.maps.Marker({
             position: pos, map,
-            title: u.alias || id,
+            title: resolverNombre(u.alias || id),
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 8,
