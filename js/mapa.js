@@ -4,6 +4,7 @@
 
 import { db } from "./firebase-config.js";
 import { estaEnJornadaHoy } from "./app.js";
+import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, onSnapshot, query, orderBy, limit,
   getDocs
@@ -15,7 +16,6 @@ let _markerData = {};      // id → datos más recientes de ubicaciones (para c
 let _unsubs    = [];
 let _mapsReady = false;
 let _autoFitDone = false;  // sólo auto-centrar una vez al primer snapshot
-let _nombres   = {};       // alias → nombre completo, cargado desde usuarios
 
 // ── Replay state ──────────────────────────────────────────────
 let _replay = {
@@ -246,15 +246,8 @@ function _crearMapa() {
     fullscreenControl: false
   });
 
-  // Cargar nombres reales desde usuarios para mostrar en tooltip
-  getDocs(collection(db, "usuarios")).then(snap => {
-    snap.forEach(d => {
-      const data = d.data();
-      if (!data.nombre) return;
-      _nombres[d.id.toLowerCase()] = data.nombre;
-      if (data.alias) _nombres[data.alias.toLowerCase()] = data.nombre;
-    });
-  }).catch(() => {});
+  // Cargar nombres desde el singleton nombres-cache (usa nombre || alias)
+  cargarNombres().catch(() => {});
 
   _escucharUbicacionesMapa(_map);
 }
@@ -306,7 +299,7 @@ function _escucharUbicacionesMapa(map) {
             const ts = live.timestamp?.toDate?.() ?? (typeof live.timestamp === "number" ? new Date(live.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
             const enJ = estaEnJornadaHoy(live);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || _humanizarAlias(live.alias) || id;
+            const nombreMostrar = resolverNombre(live.alias || id);
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
                 <strong>${nombreMostrar}</strong><br>
@@ -323,7 +316,7 @@ function _escucharUbicacionesMapa(map) {
           _markers[id].addListener("click", () => {
             const live = _markerData[id] || {};
             const enJ = estaEnJornadaHoy(live);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || _humanizarAlias(live.alias) || id;
+            const nombreMostrar = resolverNombre(live.alias || id);
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
                 <strong>${nombreMostrar}</strong><br>

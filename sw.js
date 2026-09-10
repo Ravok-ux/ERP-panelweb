@@ -1,7 +1,7 @@
 // Service Worker — N-10 ERP
 // Estrategia: Cache-first para assets estáticos, Network-first para index.html y datos dinámicos
 
-const CACHE_NAME = 'n10-erp-v149';
+const CACHE_NAME = 'n10-erp-v150';
 
 // index.html NUNCA se cachea aquí — siempre se sirve desde la red
 // para garantizar que cada deploy llegue sin necesitar cerrar tabs.
