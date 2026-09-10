@@ -86,19 +86,11 @@ export const norm = s =>
     .replace(/ll/g, "y")
     .trim();
 
-// ── Estado de jornada con validación de fecha ─────────────────
-// Devuelve true solo si enJornada=true Y el timestamp es del día calendario actual.
-// Evita que ingenieros que no cerraron jornada ayer aparezcan como activos hoy.
+// ── Estado de jornada ─────────────────────────────────────────
+// Devuelve true si enJornada=true. La app móvil es responsable de
+// resetear este campo al finalizar la jornada.
 export function estaEnJornadaHoy(ubicacion) {
-  if (!ubicacion?.enJornada) return false;
-  const ts = ubicacion.timestamp;
-  const msTs = typeof ts === "number" ? ts : (ts?.toDate?.()?.getTime() ?? 0);
-  if (!msTs) return false;
-  const hoy = new Date();
-  const diaTs = new Date(msTs);
-  return diaTs.getFullYear() === hoy.getFullYear()
-      && diaTs.getMonth()    === hoy.getMonth()
-      && diaTs.getDate()     === hoy.getDate();
+  return ubicacion?.enJornada === true;
 }
 
 // ── Auditoría ─────────────────────────────────────────────────

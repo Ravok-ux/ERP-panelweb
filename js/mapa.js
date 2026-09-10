@@ -31,6 +31,13 @@ let _replay = {
 
 const _FMT_FECHA = d => d.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
+// Humaniza un alias CamelCase o PascalCase cuando no hay nombre registrado
+// "Sismastecnicoseis" → "Sismastecnicoseis" (sin cambios si no hay mayúsculas internas)
+// "PruebasAldo" → "Pruebas Aldo"
+const _humanizarAlias = alias => alias
+  ? alias.replace(/([a-záéíóúüñ])([A-ZÁÉÍÓÚÜÑ])/g, "$1 $2").trim()
+  : alias;
+
 export const MapaModule = {
   mount(container) {
     container.innerHTML = _html();
@@ -299,7 +306,7 @@ function _escucharUbicacionesMapa(map) {
             const ts = live.timestamp?.toDate?.() ?? (typeof live.timestamp === "number" ? new Date(live.timestamp) : null);
             const hace = ts ? _tiempoRelativo(ts) : "–";
             const enJ = estaEnJornadaHoy(live);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || live.alias || id;
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || _humanizarAlias(live.alias) || id;
             _hoverIW.setContent(
               `<div style="font-family:sans-serif;font-size:12px;padding:4px 6px;line-height:1.6">
                 <strong>${nombreMostrar}</strong><br>
@@ -316,7 +323,7 @@ function _escucharUbicacionesMapa(map) {
           _markers[id].addListener("click", () => {
             const live = _markerData[id] || {};
             const enJ = estaEnJornadaHoy(live);
-            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || live.alias || id;
+            const nombreMostrar = _nombres[id.toLowerCase()] || _nombres[(live.alias||'').toLowerCase()] || _humanizarAlias(live.alias) || id;
             new google.maps.InfoWindow({
               content: `<div style="font-family:sans-serif;padding:4px">
                 <strong>${nombreMostrar}</strong><br>
