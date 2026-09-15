@@ -612,36 +612,44 @@ async function _cargarVisitas() {
       limit(1000)
     ));
 
-    const rows = snap.docs.map(d => d.data());
+    // Parsear timestamp: puede ser Firestore Timestamp u ms number
+    const parseTs = (raw) => raw?.toDate?.() ?? (typeof raw === "number" ? new Date(raw) : null);
 
-    // KPIs agrupados por ingeniero
+    const rows = snap.docs.map(d => {
+      const v = d.data();
+      return { ...v, _ts: parseTs(v.timestamp ?? v.fecha) };
+    });
+
+    // KPIs agrupados por ingeniero (usando nombre resuelto)
     const byIng = {};
     rows.forEach(v => {
-      const k = v.aliasVendedor || "–";
+      const k = resolverNombre(v.aliasVendedor || v.ingeniero || "–");
       if (!byIng[k]) byIng[k] = { total:0, sosp:0 };
       byIng[k].total++;
       if (v.flagSospechosa) byIng[k].sosp++;
     });
-    const ingenieros    = Object.keys(byIng).length;
-    const sospechosas   = rows.filter(v => v.flagSospechosa).length;
+    const ingenieros  = Object.keys(byIng).length;
+    const sospechosas = rows.filter(v => v.flagSospechosa).length;
+    const primeraTs   = rows.length > 0 ? rows[rows.length-1]._ts : null;
 
     _renderKPIs([
-      [String(rows.length),   "TOTAL VISITAS"],
-      [String(ingenieros),    "INGENIEROS"],
-      [String(sospechosas),   "SOSPECHOSAS"],
-      [rows.length > 0 ? _fmtD(new Date(rows[rows.length-1].timestamp)) : "–", "PRIMERA VISITA"]
+      [String(rows.length),                       "TOTAL VISITAS"],
+      [String(ingenieros),                         "INGENIEROS"],
+      [String(sospechosas),                        "SOSPECHOSAS"],
+      [primeraTs ? _fmtD(primeraTs) : "–",        "PRIMERA VISITA"]
     ]);
 
     _renderTabla(rows.length === 0 ? null : rows.map(v => {
-      const ts      = v.timestamp ? new Date(v.timestamp) : null;
+      const ts      = v._ts;
       const sosp    = v.flagSospechosa;
       const gpsOk   = v.distanciaMetros >= 0 && v.distanciaMetros <= 200;
       const gpsTxt  = sosp ? `⚠ ${v.distanciaMetros?.toFixed(0)||"?"}m` : gpsOk ? "✓ OK" : "–";
-      return `<tr style="border-bottom:1px solid var(--border)${sosp?";background:#FFF5F5":""}">
+      const ing     = esc(resolverNombre(v.aliasVendedor || v.ingeniero || "–"));
+      return `<tr style="border-bottom:1px solid var(--border)${sosp?";background:rgba(220,38,38,.06)":""}">
         <td class="txt" style="white-space:nowrap;font-size:11px;color:var(--text-sec)">
           ${ts ? ts.toLocaleDateString("es-MX",{day:"2-digit",month:"short"})+" "+ts.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}) : "–"}
         </td>
-        <td class="txt" style="font-weight:600">${esc(v.aliasVendedor||"–")}</td>
+        <td class="txt" style="font-weight:600">${ing}</td>
         <td class="txt">${esc(v.clienteNombre||"–")}</td>
         <td style="font-size:11px;color:var(--text-sec)">${esc(v.tipo||"–")}</td>
         <td style="font-size:11px;color:${sosp?"#DC2626":gpsOk?"#16A34A":"#9CA3AF"}">${gpsTxt}</td>
@@ -654,9 +662,9 @@ async function _cargarVisitas() {
     _csvData = [
       ["Fecha","Ingeniero","Cliente","Tipo","Distancia (m)","Sospechosa"],
       ...rows.map(v => {
-        const ts = v.timestamp ? new Date(v.timestamp).toLocaleString("es-MX") : "";
-        return [ts, v.aliasVendedor||"–", v.clienteNombre||"–", v.tipo||"–",
-          v.distanciaMetros??"-", v.flagSospechosa?"SÍ":"NO"];
+        const tsStr = v._ts ? v._ts.toLocaleString("es-MX") : "";
+        return [tsStr, resolverNombre(v.aliasVendedor||v.ingeniero||"–"),
+          v.clienteNombre||"–", v.tipo||"–", v.distanciaMetros??"-", v.flagSospechosa?"SÍ":"NO"];
       })
     ];
   } catch (e) { _renderError(e, 6); }
