@@ -509,12 +509,13 @@ function _escucharCotizacionesKPI() {
 // Lee directamente remisiones_credito — semaforoColor y totalAPagarTotal
 // NUNCA se escriben a Firestore, solo existen como cómputo local en Cartera.
 function _escucharCobranzaKPI() {
-  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  const remQ = query(collection(db, "remisiones_credito"), limit(500));
   return onSnapshot(remQ, snap => {
     const ahora = new Date();
     let totalVencido = 0, clientesVencidos = new Set();
     snap.forEach(d => {
       const r = d.data();
+      if (r.status === "PAGADO") return;
       const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
       if (!venc || venc >= ahora) return; // no vencida
       const saldo = Math.max(0, (r.montoOriginal || 0) - (r.totalAbonado || 0));
@@ -531,12 +532,13 @@ function _escucharCobranzaKPI() {
 // ── KPI: Interés en riesgo ────────────────────────────────────
 // Lee remisiones_credito: cuentas con >42 días de atraso (GRAVE o CRÍTICO).
 function _escucharInteresKPI() {
-  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  const remQ = query(collection(db, "remisiones_credito"), limit(500));
   return onSnapshot(remQ, snap => {
     const ahora = new Date();
     let cuentasCriticas = 0, interesEstimado = 0;
     snap.forEach(d => {
       const r = d.data();
+      if (r.status === "PAGADO") return;
       const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
       if (!venc) return;
       const dias = Math.floor((ahora - venc) / 86400000);
@@ -708,12 +710,15 @@ function _escucharClientesSnapshot() {
   }, _logErr("clientes-snapshot"));
 
   // 2. Remisiones activas → semáforo calculado + top deudores (tiempo real)
-  const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
+  // Sin filtro status en Firestore: documentos legacy pueden no tener el campo.
+  // Se filtra status === "PAGADO" en JS para incluirlos correctamente.
+  const remQ = query(collection(db, "remisiones_credito"), limit(500));
   const remUnsub = onSnapshot(remQ, snap => {
     const ahora = new Date();
     const porCliente = {};
     snap.forEach(d => {
       const r = d.data();
+      if (r.status === "PAGADO") return;
       const cid = r.clienteId || r.clienteNombre || d.id;
       const venc = r.fechaVencimiento?.toDate?.() ?? (r.fechaVencimiento ? new Date(r.fechaVencimiento) : null);
       const diasAtraso = venc ? Math.floor((ahora - venc) / 86400000) : 0;
