@@ -359,7 +359,10 @@ function _renderVentas() {
   if (!items) return;
 
   const filtrados = _filtroIng
-    ? _ventas.filter(v => norm(v.ingenieroAlias || "").includes(_filtroIng))
+    ? _ventas.filter(v =>
+        norm(v.ingenieroAlias || "").includes(_filtroIng) ||
+        norm(resolverNombre(v.ingenieroAlias)).includes(_filtroIng)
+      )
     : _ventas;
 
   _q("hv-no-data").style.display  = filtrados.length === 0 ? "" : "none";
