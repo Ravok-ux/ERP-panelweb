@@ -229,19 +229,19 @@ function _tabRentabilidad(datos) {
     const pct = totalG ? (c.total/totalG*100).toFixed(1) : 0;
     const w   = Math.round(c.total/(clientes[0]?.total||1)*100);
     return `<tr>
-      <td style="color:var(--text-muted);text-align:center;font-size:11px">${i+1}</td>
+      <td style="color:var(--text-muted);font-size:11px">${i+1}</td>
       <td style="font-weight:500">${esc(c.key)}</td>
       <td style="font-family:monospace">${MXN(c.total)}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:5px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:5px">
           <div style="width:56px;background:var(--surface2);border-radius:2px;height:7px">
             <div style="width:${w}%;background:#4ADE80;height:100%;border-radius:2px"></div>
           </div>
           <span style="font-size:11px;color:var(--text-muted)">${pct}%</span>
         </div>
       </td>
-      <td style="text-align:right">${c.count}</td>
-      <td style="text-align:right">${MXN(c.ticket)}</td>
+      <td>${c.count}</td>
+      <td style="font-family:monospace">${MXN(c.ticket)}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>`;
 
@@ -251,9 +251,9 @@ function _tabRentabilidad(datos) {
       <td style="font-weight:500">${esc(z.key)}</td>
       <td style="font-family:monospace">${MXN(z.total)}</td>
       <td>${pct}%</td>
-      <td style="text-align:right">${z.count}</td>
-      <td style="text-align:right">${z.clientes}</td>
-      <td style="text-align:right">${MXN(z.ticket)}</td>
+      <td>${z.count}</td>
+      <td>${z.clientes}</td>
+      <td style="font-family:monospace">${MXN(z.ticket)}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>`;
 
@@ -320,7 +320,7 @@ function _tabComparativo(todos) {
   const rowH  = hist6.map(m => `<tr>
     <td>${m.label}</td>
     <td style="font-family:monospace">${MXN(m.total)}</td>
-    <td style="text-align:right">${NUM(m.count)}</td>
+    <td>${NUM(m.count)}</td>
     <td>${MXN(m.count?m.total/m.count:0)}</td>
   </tr>`).join("");
 
@@ -468,8 +468,8 @@ function _render() {
   .bi-tab{background:transparent;border:none;border-bottom:2px solid transparent;padding:8px 18px;cursor:pointer;font-size:13px;color:var(--text-secondary)}
   .bi-tab.active{border-bottom-color:var(--accent);color:var(--text-primary);font-weight:600}
   .bi-table{width:100%;border-collapse:collapse;font-size:12px}
-  .bi-table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;white-space:nowrap}
-  .bi-table td{padding:6px 8px;border-bottom:1px solid var(--border)}
+  .bi-table th{text-align:center;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;white-space:nowrap}
+  .bi-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
   .bi-table tbody tr:hover{background:var(--surface2)}
   .bi-filter select{background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer}
 </style>
