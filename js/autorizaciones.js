@@ -10,7 +10,7 @@ import { crearNotificacion } from "./notificaciones.js";
 import {
   collection, doc, updateDoc, getDocs,
   onSnapshot, query, where, orderBy, limit,
-  serverTimestamp
+  serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { logAudit } from "./app.js";
 
@@ -34,11 +34,13 @@ let _filtroHist = "";  // filtro historial por ingeniero alias
 export const AutorizacionesModule = {
 
   mount(container) {
-    if (!Sesion.esSuperAdmin?.() && !Sesion.flags?.PUEDE_AUTORIZAR_PEDIDOS) {
+    if (!Sesion.esSuperAdmin?.() &&
+        !["GERENTE","ADMINISTRADOR","MESA_CONTROL"].includes(Sesion.rol) &&
+        !Sesion.flags?.PUEDE_AUTORIZAR_PEDIDOS) {
       container.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-sec)">
         <div style="font-size:40px;margin-bottom:12px">🔒</div>
         <div style="font-weight:700;font-size:15px">Acceso restringido</div>
-        <div style="font-size:12px;margin-top:6px">Solo Mesa de Control y Super Admin pueden autorizar pedidos.</div>
+        <div style="font-size:12px;margin-top:6px">Solo Gerentes, Administradores, Mesa de Control y Super Admin pueden autorizar pedidos.</div>
       </div>`;
       return;
     }
@@ -184,18 +186,17 @@ function _suscribirPendientes() {
 }
 
 function _suscribirHistorial() {
-  const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  // Solo filtramos por status; el rango de fecha y ordenamiento se hacen en JS
+  const hace30 = Timestamp.fromMillis(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const q = query(
     collection(db, "pedidos"),
-    where("status", "in", [STATUS_CONFIRMADO, STATUS_RECHAZADO]),
+    where("fechaAutorizacion", ">=", hace30),
+    orderBy("fechaAutorizacion", "desc"),
     limit(200)
   );
   _unsubHistorial = onSnapshot(q, snap => {
     _historial = snap.docs
       .map(d => ({ ...d.data(), id: d.id }))
-      .filter(p => (p.fechaAutorizacion || 0) >= hace30)
-      .sort((a, b) => (b.fechaAutorizacion || 0) - (a.fechaAutorizacion || 0))
+      .filter(p => [STATUS_CONFIRMADO, STATUS_RECHAZADO].includes(p.status))
       .slice(0, 50);
     _renderHistorial();
   }, err => {

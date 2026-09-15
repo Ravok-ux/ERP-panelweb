@@ -336,7 +336,7 @@ function _actualizarKPIs(rows) {
   // Pipeline ponderado = Σ (valorEstimado * probabilidad / 100) para no PERDIDOS
   const pipeline = rows
     .filter(r => r.etapa !== "PERDIDO")
-    .reduce((s, r) => s + ((r.valorEstimado || 0) * ((r.probabilidad ?? 50) / 100)), 0);
+    .reduce((s, r) => s + ((r.valorEstimado || 0) * ((r.probabilidad ?? 0) / 100)), 0);
   const elP = document.getElementById("crm-kpi-pipeline");
   if (elP) elP.textContent = fmtM(pipeline);
 }

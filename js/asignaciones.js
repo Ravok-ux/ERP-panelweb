@@ -195,7 +195,7 @@ async function _cargarUsuariosIngenieros() {
 }
 
 function _escucharClientes() {
-  _cargarUsuariosIngenieros();
+  await _cargarUsuariosIngenieros();
   cargarNombres();
   _unsubClientes = onSnapshot(
     query(collection(db, "clientes"), orderBy("nombre")),

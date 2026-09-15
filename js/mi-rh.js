@@ -173,7 +173,13 @@ function _escucharAsistencia() {
         <td style="font-size:11px;color:var(--text-sec)">${esc(r.notas || "")}</td>
       </tr>`;
     }).join("");
-  }, err => console.error("[MiRH-Asistencia]", err));
+  }, err => {
+    console.error("[MiRH-Asistencia]", err);
+    const tbody = document.getElementById("masi-body");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:#DC2626">
+      Error al cargar asistencia${err.code === "failed-precondition" ? ": índice compuesto requerido en Firestore" : ""}.
+    </td></tr>`;
+  });
   _unsubs.push(unsub);
 }
 

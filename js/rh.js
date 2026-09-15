@@ -49,7 +49,7 @@ function _puedeVer() {
   return Sesion.esSuperAdmin?.() || ["GERENTE","ADMINISTRADOR"].includes(Sesion.rol) || Sesion.tieneFlag("PUEDE_VER_RH");
 }
 function _puedeAprobar() {
-  return Sesion.esSuperAdmin?.() || ["GERENTE","ADMINISTRADOR"].includes(Sesion.rol);
+  return Sesion.esSuperAdmin?.() || ["GERENTE","ADMINISTRADOR","SUPER_ADMIN"].includes(Sesion.rol);
 }
 
 // ── HTML ─────────────────────────────────────────────────────
