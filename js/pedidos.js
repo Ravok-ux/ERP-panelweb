@@ -22,10 +22,11 @@ let _filtroStatus  = "TODOS";
 let _filtroAlias   = "TODOS";
 let _pedidos  = [];
 
-const STATUS = ["TODOS","BORRADOR","CONFIRMADO","EN_RUTA","ENTREGADO","FACTURADO","CANCELADO"];
+const STATUS = ["TODOS","BORRADOR","CONFIRMADO","EN_RUTA","ENTREGADO","FACTURADO","CANCELADO","RECHAZADO"];
 const STATUS_COLOR = {
   BORRADOR:   "#9E9E9E", CONFIRMADO: "#1565C0", EN_RUTA:    "#E65100",
-  ENTREGADO:  "#1B5E20", FACTURADO:  "#4527A0", CANCELADO:  "#B71C1C"
+  ENTREGADO:  "#1B5E20", FACTURADO:  "#4527A0", CANCELADO:  "#B71C1C",
+  RECHAZADO:  "#DC2626"
 };
 const fmt = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
 const fmtDt = d => new Date(d?.toDate?.() ?? d).toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" });
@@ -56,7 +57,7 @@ function _html() {
         letter-spacing:.04em">Estado:</span>
       ${STATUS.map(s => {
         const colors = {TODOS:"",BORRADOR:"#D97706",CONFIRMADO:"#2563EB",EN_RUTA:"#7C3AED",
-          ENTREGADO:"#16A34A",FACTURADO:"#0E7490",CANCELADO:"#DC2626"};
+          ENTREGADO:"#16A34A",FACTURADO:"#0E7490",CANCELADO:"#B71C1C",RECHAZADO:"#DC2626"};
         const c = colors[s] || "var(--text-sec)";
         return `<button class="filter-pill ${s==="TODOS"?"active":""}" data-status="${s}"
           onclick="PedidosUI.setStatus('${s}')"
@@ -64,14 +65,23 @@ function _html() {
           ${s === "TODOS" ? "Todos" : s.replace(/_/g," ")}
         </button>`;}).join("")}
       <div style="flex:1"></div>
+      <!-- Búsqueda -->
+      <div style="position:relative">
+        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:#9CA3AF;pointer-events:none">🔍</span>
+        <input id="pd-busqueda" type="text" placeholder="Folio, cliente…"
+          oninput="PedidosUI.buscar(this.value)"
+          style="padding:5px 10px 5px 26px;border:1px solid var(--border);border-radius:6px;
+            font-size:12px;background:var(--surface);color:var(--text-primary);width:160px">
+      </div>
+      <!-- Ingeniero -->
       <select id="pd-sel-alias" onchange="PedidosUI.setAlias(this.value)"
-        style="border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;
+        style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;
           background:var(--surface);color:var(--text-primary)">
         <option value="TODOS">Todos los ingenieros</option>
       </select>
       <button onclick="PedidosUI.nuevoPedido()"
         style="padding:7px 14px;background:#1B5E20;color:#fff;border:none;border-radius:6px;
-          cursor:pointer;font-size:13px;font-weight:700">
+          cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap">
         + Pedido
       </button>
     </div>
@@ -86,17 +96,18 @@ function _html() {
     </div>
 
     <!-- KPIs rápidos -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="pd-kpis">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px" id="pd-kpis">
       ${[
         {l:"Total",        id:"Total",        c:"var(--text-primary)"},
         {l:"Confirmados",  id:"Confirmados",  c:"#2563EB"},
         {l:"En ruta",      id:"Enruta",       c:"#7C3AED"},
         {l:"Entregados",   id:"Entregados",   c:"#16A34A"},
+        {l:"Monto total",  id:"Monto",        c:"#0E7490"},
       ].map(({l,id,c}) =>
         `<div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);
           padding:14px 16px;box-shadow:var(--shadow)">
-          <div style="font-size:22px;font-weight:900;color:${c};font-variant-numeric:tabular-nums"
-            id="pd-k-${id}">0</div>
+          <div style="font-size:20px;font-weight:900;color:${c};font-variant-numeric:tabular-nums"
+            id="pd-k-${id}">–</div>
           <div style="font-size:10px;font-weight:700;color:var(--text-sec);margin-top:3px;
             text-transform:uppercase;letter-spacing:.04em">${l}</div>
         </div>`).join("")}
@@ -140,7 +151,8 @@ function _bindUI() {
         b.classList.toggle("active", b.dataset.status === s));
       _renderTabla();
     },
-    setAlias(a) { _filtroAlias = a; _renderTabla(); },
+    setAlias(a)  { _filtroAlias = a; _renderTabla(); },
+    buscar(v)    { _filtroBusqueda = v.trim(); _renderTabla(); },
     nuevoPedido() { _abrirFormPedido(); },
     cerrarFormPedido() {
       _unregEsc();
@@ -190,8 +202,17 @@ function _escuchar() {
   _unsub = onSnapshot(q, snap => {
     _pedidos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // Poblar selector de ingenieros
-    const aliases = [...new Set(_pedidos.map(p => p.ingenieroAlias || p.vendedor || "–").filter(Boolean))].sort();
+    // Poblar selector de ingenieros — deduplicar por nombre resuelto
+    const rawAliases = [...new Set(
+      _pedidos.map(p => p.ingenieroAlias || p.vendedor || "").filter(a => a && a !== "–")
+    )].sort();
+    const seenNames = new Set();
+    const aliases = rawAliases.filter(a => {
+      const name = resolverNombre(a);
+      if (seenNames.has(name)) return false;
+      seenNames.add(name);
+      return true;
+    });
     const sel = document.getElementById("pd-sel-alias");
     if (sel) {
       const prev = sel.value;
@@ -206,17 +227,29 @@ function _escuchar() {
   });
 }
 
+let _filtroBusqueda = "";
+
 // ── Render ────────────────────────────────────────────────────
 function _renderTabla() {
   let lista = _pedidos;
   if (_filtroStatus !== "TODOS") lista = lista.filter(p => p.status === _filtroStatus);
-  if (_filtroAlias  !== "TODOS") lista = lista.filter(p => (p.ingenieroAlias || p.vendedor) === _filtroAlias);
+  if (_filtroAlias  !== "TODOS") lista = lista.filter(p =>
+    resolverNombre(p.ingenieroAlias || p.vendedor || "") === resolverNombre(_filtroAlias));
+  if (_filtroBusqueda) {
+    const q = norm(_filtroBusqueda);
+    lista = lista.filter(p =>
+      norm(p.folio || p.id).includes(q) ||
+      norm(p.clienteNombre || p.clienteId || "").includes(q)
+    );
+  }
 
   // KPIs
-  _setText("pd-k-Total",        String(lista.length));
-  _setText("pd-k-Confirmados",  String(lista.filter(p => p.status === "CONFIRMADO").length));
-  _setText("pd-k-Enruta",       String(lista.filter(p => p.status === "EN_RUTA").length));
-  _setText("pd-k-Entregados",   String(lista.filter(p => p.status === "ENTREGADO").length));
+  const monto = lista.reduce((s, p) => s + (p.total || 0), 0);
+  _setText("pd-k-Total",       String(lista.length));
+  _setText("pd-k-Confirmados", String(lista.filter(p => p.status === "CONFIRMADO").length));
+  _setText("pd-k-Enruta",      String(lista.filter(p => p.status === "EN_RUTA").length));
+  _setText("pd-k-Entregados",  String(lista.filter(p => p.status === "ENTREGADO").length));
+  _setText("pd-k-Monto",       fmt.format(monto));
 
   const tbody = document.getElementById("pd-tbody");
   if (!tbody) return;
@@ -226,20 +259,32 @@ function _renderTabla() {
     return;
   }
   const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-  tbody.innerHTML = lista.map(p => {
+  const _tipoLabel = t => {
+    if (!t) return "–";
+    const u = t.toUpperCase();
+    if (u === "CREDITO" || u === "CRÉDITO") return "Crédito";
+    if (u === "CONTADO") return "Contado";
+    return t;
+  };
+
+  tbody.innerHTML = lista.map((p, i) => {
     const color = STATUS_COLOR[p.status] ?? "#9E9E9E";
-    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" data-id="${esc(p.id)}">
-      <td style="padding:10px 14px;font-weight:700;font-variant-numeric:tabular-nums">${esc(p.folio || p.id)}</td>
-      <td style="padding:10px 14px">${esc(p.clienteNombre || p.clienteId || "–")}</td>
-      <td style="padding:10px 14px">${esc(resolverNombre(p.ingenieroAlias || p.vendedor))}</td>
-      <td style="padding:10px 14px;color:var(--text-sec)">${p.fechaPedido ? fmtDt(p.fechaPedido) : "–"}</td>
-      <td style="padding:10px 14px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">
+    const bg    = i % 2 === 1 ? "var(--surface-2)" : "";
+    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;background:${bg};transition:filter .1s"
+      data-id="${esc(p.id)}"
+      onmouseenter="this.style.filter='brightness(1.06)'"
+      onmouseleave="this.style.filter=''">
+      <td style="padding:10px 14px;font-weight:700;font-variant-numeric:tabular-nums;font-family:monospace;font-size:11px">${esc(p.folio || p.id)}</td>
+      <td style="padding:10px 14px;font-size:12px">${esc(p.clienteNombre || p.clienteId || "–")}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--text-sec)">${esc(resolverNombre(p.ingenieroAlias || p.vendedor))}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--text-sec)">${p.fechaPedido ? fmtDt(p.fechaPedido) : "–"}</td>
+      <td style="padding:10px 14px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:12px">
         ${fmt.format(p.total || 0)}</td>
       <td style="padding:10px 14px;text-align:center">
         <span style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px;
           background:${color}1A;color:${color}">${esc(p.status?.replace(/_/g," ") || "–")}</span></td>
-      <td style="padding:10px 14px;text-align:center;color:var(--text-sec);font-size:11px">
-        ${esc(p.tipoVenta || "–")}</td>
+      <td style="padding:10px 14px;text-align:center;font-size:11px;color:var(--text-sec)">
+        ${_tipoLabel(p.tipoVenta)}</td>
     </tr>`;
   }).join("");
 
