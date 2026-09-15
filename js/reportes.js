@@ -782,7 +782,7 @@ async function _cargarTendencia() {
         const pct    = Math.round((d.vendido / maxV) * 100);
         const barC   = d.vendido > 0 ? "#16A34A" : "#E5E7EB";
         return `<tr style="border-bottom:1px solid var(--border)">
-          <td style="font-size:12px;color:var(--text-sec)">${fecha}</td>
+          <td style="font-size:12px;color:var(--text-sec)">${fecha.slice(8)}-${fecha.slice(5,7)}-${fecha.slice(0,4)}</td>
           <td>${d.pedidos}</td>
           <td style="font-variant-numeric:tabular-nums;font-weight:${d.vendido?700:400}">
             ${d.vendido ? _fmt(d.vendido) : "–"}</td>
@@ -1005,7 +1005,7 @@ function _semana(d) {
 function _fmtD(d) { return d.toLocaleDateString("es-MX", { day:"numeric", month:"short" }); }
 function _fmt(n)  {
   if (typeof n !== "number") return "–";
-  return n >= 1000 ? "$" + (n/1000).toFixed(1)+"k" : "$" + n.toLocaleString("es-MX");
+  return new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN", minimumFractionDigits:0, maximumFractionDigits:0 }).format(n);
 }
 function _setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
