@@ -1680,7 +1680,7 @@ function _montarMermas() {
         onmouseenter="this.style.background='#FEF2F220'" onmouseleave="this.style.background='transparent'">
         <div>
           <div style="font-size:12px;font-weight:600">${esc(p.nombre||"")}</div>
-          <div style="font-size:10px;color:#64748B">Stock: ${p.stockActual??0} ${p.unidad||"pza"}</div>
+          <div style="font-size:10px;color:#64748B">Stock: ${p.stockActual??0} ${p.unidad||"pieza"}</div>
         </div>
       </div>`).join("");
     listaEl.querySelectorAll("[data-mrm-idx]").forEach(el => {
@@ -1690,7 +1690,7 @@ function _montarMermas() {
         document.getElementById("mrm-prod-nom").value   = p.nombre;
         document.getElementById("mrm-prod-stock").value = p.stockActual ?? 0;
         document.getElementById("mrm-chip-nom").textContent   = p.nombre;
-        document.getElementById("mrm-chip-stock").textContent = `Stock sistema: ${p.stockActual??0} ${p.unidad||"pza"}`;
+        document.getElementById("mrm-chip-stock").textContent = `Stock sistema: ${p.stockActual??0} ${p.unidad||"pieza"}`;
         document.getElementById("mrm-prod-chip").style.display   = "flex";
         document.getElementById("mrm-prod-search").style.display = "none";
         listaEl.style.display = "none";

@@ -2670,7 +2670,7 @@ function _pedidoToHistorial(pedidoId, p) {
     nombre:      i.nombre     || i.nombreProducto || "–",
     precio:      typeof i.precio    === "number" ? i.precio    : (typeof i.precioUnitario === "number" ? i.precioUnitario : 0),
     cantidad:    typeof i.cantidad  === "number" ? i.cantidad  : (Number(i.cantidad)  || 1),
-    unidad:      i.unidad     || "pza",
+    unidad:      i.unidad     || "pieza",
     categoria:   i.categoria  || "",
     productoId:  i.productoId || i.idPretoriano || "",
   }));

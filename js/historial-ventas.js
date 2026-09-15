@@ -424,13 +424,13 @@ function _exportarExcelIngeniero() {
   const rows = [["Fecha","Cliente","Ingeniero","Cultivo","Etapa","Enfermedad","Producto","Categoría","Cantidad","Unidad","Precio","Total Venta","Método Pago"]];
   _ventas.forEach(v => {
     const ctx = v.contexto || {};
-    (v.productos || [{ nombre: "–", categoria: "–", cantidad: 1, unidad: "pza", precio: v.totalMXN }]).forEach(p => {
+    (v.productos || [{ nombre: "–", categoria: "–", cantidad: 1, unidad: "pieza", precio: v.totalMXN }]).forEach(p => {
       rows.push([
         fmtFecha(v._ts), v.clienteNombre || v.clienteId || "–",
         resolverNombre(v.ingenieroAlias),
         ctx.cultivo || "–", ctx.etapaFenologica || "–", ctx.enfermedad || "–",
         p.nombre || "–", p.categoria || "–",
-        p.cantidad || 1, p.unidad || "pza", p.precio || 0,
+        p.cantidad || 1, p.unidad || "pieza", p.precio || 0,
         v.totalMXN || 0, v.metodoPago || "–"
       ]);
     });
@@ -639,7 +639,7 @@ function _cardVenta(v, mostrarCliente = false) {
         ${p.categoria ? `<span style="font-size:10px;color:#9CA3AF;margin-left:6px">${esc(p.categoria)}</span>` : ""}
       </div>
       <div style="text-align:right;flex-shrink:0;margin-left:12px">
-        <span style="font-size:11px;color:#9CA3AF">${p.cantidad || 1} ${esc(p.unidad || "pza")}</span>
+        <span style="font-size:11px;color:#9CA3AF">${p.cantidad || 1} ${esc(p.unidad || "pieza")}</span>
         <span style="font-size:12px;font-weight:700;color:#4ADE80;margin-left:8px">${fmtMXN(p.precio)}</span>
       </div>
     </div>`).join("");
@@ -687,7 +687,7 @@ function _exportarExcel() {
 
   _ventas.forEach(v => {
     const ctx = v.contexto || {};
-    (v.productos || [{ nombre: "–", categoria: "–", cantidad: 1, unidad: "pza", precio: v.totalMXN }]).forEach(p => {
+    (v.productos || [{ nombre: "–", categoria: "–", cantidad: 1, unidad: "pieza", precio: v.totalMXN }]).forEach(p => {
       rows.push([
         v._fecha || fmtFecha(v._ts),
         v.clienteNombre || _clienteSel?.nombre || "–",
@@ -698,7 +698,7 @@ function _exportarExcel() {
         p.nombre || "–",
         p.categoria || "–",
         p.cantidad || 1,
-        p.unidad || "pza",
+        p.unidad || "pieza",
         p.precio || 0,
         v.totalMXN || 0,
         v.metodoPago || "–"

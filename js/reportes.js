@@ -429,7 +429,7 @@ async function _cargarTopProductos() {
       const items = p.items || p.productos || [];
       items.forEach(it => {
         const nombre = it.nombreProducto || it.nombre || "–";
-        if (!productos[nombre]) productos[nombre] = { cantidad:0, ingresos:0, pedidos:0, unidad: it.unidad || "pza" };
+        if (!productos[nombre]) productos[nombre] = { cantidad:0, ingresos:0, pedidos:0, unidad: it.unidad || "pieza" };
         const cant = Number(it.cantidad) || 0;
         productos[nombre].cantidad  += cant;
         productos[nombre].ingresos  += Number(it.subtotal || it.importe || (it.precio * cant)) || 0;
