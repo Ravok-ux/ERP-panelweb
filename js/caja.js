@@ -48,7 +48,7 @@ function _html() {
 
   <div id="caja-resumen" class="caja-resumen-bar"></div>
 
-  <div style="overflow-x:auto">
+  <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
     <table class="tabla-caja">
       <thead>
         <tr>

@@ -70,7 +70,7 @@ function _inyectarEstilos() {
 .gastos-kpi-card .kpi-val { font-size:22px;font-weight:800;line-height:1.1; }
 .gastos-kpi-card .kpi-lbl { font-size:11px;color:var(--text-sec);text-transform:uppercase;letter-spacing:.4px;font-weight:600; }
 .gastos-resumen { font-size:.85rem;color:var(--text-sec);margin-bottom:.75rem; }
-.tabla-scroll { overflow-x:auto; }
+.tabla-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 250px); }
 .tabla-gastos { width:100%;border-collapse:collapse;font-size:.9rem; }
 .tabla-gastos th { background:var(--surface-2,#F9FAFB);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2 }
 .tabla-gastos td { padding:.55rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle; }

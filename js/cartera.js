@@ -119,7 +119,7 @@ function _html() {
     .cart-pill { padding:5px 13px;border-radius:20px;border:1.5px solid;
       font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;
       background:transparent }
-    .cart-tabla-wrap { overflow-x:auto;border:1px solid var(--border);border-radius:10px }
+    .cart-tabla-wrap { overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px);border:1px solid var(--border);border-radius:10px }
     .cart-tabla { width:100%;border-collapse:collapse;font-size:13px }
     .cart-tabla th { background:var(--surface);padding:10px 12px;
       text-align:left;font-size:10px;font-weight:700;color:#9CA3AF;

@@ -464,7 +464,7 @@ function _montarSpei() {
         </div>
       </div>
 
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
         <table class="data-table">
           <thead><tr>
             <th>FECHA</th><th>REFERENCIA</th><th>CONCEPTO / BANCO</th>
@@ -780,7 +780,7 @@ function _montarWhatsapp() {
           Cola vacía — los mensajes aparecerán aquí cuando se generen desde cobranza o pedidos</div>`;
         return;
       }
-      div.innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+      div.innerHTML = `<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)"><table class="data-table">
         <thead><tr><th>FECHA</th><th>TIPO</th><th>CLIENTE</th><th>TELÉFONO</th><th>ESTADO</th></tr></thead>
         <tbody>${rows.map(r => {
           const estBg = r.estado==="ENVIADO"?"#DCFCE7":r.estado==="ERROR"?"#FEE2E2":"#FEF3C7";
@@ -927,7 +927,7 @@ function _montarApi() {
           Sin tokens generados. Crea el primero para permitir acceso externo a la API.</div>`;
         return;
       }
-      div.innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+      div.innerHTML = `<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)"><table class="data-table">
         <thead><tr><th>CONSUMIDOR</th><th>TIPO</th><th>TOKEN (preview)</th>
           <th>ESTADO</th><th>CREADO</th>${SA()?"<th></th>":""}</tr></thead>
         <tbody>${rows.map(r => {
@@ -1117,7 +1117,7 @@ function _montarApi() {
           Sin eventos registrados. Los eventos aparecerán aquí cuando la API esté activa.</div>`;
         return;
       }
-      div.innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+      div.innerHTML = `<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)"><table class="data-table">
         <thead><tr><th>FECHA</th><th>EVENTO</th><th>WEBHOOK</th><th>STATUS</th><th>PAYLOAD</th></tr></thead>
         <tbody>${rows.map(r => {
           const stBg = r.status===200?"#DCFCE7":r.status>=400?"#FEE2E2":"#FEF3C7";

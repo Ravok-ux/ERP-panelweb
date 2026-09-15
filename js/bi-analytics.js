@@ -261,7 +261,7 @@ function _tabRentabilidad(datos) {
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
   <div class="bi-card">
     <div class="bi-card-title">Rentabilidad por zona</div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
       <table class="bi-table">
         <thead><tr><th>Zona</th><th>Total</th><th>%</th><th>Pedidos</th><th>Clientes</th><th>Ticket prom.</th></tr></thead>
         <tbody>${rowZ}</tbody>
@@ -419,7 +419,7 @@ function _tabDemanda(todos) {
     Promedio ponderado de los últimos 3 meses (peso 1×–2×–3×).
     Basada en ${todos.length} pedidos históricos. Unidades vendidas por producto.
   </p>
-  <div style="overflow-x:auto">
+  <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
     <table class="bi-table">
       <thead><tr>
         <th>Producto</th>${heads}

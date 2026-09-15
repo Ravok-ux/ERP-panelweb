@@ -47,7 +47,7 @@ function _html() {
 
   <div id="tab-asistencia">
     <div id="asi-resumen" style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem"></div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
       <table class="asi-tabla">
         <thead>
           <tr>

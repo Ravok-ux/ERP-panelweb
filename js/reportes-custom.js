@@ -180,7 +180,7 @@ function _html() {
 
   <div id="rc-resumen" style="font-size:.85rem;color:var(--muted);margin:.75rem 0"></div>
 
-  <div style="overflow-x:auto">
+  <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
     <table id="rc-table" class="rc-tabla" style="display:none">
       <thead id="rc-thead"></thead>
       <tbody id="rc-tbody"></tbody>

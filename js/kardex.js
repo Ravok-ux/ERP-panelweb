@@ -91,7 +91,7 @@ function _html() {
     .kx-kpi-val { font-size:22px;font-weight:800;font-variant-numeric:tabular-nums }
     .kx-kpi-lbl { font-size:10px;font-weight:600;color:#9CA3AF;
       text-transform:uppercase;letter-spacing:.05em;margin-top:2px }
-    .kx-tabla-wrap { overflow-x:auto }
+    .kx-tabla-wrap { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 250px) }
     .kx-tabla { width:100%;border-collapse:collapse;font-size:12.5px }
     .kx-tabla th { background:var(--surface);padding:9px 13px;
       text-align:left;font-size:10px;font-weight:700;color:#9CA3AF;
@@ -259,11 +259,14 @@ function _escucharAlertas() {
 }
 
 // ── Render ────────────────────────────────────────────────────
+const TIPOS_KPI_ENTRADA = new Set(["ENTRADA","AJUSTE_ENTRADA","CARGA","REABASTO_SURTIDO"]);
+const TIPOS_KPI_SALIDA  = new Set(["SALIDA","AJUSTE_SALIDA","VENTA","DESCARGA"]);
+
 function _renderKPIs() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set("kx-k-total",   _movimientos.length);
-  set("kx-k-entrada", _movimientos.filter(m => m.tipo === "ENTRADA").length);
-  set("kx-k-salida",  _movimientos.filter(m => m.tipo === "SALIDA").length);
+  set("kx-k-entrada", _movimientos.filter(m => TIPOS_KPI_ENTRADA.has(m.tipo)).length);
+  set("kx-k-salida",  _movimientos.filter(m => TIPOS_KPI_SALIDA.has(m.tipo)).length);
   set("kx-k-ajuste",  _movimientos.filter(m => TIPOS_AJUSTE.includes(m.tipo)).length);
 }
 
@@ -288,7 +291,8 @@ function _renderTabla() {
   tbody.innerHTML = lista.slice(0, 200).map(m => {
     const meta = _meta(m.tipo);
     const ref  = m.folioPedido ? `Pedido ${esc(m.folioPedido)}` : esc(m.motivo || m.referencia || "—");
-    const cant = m.tipo === "SALIDA" || m.tipo === "AJUSTE_SALIDA"
+    const esSalida = TIPOS_KPI_SALIDA.has(m.tipo);
+    const cant = esSalida
       ? `<span style="color:#DC2626;font-weight:700">−${fmtNum(m.cantidad)}</span>`
       : `<span style="color:#16A34A;font-weight:700">+${fmtNum(m.cantidad)}</span>`;
     return `<tr>

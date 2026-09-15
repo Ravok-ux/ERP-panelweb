@@ -86,7 +86,7 @@ function _html() {
     .vis-kpi-lbl { font-size:10px; font-weight:600; color:#9CA3AF;
       text-transform:uppercase; letter-spacing:.05em; margin-top:2px }
     .vis-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px }
-    .vis-tabla-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:10px }
+    .vis-tabla-wrap { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 250px); border:1px solid var(--border); border-radius:10px }
     .vis-tabla { width:100%; border-collapse:collapse; font-size:13px }
     .vis-tabla th { background:var(--surface); padding:10px 14px;
       text-align:left; font-size:10px; font-weight:700; color:#9CA3AF;

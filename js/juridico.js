@@ -82,7 +82,7 @@ export const JuridicoModule = {
       </div>
 
       <!-- Tabla -->
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
         <table class="data-table">
           <thead><tr>
             <th>CLIENTE</th>

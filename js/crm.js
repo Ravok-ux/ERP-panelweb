@@ -388,7 +388,7 @@ function _renderTabla(rows) {
     v.innerHTML = `<div style="padding:48px;text-align:center;color:var(--text-sec)">Sin prospectos con estos filtros</div>`;
     return;
   }
-  v.innerHTML = `<div style="overflow-x:auto"><table class="data-table" id="crm-tabla">
+  v.innerHTML = `<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)"><table class="data-table" id="crm-tabla">
     <thead><tr>
       <th>NOMBRE / GIRO</th><th>TELÉFONO</th><th>INGENIERO</th>
       <th>ETAPA</th><th>NOTAS</th><th>FECHA</th><th></th>
