@@ -9,10 +9,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 
-let _periodo      = "semana";
+let _periodo      = "mes";
 let _tipo         = "comisiones"; // cartera | visitas | comisiones | ventas | productos
 let _fechaDesde   = null; // Date | null — rango personalizado
 let _fechaHasta   = null;
+let _filtroIng    = ""; // filtro de ingeniero en ventas ejecutivas
 
 const META_KEY = "n10_meta_mensual";
 function _getMeta() { return Number(localStorage.getItem(META_KEY)) || 150000; }
@@ -21,10 +22,11 @@ function _setMeta(v) { const n = Number(v); if (n > 0) localStorage.setItem(META
 export const ReportesModule = {
   mount(container) {
     cargarNombres();
-    _periodo    = "semana";
+    _periodo    = "mes";
     _tipo       = "comisiones";
     _fechaDesde = null;
     _fechaHasta = null;
+    _filtroIng  = "";
     _csvData    = [];
     container.innerHTML = _html();
     document.getElementById("rp-tbody").innerHTML = window.skeleton?.(5, 5) ?? "";
@@ -34,10 +36,11 @@ export const ReportesModule = {
   },
 
   destroy() {
-    _periodo    = "semana";
+    _periodo    = "mes";
     _tipo       = "comisiones";
     _fechaDesde = null;
     _fechaHasta = null;
+    _filtroIng  = "";
     _csvData    = [];
   }
 };
@@ -76,7 +79,7 @@ function _html() {
       box-shadow:0 1px 3px rgba(0,0,0,.06);flex-wrap:wrap">
       <span style="font-size:12px;font-weight:700;color:var(--text-primary)">Período:</span>
       ${["hoy","semana","mes","trimestre"].map(p => `
-        <button class="filter-pill ${p==="semana"?"active":""}" data-periodo="${p}"
+        <button class="filter-pill ${p==="mes"?"active":""}" data-periodo="${p}"
           onclick="ReportUI.setPeriodo('${p}')">
           ${{hoy:"Hoy",semana:"Esta semana",mes:"Este mes",trimestre:"Trimestre"}[p]}
         </button>`).join("")}
@@ -88,6 +91,12 @@ function _html() {
       <input type="date" id="rp-hasta" class="sel-sm" style="padding:4px 8px"
         onchange="ReportUI.setRango()">
       <div style="flex:1"></div>
+      <!-- Filtro ingeniero (solo visible en ventas) -->
+      <select id="rp-filtro-ing" style="display:none;padding:4px 8px;border:1px solid var(--border);
+        border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:12px"
+        onchange="ReportUI.setFiltroIng(this.value)">
+        <option value="">Todos los ingenieros</option>
+      </select>
       <label id="rp-meta-wrap" style="font-size:11px;font-weight:700;color:var(--text-sec);display:flex;align-items:center;gap:6px">
         META $
         <input id="rp-meta-input" type="number" min="1" step="1000" value="${_getMeta()}"
@@ -143,14 +152,17 @@ function _bindUI() {
   window.ReportUI = {
     setTipo(t) {
       _tipo = t;
+      _filtroIng = "";
       document.querySelectorAll("[data-tipo]").forEach(b =>
         b.classList.toggle("active", b.dataset.tipo === t));
-      const periodoBar = document.getElementById("rp-periodo-bar");
-      const metaWrap   = document.getElementById("rp-meta-wrap");
-      const tableWrap  = document.querySelector("#reporte-papel .report-table-wrap");
-      const chartArea  = document.getElementById("rp-chart-area");
+      const periodoBar  = document.getElementById("rp-periodo-bar");
+      const metaWrap    = document.getElementById("rp-meta-wrap");
+      const filtroIng   = document.getElementById("rp-filtro-ing");
+      const tableWrap   = document.querySelector("#reporte-papel .report-table-wrap");
+      const chartArea   = document.getElementById("rp-chart-area");
       if (periodoBar) periodoBar.style.display = (t === "cartera" || t === "tendencia") ? "none" : "";
       if (metaWrap)   metaWrap.style.display   = t !== "comisiones" ? "none" : "";
+      if (filtroIng)  { filtroIng.style.display = t === "ventas" ? "" : "none"; filtroIng.value = ""; }
       // Mostrar tabla para todos excepto tendencia; la tendencia gestiona su propio layout
       if (tableWrap) tableWrap.style.display = t === "tendencia" ? "none" : "";
       if (chartArea && t !== "tendencia") chartArea.style.display = "none";
@@ -174,6 +186,7 @@ function _bindUI() {
         _cargarDatos();
       }
     },
+    setFiltroIng(v) { _filtroIng = v; _cargarDatos(); },
     exportarPDF() { window.print(); },
     exportarExcel() { _exportarExcel(); }
   };
@@ -216,11 +229,11 @@ async function _cargarComisiones() {
   try {
     const [pedidosSnap, abonosSnap] = await Promise.all([
       getDocs(query(collection(db,"pedidos"),
-        where("timestamp",">=",Timestamp.fromDate(desde)),
-        where("timestamp","<=",Timestamp.fromDate(hasta)))),
+        where("fechaPedido",">=",desde.getTime()),
+        where("fechaPedido","<=",hasta.getTime()))),
       getDocs(query(collection(db,"abonos_remision"),
-        where("timestamp",">=",Timestamp.fromMillis(desde.getTime())),
-        where("timestamp","<=",Timestamp.fromMillis(hasta.getTime()))))
+        where("fechaAbono",">=",desde.getTime()),
+        where("fechaAbono","<=",hasta.getTime())))
     ]);
 
     const stats = {};
@@ -231,7 +244,7 @@ async function _cargarComisiones() {
       stats[alias].pedidos  += 1;
     });
     abonosSnap.forEach(d => {
-      const a = d.data(), alias = a.quienRegistro || a.alias || "–";
+      const a = d.data(), alias = resolverNombre(a.quienRegistro || a.ingenieroAlias || a.alias || "–");
       if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
       stats[alias].cobrado += a.monto || 0;
     });
@@ -298,21 +311,26 @@ async function _cargarVentasEjecutivas() {
   </tr>`;
 
   try {
+    // cotizaciones: intentar con número y con Timestamp por si acaso
     const [pedSnap, cotSnap] = await Promise.all([
       getDocs(query(collection(db,"pedidos"),
-        where("timestamp",">=",Timestamp.fromDate(desde)),
-        where("timestamp","<=",Timestamp.fromDate(hasta)))),
+        where("fechaPedido",">=",desde.getTime()),
+        where("fechaPedido","<=",hasta.getTime()))),
       getDocs(query(collection(db,"cotizaciones"),
-        where("creadaEn",">=",desde.getTime()),
-        where("creadaEn","<=",hasta.getTime()),
-        limit(2000)))
+        where("creadaEn",">=",Timestamp.fromDate(desde)),
+        where("creadaEn","<=",Timestamp.fromDate(hasta)),
+        limit(2000))).catch(() =>
+          getDocs(query(collection(db,"cotizaciones"),
+            where("creadaEn",">=",desde.getTime()),
+            where("creadaEn","<=",hasta.getTime()),
+            limit(2000))))
     ]);
 
     // Agrupar pedidos por ingeniero
     const stats = {};
     pedSnap.forEach(d => {
       const p = d.data();
-      const alias = resolverNombre(p.vendedor || p.alias || p.ingenieroAlias);
+      const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
       if (!stats[alias]) stats[alias] = { pedidos:0, vendido:0, zona: p.zona || p.zonaAsignada || "–", cots:0, convertidas:0 };
       stats[alias].pedidos++;
       stats[alias].vendido += p.total || 0;
@@ -321,13 +339,27 @@ async function _cargarVentasEjecutivas() {
     // Cotizaciones
     cotSnap.forEach(d => {
       const c = d.data();
-      const alias = resolverNombre(c.ingenieroAlias);
+      const alias = resolverNombre(c.ingenieroAlias || c.vendedor || "–");
       if (!stats[alias]) stats[alias] = { pedidos:0, vendido:0, zona:"–", cots:0, convertidas:0 };
       stats[alias].cots++;
       if (c.status === "CONVERTIDA") stats[alias].convertidas++;
     });
 
-    const ranking = Object.entries(stats).sort((a,b) => b[1].vendido - a[1].vendido);
+    // Poblar selector de ingenieros
+    const selIng = document.getElementById("rp-filtro-ing");
+    if (selIng) {
+      const ingenieros = Object.keys(stats).sort();
+      const curVal = selIng.value;
+      selIng.innerHTML = '<option value="">Todos los ingenieros</option>' +
+        ingenieros.map(a => `<option value="${esc(a)}" ${curVal===a?"selected":""}>${esc(a)}</option>`).join("");
+    }
+
+    // Aplicar filtro de ingeniero si está activo
+    const statsFiltered = _filtroIng
+      ? Object.fromEntries(Object.entries(stats).filter(([a]) => a === _filtroIng))
+      : stats;
+
+    const ranking = Object.entries(statsFiltered).sort((a,b) => b[1].vendido - a[1].vendido);
     const totalVendido  = ranking.reduce((s,[,v]) => s + v.vendido, 0);
     const totalPedidos  = ranking.reduce((s,[,v]) => s + v.pedidos, 0);
     const totalCots     = ranking.reduce((s,[,v]) => s + v.cots, 0);
@@ -385,8 +417,8 @@ async function _cargarTopProductos() {
   try {
     const snap = await getDocs(query(
       collection(db,"pedidos"),
-      where("timestamp",">=",Timestamp.fromDate(desde)),
-      where("timestamp","<=",Timestamp.fromDate(hasta)),
+      where("fechaPedido",">=",desde.getTime()),
+      where("fechaPedido","<=",hasta.getTime()),
       limit(2000)
     ));
 
@@ -397,8 +429,9 @@ async function _cargarTopProductos() {
       items.forEach(it => {
         const nombre = it.nombreProducto || it.nombre || "–";
         if (!productos[nombre]) productos[nombre] = { cantidad:0, ingresos:0, pedidos:0, unidad: it.unidad || "pza" };
-        productos[nombre].cantidad  += Number(it.cantidad) || 0;
-        productos[nombre].ingresos  += Number(it.subtotal || it.importe) || 0;
+        const cant = Number(it.cantidad) || 0;
+        productos[nombre].cantidad  += cant;
+        productos[nombre].ingresos  += Number(it.subtotal || it.importe || (it.precio * cant)) || 0;
         productos[nombre].pedidos++;
       });
     });
@@ -651,8 +684,8 @@ async function _cargarTendencia() {
     const desde = new Date(); desde.setDate(desde.getDate() - 29); desde.setHours(0,0,0,0);
     const snap = await getDocs(query(
       collection(db, "pedidos"),
-      where("timestamp", ">=", Timestamp.fromDate(desde)),
-      orderBy("timestamp", "asc"),
+      where("fechaPedido", ">=", desde.getTime()),
+      orderBy("fechaPedido", "asc"),
       limit(3000)
     ));
 
@@ -665,13 +698,13 @@ async function _cargarTendencia() {
     }
     snap.forEach(doc => {
       const p = doc.data();
-      const ts = p.timestamp instanceof Object ? p.timestamp.toDate() : new Date(p.timestamp);
+      const ts = p.fechaPedido ? new Date(p.fechaPedido) : (p.createdAt ? new Date(p.createdAt) : null);
       const key = ts.toISOString().slice(0,10);
       if (diasMap[key]) {
         diasMap[key].pedidos++;
         diasMap[key].vendido += p.total || 0;
       }
-      const alias = resolverNombre(p.vendedor || p.ingenieroAlias);
+      const alias = resolverNombre(p.vendedor || p.alias || p.ingenieroAlias || "–");
       ingMap[alias] = (ingMap[alias] || 0) + (p.total || 0);
     });
 
@@ -878,9 +911,10 @@ function _renderError(e, cols) {
   if (!window.manejarErrorFirestore?.(e)) {
     const tbody = document.getElementById("rp-tbody");
     if (tbody) tbody.innerHTML = `<tr><td colspan="${cols}"
-      style="color:#DC2626;padding:16px;text-align:center">
-      Error al cargar datos: ${e.message}
+      style="color:#DC2626;padding:16px;text-align:center;font-size:12px">
+      ⚠ Error al cargar datos: ${esc(e.message)}
     </td></tr>`;
+    window.toast?.("Error al cargar reporte: " + e.message, "error");
   }
 }
 

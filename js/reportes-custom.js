@@ -15,6 +15,7 @@ const FUENTES = {
     label: "Pedidos",
     icon: "📦",
     collection: "pedidos",
+    tsField: "fechaPedido",
     campos: {
       folio:          { label: "Folio",          tipo: "texto"   },
       clienteNombre:  { label: "Cliente",        tipo: "texto"   },
@@ -24,7 +25,7 @@ const FUENTES = {
       tipoPedido:     { label: "Tipo pedido",    tipo: "texto"   },
       tipoVenta:      { label: "Tipo venta",     tipo: "texto"   },
       moneda:         { label: "Moneda",         tipo: "texto"   },
-      _ts:            { label: "Fecha",          tipo: "fecha"   },
+      fechaPedido:    { label: "Fecha",          tipo: "fecha"   },
     },
     filtros: ["status", "ingenieroAlias", "clienteNombre", "moneda"],
   },
@@ -319,11 +320,12 @@ async function _generar() {
         .filter(r => r.status !== "PAGADO");
       docs = enriquecerRemisiones(raw);
     } else {
+      const tsF  = fuente.tsField || "_ts";
       const snap = await getDocs(query(
         collection(db, fuente.collection),
-        where("_ts", ">=", ini),
-        where("_ts", "<=", fin),
-        orderBy("_ts", "desc"),
+        where(tsF, ">=", ini),
+        where(tsF, "<=", fin),
+        orderBy(tsF, "desc"),
         fsLimit(500)
       ));
       docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));

@@ -151,6 +151,22 @@
         { "fieldPath": "canal", "order": "ASCENDING" },
         { "fieldPath": "_ts",   "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "presupuestos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "mes",       "order": "ASCENDING" },
+        { "fieldPath": "categoria", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "rh_asistencia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid",   "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

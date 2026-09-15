@@ -27,7 +27,7 @@ async function _cargar() {
     const snap = await getDocs(
       query(collection(db, "pedidos"),
         where("status", "in", STATI),
-        orderBy("fechaCreacion", "desc"),
+        orderBy("fechaPedido", "desc"),
         limit(3000)
       )
     );
@@ -35,15 +35,17 @@ async function _cargar() {
   } catch {
     // si falla el índice, traemos sin filtro y filtramos en cliente
     const snap2 = await getDocs(
-      query(collection(db, "pedidos"), orderBy("fechaCreacion", "desc"), limit(3000))
+      query(collection(db, "pedidos"), orderBy("fechaPedido", "desc"), limit(3000))
     );
     docs = snap2.docs.filter(d => STATI.includes(d.data().status));
   }
 
   _pedidos = docs.map(d => {
     const r = d.data();
-    const fecha = r.fechaCreacion?.toDate?.()
-      || (typeof r.fechaCreacion === "number" ? new Date(r.fechaCreacion) : new Date(0));
+    // APK escribe fechaPedido como ms number; fallback a createdAt
+    const tsRaw = r.fechaPedido ?? r.createdAt;
+    const fecha = tsRaw?.toDate?.()
+      || (typeof tsRaw === "number" ? new Date(tsRaw) : new Date(0));
     return {
       id:        d.id,
       monto:     Number(r.monto || r.total || 0),
@@ -52,7 +54,7 @@ async function _cargar() {
       ingeniero: resolverNombre(r.ingenieroAlias || r.alias || r.ingeniero) || "Desconocido",
       cliente:   r.clienteNombre  || r.cliente || "Desconocido",
       clienteId: r.clienteId || "",
-      productos: Array.isArray(r.productos) ? r.productos : [],
+      productos: Array.isArray(r.items) ? r.items : (Array.isArray(r.productos) ? r.productos : []),
       pago:      r.tipoVenta || r.metodoPago || "—",
     };
   });
@@ -85,10 +87,12 @@ function _agrupar(datos, campo) {
 function _productos(datos) {
   const m = {};
   datos.forEach(p => p.productos.forEach(pr => {
-    const k = pr.nombre || "—";
-    if (!m[k]) m[k] = { nombre:k, categoria:pr.categoria||"—", unidades:0, total:0 };
+    if (!pr.nombre) return;
+    const k = pr.nombre.trim().toLowerCase(); // normalizar case para agrupar correctamente
+    const display = pr.nombre.trim();
+    if (!m[k]) m[k] = { nombre: display, categoria: pr.categoria || "—", unidades: 0, total: 0 };
     m[k].unidades += Number(pr.cantidad || 1);
-    m[k].total    += Number(pr.precioUnitario || 0) * Number(pr.cantidad || 1);
+    m[k].total    += Number(pr.subtotal || pr.importe || (pr.precio * Number(pr.cantidad || 1))) || 0;
   }));
   return Object.values(m).sort((a,b) => b.total - a.total);
 }
@@ -205,7 +209,7 @@ function _tabDashboard(datos) {
 </div>
 
 <div class="bi-card" style="margin-bottom:14px">
-  <div class="bi-card-title">Tendencia — últimas 8 semanas</div>
+  <div class="bi-card-title">Tendencia — últimos 8 meses</div>
   ${_linea(semanas)}
 </div>
 
@@ -371,8 +375,10 @@ function _tabDemanda(todos) {
   mesesDef.forEach(({ label, ini, fin }) => {
     const grp = todos.filter(p => p.fecha >= ini && p.fecha <= fin);
     grp.forEach(p => p.productos.forEach(pr => {
-      const k = pr.nombre || "—";
-      if (!histProd[k]) histProd[k] = { nombre:k, h: Array(nMeses).fill(0) };
+      if (!pr.nombre) return;
+      const k = pr.nombre.trim().toLowerCase();
+      const display = pr.nombre.trim();
+      if (!histProd[k]) histProd[k] = { nombre: display, h: Array(nMeses).fill(0) };
       const idx = mesesDef.findIndex(m => m.label === label);
       if (idx >= 0) histProd[k].h[idx] += Number(pr.cantidad || 1);
     }));
