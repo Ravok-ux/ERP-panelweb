@@ -230,7 +230,7 @@ function _tabRentabilidad(datos) {
     const w   = Math.round(c.total/(clientes[0]?.total||1)*100);
     return `<tr>
       <td style="color:var(--text-muted);font-size:11px">${i+1}</td>
-      <td style="font-weight:500">${esc(c.key)}</td>
+      <td style="font-weight:500;text-align:left">${esc(c.key)}</td>
       <td style="font-family:monospace">${MXN(c.total)}</td>
       <td>
         <div style="display:flex;align-items:center;justify-content:center;gap:5px">
@@ -272,7 +272,7 @@ function _tabRentabilidad(datos) {
     <div class="bi-card-title">Top 30 clientes por volumen</div>
     <div style="overflow-x:auto;max-height:440px">
       <table class="bi-table">
-        <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Part.</th><th>Pedidos</th><th>Ticket prom.</th></tr></thead>
+        <thead><tr><th>#</th><th style="text-align:left">Cliente</th><th>Total</th><th>Part.</th><th>Pedidos</th><th>Ticket prom.</th></tr></thead>
         <tbody>${rowCl}</tbody>
       </table>
     </div>
