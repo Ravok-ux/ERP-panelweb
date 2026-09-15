@@ -2573,3 +2573,204 @@ exports.propagarRemisionACredito = onDocumentWritten(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-OFFLINE: forzar enJornada=false a las 5am
+// Regla: si un ingeniero tiene enJornada:true y su último GPS
+// es de antes de la medianoche de hoy (día anterior), se fuerza offline.
+// Previene que olvidos del día anterior contaminen el KPI del día nuevo.
+// ═══════════════════════════════════════════════════════════════
+exports.autoOfflineIngenieros = onSchedule(
+  { schedule: "0 5 * * *", timeZone: "America/Monterrey", region: "us-central1" },
+  async () => {
+    const ahora = Date.now();
+    // Medianoche de hoy (inicio del día actual en Monterrey)
+    const medianoche = new Date();
+    medianoche.setHours(0, 0, 0, 0);
+    const medianoches = medianoche.getTime();
+
+    const snap = await db.collection("ubicaciones")
+      .where("enJornada", "==", true)
+      .get();
+
+    if (snap.empty) {
+      logger.info("[autoOffline] Ningún ingeniero en jornada — nada que hacer");
+      return;
+    }
+
+    const batch = db.batch();
+    let count = 0;
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const ts   = typeof data.timestamp === "number" ? data.timestamp
+                 : data.timestamp?.toMillis?.() ?? 0;
+
+      // Solo forzar offline si el GPS es de antes de la medianoche de hoy
+      if (ts < medianoches) {
+        batch.update(doc.ref, {
+          enJornada:     false,
+          autoOfflineAt: ahora,
+        });
+        logger.info(`[autoOffline] ${data.alias || doc.id} → offline (último GPS hace ${Math.round((ahora - ts) / 3600000)}h)`);
+        count++;
+
+        // Feed event para trazabilidad
+        const feedRef = db.collection("feed").doc();
+        batch.set(feedRef, {
+          tipo:      "AUTO_OFFLINE",
+          alias:     data.alias || doc.id,
+          uid:       data.uid   || doc.id,
+          timestamp: ahora,
+          mensaje:   `${data.alias || doc.id} fue marcado offline automáticamente (jornada abierta del día anterior)`,
+        });
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+      logger.info(`[autoOffline] ${count} ingeniero(s) forzados offline`);
+    } else {
+      logger.info("[autoOffline] Todos los GPS son de hoy — sin acción");
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════
+// HISTORIAL DE VENTAS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Convierte un pedido confirmado en un doc de historial_ventas.
+ * Se usa tanto en el trigger en tiempo real como en el backfill.
+ */
+function _pedidoToHistorial(pedidoId, p) {
+  // Resolver timestamp: fechaPedido (ms), o createdAt (Firestore Timestamp / objeto con _seconds)
+  let ts = 0;
+  if (typeof p.fechaPedido === "number" && p.fechaPedido > 0) {
+    ts = p.fechaPedido;
+  } else if (p.createdAt) {
+    ts = typeof p.createdAt.toMillis === "function"
+      ? p.createdAt.toMillis()
+      : (p.createdAt._seconds || 0) * 1000;
+  } else if (p.updatedAt) {
+    ts = typeof p.updatedAt.toMillis === "function"
+      ? p.updatedAt.toMillis()
+      : (p.updatedAt._seconds || 0) * 1000;
+  }
+  if (!ts) ts = Date.now();
+
+  const fecha = new Date(ts);
+  const _fecha = fecha.toLocaleDateString("es-MX", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+
+  const productos = (p.items || []).map(i => ({
+    nombre:      i.nombre     || i.nombreProducto || "–",
+    precio:      typeof i.precio    === "number" ? i.precio    : (typeof i.precioUnitario === "number" ? i.precioUnitario : 0),
+    cantidad:    typeof i.cantidad  === "number" ? i.cantidad  : (Number(i.cantidad)  || 1),
+    unidad:      i.unidad     || "pza",
+    categoria:   i.categoria  || "",
+    productoId:  i.productoId || i.idPretoriano || "",
+  }));
+
+  return {
+    pedidoId,
+    folio:         p.folio         || pedidoId,
+    clienteId:     p.clienteId     || "",
+    clienteNombre: p.clienteNombre || "–",
+    ingenieroAlias:p.ingenieroAlias|| "–",
+    ingenieroUid:  p.ingenieroUid  || "",
+    totalMXN:      typeof p.total === "number" ? p.total : 0,
+    metodoPago:    p.tipoVenta     || p.metodoPago || "–",
+    tipoPedido:    p.tipoPedido    || "",
+    status:        p.status        || "CONFIRMADO",
+    productos,
+    // Contexto agronómico: si el pedido lo trae futuro, se guarda aquí
+    contexto: {
+      cultivo:         p.cultivo          || p.contexto?.cultivo         || "",
+      etapaFenologica: p.etapaFenologica  || p.contexto?.etapaFenologica || "",
+      enfermedad:      p.enfermedad       || p.contexto?.enfermedad      || "",
+      region:          p.region           || p.contexto?.region          || "",
+      hectareas:       p.hectareas        || p.contexto?.hectareas       || 0,
+    },
+    _ts:    ts,
+    _fecha,
+    _fuente: "PEDIDO",
+    creadoEn: FieldValue.serverTimestamp(),
+  };
+}
+
+// ── Trigger: pedido → CONFIRMADO ─────────────────────────────────
+exports.onPedidoConfirmado = onDocumentUpdated(
+  { document: "pedidos/{pedidoId}", region: "us-central1" },
+  async (event) => {
+    const antes   = event.data.before.data();
+    const despues = event.data.after.data();
+    const pedidoId = event.params.pedidoId;
+
+    // Solo actuar cuando el status cambia a CONFIRMADO o ENTREGADO
+    const statusesObjectivo = ["CONFIRMADO", "ENTREGADO", "FACTURADO"];
+    const eraNeutro = !statusesObjectivo.includes(antes.status);
+    const esObjetivo = statusesObjectivo.includes(despues.status);
+    if (!eraNeutro || !esObjetivo) return;
+
+    if (!despues.clienteId) {
+      logger.warn(`[onPedidoConfirmado] Pedido ${pedidoId} sin clienteId — omitido`);
+      return;
+    }
+
+    const doc = _pedidoToHistorial(pedidoId, despues);
+    // Usar el pedidoId como doc ID → idempotente
+    await db.collection("historial_ventas").doc(pedidoId).set(doc, { merge: false });
+    logger.info(`[onPedidoConfirmado] historial_ventas/${pedidoId} escrito — cliente=${despues.clienteId} total=${despues.total}`);
+  }
+);
+
+// ── HTTP: backfill de pedidos ya CONFIRMADO/ENTREGADO/FACTURADO ──
+// GET/POST https://us-central1-n10-erp.cloudfunctions.net/backfillHistorialVentas
+// Solo accesible con el Admin SDK (no tiene CORS público).
+exports.backfillHistorialVentas = onRequest(
+  { region: "us-central1", cors: ["https://n10-erp.web.app"] },
+  async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const statusesObjetivo = ["CONFIRMADO", "ENTREGADO", "FACTURADO"];
+      let total = 0, escritos = 0, omitidos = 0;
+
+      for (const status of statusesObjetivo) {
+        const snap = await db.collection("pedidos")
+          .where("status", "==", status)
+          .get();
+
+        total += snap.size;
+
+        // Lote de máx 400 para no exceder límite de 500
+        const chunks = [];
+        for (let i = 0; i < snap.docs.length; i += 400) {
+          chunks.push(snap.docs.slice(i, i + 400));
+        }
+
+        for (const chunk of chunks) {
+          const batch = db.batch();
+          for (const d of chunk) {
+            const p = d.data();
+            if (!p.clienteId) { omitidos++; continue; }
+            const doc = _pedidoToHistorial(d.id, p);
+            batch.set(db.collection("historial_ventas").doc(d.id), doc, { merge: false });
+            escritos++;
+          }
+          await batch.commit();
+        }
+      }
+
+      const ms = Date.now() - t0;
+      logger.info(`[backfillHistorialVentas] total=${total} escritos=${escritos} omitidos=${omitidos} ms=${ms}`);
+      res.json({ ok: true, total, escritos, omitidos, ms });
+    } catch (e) {
+      logger.error("[backfillHistorialVentas] Error:", e);
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+);

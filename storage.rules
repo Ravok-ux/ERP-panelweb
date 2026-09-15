@@ -121,6 +121,21 @@ service firebase.storage {
       allow delete: if cuentaActiva() && esAdminOSuperior();
     }
 
+    // ── chat_adjuntos/{canal}/{archivo} ──────────────────────────────────────
+    // Archivos e imágenes compartidos en el chat interno.
+    match /chat_adjuntos/{canal}/{archivo} {
+      // Lectura: cualquier usuario autenticado activo
+      allow read: if cuentaActiva() && esRolConocido();
+      // Escritura: cualquier rol conocido, máx 20 MB, tipos: imagen/pdf/office
+      allow write: if cuentaActiva()
+                   && esRolConocido()
+                   && request.resource.size <= 20 * 1024 * 1024
+                   && request.resource.contentType.matches(
+                        'image/(jpeg|png|webp|gif)|application/pdf|'
+                        + 'application/vnd.openxmlformats-officedocument\\.(wordprocessingml\\.document|spreadsheetml\\.sheet)');
+      allow delete: if cuentaActiva() && esRolConocido();
+    }
+
     // Bloqueo por defecto — cualquier ruta no listada queda denegada
     match /{allPaths=**} {
       allow read, write: if false;

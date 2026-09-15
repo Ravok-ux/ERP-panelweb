@@ -8,9 +8,11 @@ import { Sesion } from "./auth.js";
 import { esc } from "./app.js";
 import {
   collection, doc, addDoc, onSnapshot, query, setDoc,
-  limit, where, serverTimestamp, updateDoc,
+  limit, where, orderBy, serverTimestamp, updateDoc,
   deleteField, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
+  from "./firebase-storage.js";
 
 const EMOJIS = ["👍","❤️","😂","😮","👏"];
 
@@ -75,7 +77,7 @@ function _bgListenerCanal(canalId) {
   let maxTs   = parseInt(sessionStorage.getItem("chat_visto_" + canalId) || "0");
   let isFirst = true;
   const unsub = onSnapshot(
-    query(collection(db,"mensajes_internos"), where("canal","==",canalId), limit(100)),
+    query(collection(db,"mensajes_internos"), where("canal","==",canalId), orderBy("_ts","asc"), limit(100)),
     snap => {
       if (!isFirst) {
         const nuevos = snap.docs.filter(d => (d.data()._ts||0) > maxTs && d.data().uid !== Sesion.uid);
@@ -209,6 +211,22 @@ function _html() {
     .typing-dots span:nth-child(3){animation-delay:.4s}
     @keyframes tdot{0%,60%,100%{opacity:.25}30%{opacity:1}}
 
+    /* ── Adjunto ── */
+    .chat-attach-btn{background:none;border:none;cursor:pointer;font-size:18px;
+      padding:0 6px;line-height:1;border-radius:6px;transition:background .12s;
+      color:var(--text-sec);flex-shrink:0}
+    .chat-attach-btn:hover{background:var(--hover-bg,rgba(0,0,0,.07))}
+    .chat-archivo-img{max-width:260px;max-height:200px;border-radius:10px;
+      display:block;cursor:pointer;margin-top:4px;object-fit:cover}
+    .chat-archivo-card{display:inline-flex;align-items:center;gap:8px;
+      background:var(--card-bg,#f3f4f6);border:1px solid var(--border);
+      border-radius:10px;padding:8px 12px;cursor:pointer;margin-top:4px;
+      text-decoration:none;color:inherit;max-width:260px}
+    .chat-archivo-card:hover{background:var(--hover-bg,rgba(0,0,0,.07))}
+    .chat-archivo-card-nombre{font-size:12px;font-weight:600;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+    .chat-archivo-card-hint{font-size:10px;color:var(--text-sec);margin-top:1px}
+
     /* ── Crear canal ── */
     .chat-canal-add{background:none;border:none;cursor:pointer;font-size:19px;
       line-height:1;padding:0 2px;color:var(--text-sec);border-radius:4px;
@@ -255,6 +273,9 @@ function _html() {
       </div>
       <div class="chat-typing" id="chat-typing"></div>
       <div class="chat-input-bar">
+        <input type="file" id="chat-file-input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+               style="display:none">
+        <button class="chat-attach-btn" id="chat-attach" title="Adjuntar imagen o archivo">📎</button>
         <textarea id="chat-input" class="chat-input" rows="1"
           placeholder="Escribe un mensaje… (Enter para enviar, Shift+Enter para nueva línea)"></textarea>
         <button class="chat-send-btn" id="chat-send">↑ Enviar</button>
@@ -295,6 +316,14 @@ function _bindUI() {
     _notificarTyping();
   });
   document.getElementById("chat-send")?.addEventListener("click", _enviarMensaje);
+
+  document.getElementById("chat-attach")?.addEventListener("click", () => {
+    document.getElementById("chat-file-input")?.click();
+  });
+  document.getElementById("chat-file-input")?.addEventListener("change", e => {
+    const file = e.target.files?.[0];
+    if (file) { _enviarArchivo(file); e.target.value = ""; }
+  });
 }
 
 // ── Canales custom (Firestore) ──────────────────────────────────
@@ -390,6 +419,7 @@ function _escucharMensajes(canalId) {
   const q = query(
     collection(db,"mensajes_internos"),
     where("canal","==",canalId),
+    orderBy("_ts","asc"),
     limit(100)
   );
 
@@ -462,7 +492,26 @@ function _escucharMensajes(canalId) {
             </div>
             ${cambiaNombre?`<div class="chat-msg-alias">${esc(m.alias||"–")}</div>`:""}
             <div class="chat-bubble ${esMio?"chat-bubble-mio":""}">
-              <span class="chat-texto">${esc(m.texto||"").replace(/\n/g,"<br>")}</span>
+              ${m.texto ? `<span class="chat-texto">${esc(m.texto).replace(/\n/g,"<br>")}</span>` : ""}
+              ${m.tipo==="archivo" && m.archivoTipo?.startsWith("image/")
+                ? `<img class="chat-archivo-img" src="${esc(m.archivoUrl)}"
+                       alt="${esc(m.archivoNombre)}"
+                       onclick="window.open('${esc(m.archivoUrl)}','_blank')"
+                       loading="lazy">`
+                : ""}
+              ${m.tipo==="archivo" && !m.archivoTipo?.startsWith("image/")
+                ? `<a class="chat-archivo-card" href="${esc(m.archivoUrl)}" target="_blank" rel="noopener">
+                     <span style="font-size:20px">${
+                       m.archivoTipo?.includes("pdf") ? "📄"
+                       : m.archivoTipo?.includes("sheet") ? "📊"
+                       : m.archivoTipo?.includes("word") ? "📝" : "📎"
+                     }</span>
+                     <div>
+                       <div class="chat-archivo-card-nombre">${esc(m.archivoNombre||"Archivo")}</div>
+                       <div class="chat-archivo-card-hint">Abrir archivo</div>
+                     </div>
+                   </a>`
+                : ""}
               <span class="chat-hora">${fmtHora(m._ts)}</span>
               ${pinBtn}
             </div>
@@ -591,6 +640,36 @@ async function _enviarMensaje() {
     console.error("[Chat] enviar:", e);
     window.toast?.("Error al enviar: "+e.message,"error");
     if (input) input.value = texto;
+  }
+}
+
+// ── Enviar archivo ──────────────────────────────────────────────
+async function _enviarArchivo(file) {
+  const toast = window.toast;
+  try {
+    toast?.("⬆ Subiendo archivo…", "info");
+    const storage = getStorage();
+    const ruta    = `chat_adjuntos/${_canalActivo}/${Date.now()}_${Sesion.uid}_${file.name}`;
+    const ref     = sRef(storage, ruta);
+    await uploadBytes(ref, file, { contentType: file.type });
+    const url = await getDownloadURL(ref);
+    await addDoc(collection(db,"mensajes_internos"), {
+      canal:         _canalActivo,
+      texto:         "",
+      tipo:          "archivo",
+      archivoUrl:    url,
+      archivoNombre: file.name,
+      archivoTipo:   file.type,
+      uid:           Sesion.uid   || "–",
+      alias:         Sesion.alias || "–",
+      rol:           Sesion.rol   || "–",
+      timestamp:     serverTimestamp(),
+      _ts:           Date.now(),
+    });
+    _sonidoEnviar();
+  } catch(e) {
+    console.error("[Chat] archivo:", e);
+    window.toast?.("Error al subir archivo: "+e.message,"error");
   }
 }
 

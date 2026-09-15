@@ -135,6 +135,22 @@
         { "fieldPath": "clienteId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "mensajes_internos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "canal", "order": "ASCENDING" },
+        { "fieldPath": "_ts",   "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mensajes_internos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "canal", "order": "ASCENDING" },
+        { "fieldPath": "_ts",   "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
