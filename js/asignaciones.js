@@ -7,15 +7,16 @@
 import { db } from "./firebase-config.js";
 import { esc, norm } from "./app.js";
 import { Sesion } from "./auth.js";
-import { cargarNombres, resolverNombre } from "./nombres-cache.js";
+import { cargarNombres, resolverNombre, suscribirCambios } from "./nombres-cache.js";
 import {
-  collection, query, orderBy, onSnapshot, getDocs,
-  doc, updateDoc, addDoc, serverTimestamp, limit, where
+  collection, query, orderBy, onSnapshot,
+  doc, updateDoc, addDoc, serverTimestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ── Estado ─────────────────────────────────────────────────────
 let _unsubClientes   = null;
 let _unsubTraspasos  = null;
+let _unsubUsuarios   = null;
 let _clientes        = [];
 let _ingenieros      = [];   // aliases únicos de clientes (panel izq)
 let _usuariosIng     = [];   // aliases rol=INGENIERO (dropdown destino)
@@ -65,7 +66,8 @@ export const AsignacionesModule = {
   destroy() {
     _unsubClientes?.();
     _unsubTraspasos?.();
-    _unsubClientes = _unsubTraspasos = null;
+    _unsubUsuarios?.();
+    _unsubClientes = _unsubTraspasos = _unsubUsuarios = null;
     _clientes = []; _ingenieros = []; _usuariosIng = [];
     _selIngenieroOri = null; _seleccionados.clear();
     _tabActiva = "asignar"; _filtroClientes = "";
@@ -180,22 +182,18 @@ function _bindTabs() {
 }
 
 // ── Datos ─────────────────────────────────────────────────────
-async function _cargarUsuariosIngenieros() {
-  try {
-    const snap = await getDocs(query(
-      collection(db, "usuarios"),
-      where("rol", "==", "INGENIERO")
-    ));
-    _usuariosIng = snap.docs
-      .filter(d => d.data().activo !== false)
-      .map(d => d.data().alias || d.data().email || d.id)
+function _suscribirIngenieros() {
+  _unsubUsuarios = suscribirCambios(usuarios => {
+    _usuariosIng = usuarios
+      .filter(u => u.activo !== false && u.rol === "INGENIERO")
+      .map(u => u.alias || u.email || u.uid)
       .filter(Boolean)
       .sort();
-  } catch { _usuariosIng = []; }
+  });
 }
 
 async function _escucharClientes() {
-  await _cargarUsuariosIngenieros();
+  _suscribirIngenieros();
   cargarNombres();
   _unsubClientes = onSnapshot(
     query(collection(db, "clientes"), orderBy("nombre")),

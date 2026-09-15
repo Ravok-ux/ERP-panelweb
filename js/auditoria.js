@@ -6,12 +6,14 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, norm } from "./app.js";
+import { suscribirCambios } from "./nombres-cache.js";
 import {
   collection, query, where, orderBy, limit,
-  onSnapshot, getDocs, Timestamp
+  onSnapshot, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-let _unsub = null;
+let _unsub       = null;
+let _unsubUsuarios = null;
 let _rows  = [];
 let _ings  = [];
 
@@ -78,7 +80,8 @@ export const AuditoriaModule = {
     }
     container.innerHTML = _html();
     document.getElementById("aud-body").innerHTML = window.skeleton?.(5, 6) ?? "";
-    _cargarIngenieros().then(() => _bindUI());
+    _bindUI();
+    _suscribirIngenieros();
     _escuchar();
     return () => this.destroy();
   },
@@ -86,6 +89,7 @@ export const AuditoriaModule = {
     _unsub?.();  _unsub  = null;
     _unsubA?.(); _unsubA = null;
     _unsubB?.(); _unsubB = null;
+    _unsubUsuarios?.(); _unsubUsuarios = null;
     _rows = []; _rowsRaw = [];
     _mapaAmbasA = {}; _mapaAmbasB = {};
   }
@@ -95,23 +99,17 @@ function _puedeVer() {
   return Sesion.esSuperAdmin?.() || ["GERENTE","ADMINISTRADOR"].includes(Sesion.rol);
 }
 
-async function _cargarIngenieros() {
-  try {
-    // Sin orderBy para evitar índice compuesto; sort en JS
-    const snap = await getDocs(query(
-      collection(db, "usuarios"),
-      where("activo", "==", true)
-    ));
-    _ings = snap.docs
-      .map(d => ({ uid: d.id, ...d.data() }))
-      .filter(d => d.alias)
+function _suscribirIngenieros() {
+  _unsubUsuarios = suscribirCambios(usuarios => {
+    _ings = usuarios
+      .filter(u => u.activo !== false && u.alias)
       .sort((a, b) => (a.alias || "").localeCompare(b.alias || ""));
     const sel = document.getElementById("aud-ingeniero");
     if (sel) {
       sel.innerHTML = `<option value="">Todos los usuarios</option>` +
         _ings.map(i => `<option value="${esc(i.alias)}">${esc(i.alias)} (${esc(i.rol || "–")})</option>`).join("");
     }
-  } catch(e) { console.error("[Auditoria] cargarIngenieros:", e); }
+  });
 }
 
 // ── HTML ─────────────────────────────────────────────────────

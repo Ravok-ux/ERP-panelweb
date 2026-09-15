@@ -1,15 +1,17 @@
-// nombres-cache.js — Singleton para resolver alias → nombre real desde usuarios
+// nombres-cache.js — Singleton reactivo: alias → nombre real, lista viva de usuarios
 import { db } from "./firebase-config.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const _cache = {};
-let _cargado = false;
-let _promesa = null;
+let _usuariosList = [];
+const _subs = new Set();
+let _unsubFS = null;
 
-export function cargarNombres() {
-  if (_cargado) return Promise.resolve(_cache);
-  if (_promesa) return _promesa;
-  _promesa = getDocs(collection(db, "usuarios")).then(snap => {
+function _iniciarListener() {
+  if (_unsubFS) return;
+  _unsubFS = onSnapshot(collection(db, "usuarios"), snap => {
+    Object.keys(_cache).forEach(k => delete _cache[k]);
+    _usuariosList = [];
     snap.forEach(d => {
       const data = d.data();
       const nombre = data.nombre || data.alias;
@@ -18,14 +20,37 @@ export function cargarNombres() {
       if (data.alias)  _cache[data.alias.toLowerCase()]  = nombre;
       if (data.correo) _cache[data.correo.split('@')[0].toLowerCase()] = nombre;
       if (data.email)  _cache[data.email.split('@')[0].toLowerCase()]  = nombre;
+      _usuariosList.push({ uid: d.id, ...data });
     });
-    _cargado = true;
-    return _cache;
-  }).catch(() => _cache);
-  return _promesa;
+    _subs.forEach(cb => { try { cb(_usuariosList); } catch(e) { console.error("[NombresCache] sub:", e); } });
+  }, err => console.error("[NombresCache] onSnapshot:", err));
+}
+
+// Compatibilidad retroactiva — sigue funcionando igual que antes
+export function cargarNombres() {
+  _iniciarListener();
+  return Promise.resolve(_cache);
 }
 
 export function resolverNombre(alias) {
   if (!alias) return "–";
   return _cache[alias.toLowerCase()] || alias;
+}
+
+// Suscripción reactiva — callback recibe lista completa de usuarios cada vez que cambia
+// Devuelve función para cancelar la suscripción
+export function suscribirCambios(callback) {
+  _iniciarListener();
+  _subs.add(callback);
+  if (_usuariosList.length > 0) {
+    try { callback(_usuariosList); } catch(e) {}
+  }
+  return () => _subs.delete(callback);
+}
+
+// Lista filtrada por roles (array) y activo=true
+export function getIngenieros(roles = null) {
+  const activos = _usuariosList.filter(u => u.activo !== false);
+  if (!roles) return activos;
+  return activos.filter(u => roles.includes(u.rol));
 }

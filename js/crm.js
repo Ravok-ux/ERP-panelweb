@@ -7,9 +7,9 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
-import { cargarNombres, resolverNombre } from "./nombres-cache.js";
+import { cargarNombres, resolverNombre, suscribirCambios } from "./nombres-cache.js";
 import {
-  collection, doc, query, where, orderBy, limit,
+  collection, doc, query, orderBy, limit,
   onSnapshot, addDoc, updateDoc, setDoc, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -35,6 +35,7 @@ const FRECUENCIAS = [
 ];
 
 let _unsubs  = [];
+let _unsubUsuarios = null;
 let _ingenieros = [];
 
 export const CrmModule = {
@@ -191,29 +192,43 @@ export const CrmModule = {
     </div>`;
 
     cargarNombres();
-    _cargarIngenieros().then(() => _iniciarListeners());
+    _suscribirIngenieros();
+    _cargarCatalogos().then(() => _iniciarListeners());
     _bindUI();
     return () => this.destroy();
   },
-  destroy() { _unsubs.forEach(u => u?.()); _unsubs = []; }
+  destroy() {
+    _unsubs.forEach(u => u?.());
+    _unsubs = [];
+    _unsubUsuarios?.();
+    _unsubUsuarios = null;
+  }
 };
 
-// ── Cargar ingenieros ─────────────────────────────────────────
-async function _cargarIngenieros() {
-  const [ingSnap, segSnap, prodSnap] = await Promise.all([
-    getDocs(query(collection(db,"usuarios"), where("activo","==",true))),
+// ── Ingenieros reactivos ──────────────────────────────────────
+function _poblarSelIngenieros() {
+  const opts = _ingenieros.map(u => `<option value="${esc(u.uid)}">${esc(u.alias||u.uid)}</option>`).join("");
+  const filtro = document.getElementById("crm-filtro-ing");
+  const asig   = document.getElementById("crm-ing-asig");
+  if (filtro) filtro.innerHTML = `<option value="">Todos los ingenieros</option>` + opts;
+  if (asig)   asig.innerHTML   = `<option value="">Sin asignar</option>`          + opts;
+}
+
+function _suscribirIngenieros() {
+  _unsubUsuarios = suscribirCambios(usuarios => {
+    _ingenieros = usuarios
+      .filter(u => u.activo !== false && ["INGENIERO","RECUPERADOR"].includes(u.rol))
+      .sort((a, b) => (a.alias||"").localeCompare(b.alias||""));
+    _poblarSelIngenieros();
+  });
+}
+
+// ── Cargar catálogos (segmentos y productos — no usuarios) ────
+async function _cargarCatalogos() {
+  const [segSnap, prodSnap] = await Promise.all([
     getDocs(query(collection(db,"segmentos"), orderBy("nombre"))),
     getDocs(query(collection(db,"productos"),  orderBy("nombre")))
   ]);
-
-  _ingenieros = ingSnap.docs
-    .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol))
-    .map(d => ({ uid: d.id, ...d.data() }))
-    .sort((a, b) => (a.alias||"").localeCompare(b.alias||""));
-
-  const opts = _ingenieros.map(u => `<option value="${esc(u.uid)}">${esc(u.alias||u.uid)}</option>`).join("");
-  document.getElementById("crm-filtro-ing")?.insertAdjacentHTML("beforeend", opts);
-  document.getElementById("crm-ing-asig")?.insertAdjacentHTML("beforeend", opts);
 
   // Segmentos dinámicos en "Convertir a cliente"
   const segSel = document.getElementById("crm-conv-seg");

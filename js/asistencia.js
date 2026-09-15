@@ -2,23 +2,27 @@
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { norm } from "./app.js";
+import { suscribirCambios } from "./nombres-cache.js";
 import {
   collection, query, where, orderBy, onSnapshot, doc,
-  setDoc, getDoc, getDocs, serverTimestamp, limit
+  setDoc, getDoc, serverTimestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-let _unsub    = null;
-let _container = null;
+let _unsub        = null;
+let _unsubUsuarios = null;
+let _container    = null;
 
 export function mount(container) {
   _container = container;
   _container.innerHTML = _html();
   _bindEvents();
   _cargar();
+  _suscribirEmpleados();
 }
 
 export function destroy() {
   if (_unsub) { _unsub(); _unsub = null; }
+  if (_unsubUsuarios) { _unsubUsuarios(); _unsubUsuarios = null; }
 }
 
 // ─── HTML ─────────────────────────────────────────────────────────────────────
@@ -124,7 +128,7 @@ function _bindEvents() {
       _container.querySelectorAll(".asi-tab").forEach(b => b.classList.toggle("asi-tab-active", b === btn));
       _container.querySelector("#tab-asistencia").style.display = btn.dataset.tab === "asistencia" ? "block" : "none";
       _container.querySelector("#tab-horarios").style.display   = btn.dataset.tab === "horarios"   ? "block" : "none";
-      if (btn.dataset.tab === "horarios") { _cargarEmpleadosSelect(); _cargarHorarios(); }
+      if (btn.dataset.tab === "horarios") { _cargarHorarios(); }
     });
   });
 }
@@ -211,24 +215,19 @@ function _retardoMin(d, horario) {
 
 // ─── Horarios ─────────────────────────────────────────────────────────────────
 
-async function _cargarEmpleadosSelect() {
-  const sel = _container?.querySelector("#hor-alias");
-  if (!sel || sel.options.length > 1) return; // ya poblado
-  try {
-    const snap = await getDocs(query(collection(db, "usuarios"), where("activo", "==", true)));
-    const EXCLUIR = ["SUPER_ADMIN"];
-    const empleados = snap.docs
-      .filter(d => !EXCLUIR.includes(d.data().rol))
-      .map(d => d.data().alias)
-      .filter(Boolean)
+function _suscribirEmpleados() {
+  const EXCLUIR = ["SUPER_ADMIN"];
+  _unsubUsuarios = suscribirCambios(usuarios => {
+    const sel = _container?.querySelector("#hor-alias");
+    if (!sel) return;
+    const actual = sel.value;
+    const empleados = usuarios
+      .filter(u => u.activo !== false && !EXCLUIR.includes(u.rol) && u.alias)
+      .map(u => u.alias)
       .sort((a, b) => a.localeCompare(b));
-    empleados.forEach(alias => {
-      const opt = document.createElement("option");
-      opt.value = alias;
-      opt.textContent = alias;
-      sel.appendChild(opt);
-    });
-  } catch(e) { console.warn("[Asistencia] No se pudieron cargar empleados:", e); }
+    sel.innerHTML = `<option value="">— Empleado —</option>` +
+      empleados.map(a => `<option value="${a}"${a === actual ? " selected" : ""}>${a}</option>`).join("");
+  });
 }
 
 async function _cargarHorarios() {
