@@ -503,14 +503,14 @@ function _bindUI(container) {
     const q = norm(_busqueda);
     if (q.length < 2 || !visSearchDd) { if (visSearchDd) visSearchDd.style.display = "none"; return; }
     const matches = _clientes
-      .filter(c => norm(c.nombre).includes(q) || norm(c.vendedor).includes(q))
+      .filter(c => norm(c.nombre).includes(q) || norm(c.ingenieroAlias || c.vendedor || "").includes(q))
       .slice(0, 12);
     if (!matches.length) { visSearchDd.style.display = "none"; return; }
     visSearchDd.innerHTML = matches.map(c =>
       `<div class="vis-dd-item" data-nombre="${esc(c.nombre)}"
         style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary)">
         <span style="font-weight:600">${esc(c.nombre)}</span>
-        ${c.vendedor ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.vendedor)}</span>` : ""}
+        ${(c.ingenieroAlias||c.vendedor) ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.ingenieroAlias||c.vendedor)}</span>` : ""}
       </div>`).join("");
     visSearchDd.style.display = "block";
     visSearchDd.querySelectorAll(".vis-dd-item").forEach(el =>
