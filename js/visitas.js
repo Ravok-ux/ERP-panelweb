@@ -308,7 +308,7 @@ function _renderCalendario() {
   const en7 = new Date(hoy); en7.setDate(en7.getDate() + 7);
 
   let lista = _clientes.filter(c => {
-    if (q && !norm(c.nombre).includes(q) && !norm(c.vendedor).includes(q)) return false;
+    if (q && !norm(c.nombre).includes(q) && !norm(c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
     const pv = toDate(c.proximaVisita);
     switch (_filtroFreq) {
       case "VENCIDAS":    return pv && pv < hoy;
@@ -346,7 +346,7 @@ function _renderCalendario() {
     return `<tr>
       <td style="font-weight:600;max-width:200px;overflow:hidden;
         text-overflow:ellipsis;white-space:nowrap">${esc(c.nombre || c.id)}</td>
-      <td style="color:#9CA3AF;font-size:12px">${esc(c.vendedor || "—")}</td>
+      <td style="color:#9CA3AF;font-size:12px">${esc(c.ingenieroAlias || c.vendedor || "—")}</td>
       <td style="font-size:12px">${esc(freqLabel)}</td>
       <td style="font-size:12px;color:#9CA3AF">${uv ? fmtCorto(uv) : "Nunca"}</td>
       <td style="font-size:12px">${pv ? fmtFecha(pv) : "—"}</td>
