@@ -75,7 +75,7 @@ function _html() {
 .caja-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem; }
 .caja-resumen-bar { font-size:.85rem;color:var(--muted);margin-bottom:.75rem; }
 .tabla-caja { width:100%;border-collapse:collapse;font-size:.88rem; }
-.tabla-caja th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap; }
+.tabla-caja th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2 }
 .tabla-caja td { padding:.55rem .8rem;border-bottom:1px solid var(--border);vertical-align:top; }
 .tabla-caja tr:hover td { background:var(--surface-2); }
 .monto-pos { color:#16A34A;font-weight:700; }
@@ -109,9 +109,9 @@ function _bindEvents() {
 
 function _cargarCortes() {
   if (_unsub) { _unsub(); _unsub = null; }
-  let q = query(collection(db, "cortes_caja"), orderBy("_ts", "desc"));
+  let q = query(collection(db, "cortes_caja"), orderBy("_ts", "desc"), limit(200));
   if (_filtroStatus) {
-    q = query(collection(db, "cortes_caja"), where("status", "==", _filtroStatus), orderBy("_ts", "desc"));
+    q = query(collection(db, "cortes_caja"), where("status", "==", _filtroStatus), orderBy("_ts", "desc"), limit(200));
   }
   _unsub = onSnapshot(q, snap => {
     _lastDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -162,7 +162,7 @@ function _render(docs) {
     const dif     = (c.totalDeclarado || 0) - (c.totalSistema || 0);
     const difCls  = dif < -1 ? "monto-neg" : dif > 1 ? "monto-pos" : "";
     const badgeCls = c.status === "VALIDADO" ? "badge-val" : c.status === "DIFERENCIA" ? "badge-dif" : "badge-pend";
-    const fecha    = c._ts ? new Date(c._ts).toLocaleDateString("es-MX", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+    const fecha    = c._ts ? new Date(c._ts).toLocaleString("es-MX", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
     const acciones = c.status === "PENDIENTE" ? `
       <button class="btn-validar" data-id="${c.id}">Validar</button>
       <button class="btn-rechazar" data-id="${c.id}">Diferencia</button>` : `<span style="font-size:.8rem;color:var(--muted)">${c.validadoPor || "—"}</span>`;

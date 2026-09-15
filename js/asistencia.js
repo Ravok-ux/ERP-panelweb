@@ -92,7 +92,7 @@ function _html() {
 .asi-tab:hover { background:var(--surface-2); }
 .asi-tab-active { background:#2563EB;color:#fff;border-color:#2563EB;font-weight:700; }
 .asi-tabla { width:100%;border-collapse:collapse;font-size:.88rem; }
-.asi-tabla th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap; }
+.asi-tabla th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2 }
 .asi-tabla td { padding:.55rem .8rem;border-bottom:1px solid var(--border); }
 .asi-tabla tr:hover td { background:var(--surface-2); }
 .asi-badge-ok  { background:#D1FAE5;color:#065F46;border-radius:4px;padding:.15rem .4rem;font-size:.75rem;font-weight:700; }

@@ -71,7 +71,8 @@ export const CotizacionesPanelModule = (() => {
       .cot-tabla th { background:var(--surface); padding:10px 14px;
         text-align:left; font-size:10px; font-weight:700; color:#9CA3AF;
         text-transform:uppercase; letter-spacing:.06em;
-        border-bottom:1px solid var(--border); white-space:nowrap }
+        border-bottom:1px solid var(--border); white-space:nowrap;
+        position:sticky; top:0; z-index:2 }
       .cot-tabla td { padding:11px 14px; border-bottom:1px solid var(--border);
         color:var(--text-primary); vertical-align:middle }
       .cot-tabla tbody tr:last-child td { border-bottom:none }

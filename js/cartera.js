@@ -71,10 +71,13 @@ function _escuchar() {
   _unsub = onSnapshot(
     query(collection(db, "clientes"), limit(500)),
     snap => {
+      if (snap.docs.length >= 500) {
+        window.toast?.("Mostrando los primeros 500 clientes. Puede haber más registros.", "warning");
+      }
       _clientes = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(c => (c.saldoPendiente > 0 || c.totalAPagarTotal > 0 ||
-                      c.diasMaxVencidos > 0 || c.semaforoColor))
+                      c.diasMaxVencidos > 0 || (c.semaforoColor && c.saldoCapitalTotal > 0)))
         .sort((a, b) => (b.diasMaxVencidos || 0) - (a.diasMaxVencidos || 0));
       _renderKpis();
       _aplicarFiltros();
@@ -121,7 +124,8 @@ function _html() {
     .cart-tabla th { background:var(--surface);padding:10px 12px;
       text-align:left;font-size:10px;font-weight:700;color:#9CA3AF;
       text-transform:uppercase;letter-spacing:.06em;
-      border-bottom:1px solid var(--border);white-space:nowrap }
+      border-bottom:1px solid var(--border);white-space:nowrap;
+      position:sticky;top:0;z-index:2 }
     .cart-tabla th.num { text-align:right }
     .cart-tabla th.ctr { text-align:center }
     .cart-tabla td { padding:10px 12px;border-bottom:1px solid var(--border);

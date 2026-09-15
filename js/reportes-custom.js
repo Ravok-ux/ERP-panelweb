@@ -202,7 +202,7 @@ function _html() {
 .rc-label { display:block;font-size:.82rem;font-weight:700;margin-bottom:.35rem; }
 .rc-campo-check { display:flex;align-items:center;gap:.3rem;font-size:.82rem;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:.25rem .5rem;cursor:pointer; }
 .rc-tabla { width:100%;border-collapse:collapse;font-size:.88rem; }
-.rc-tabla th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap; }
+.rc-tabla th { background:var(--surface-2);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2 }
 .rc-tabla td { padding:.5rem .8rem;border-bottom:1px solid var(--border); }
 .rc-tabla tr:hover td { background:var(--surface-2); }
 </style>`;

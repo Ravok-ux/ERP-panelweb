@@ -468,7 +468,7 @@ function _render() {
   .bi-tab{background:transparent;border:none;border-bottom:2px solid transparent;padding:8px 18px;cursor:pointer;font-size:13px;color:var(--text-secondary)}
   .bi-tab.active{border-bottom-color:var(--accent);color:var(--text-primary);font-weight:600}
   .bi-table{width:100%;border-collapse:collapse;font-size:12px}
-  .bi-table th{text-align:center;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;white-space:nowrap}
+  .bi-table th{text-align:center;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;white-space:nowrap;background:var(--surface-2,var(--bg));position:sticky;top:0;z-index:2}
   .bi-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
   .bi-table tbody tr:hover{background:var(--surface2)}
   .bi-filter select{background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer}

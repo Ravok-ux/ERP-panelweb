@@ -72,7 +72,7 @@ function _inyectarEstilos() {
 .gastos-resumen { font-size:.85rem;color:var(--text-sec);margin-bottom:.75rem; }
 .tabla-scroll { overflow-x:auto; }
 .tabla-gastos { width:100%;border-collapse:collapse;font-size:.9rem; }
-.tabla-gastos th { background:var(--surface-2,#F9FAFB);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap; }
+.tabla-gastos th { background:var(--surface-2,#F9FAFB);padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2 }
 .tabla-gastos td { padding:.55rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle; }
 .tabla-gastos tr:hover td { background:var(--surface-2,#F9FAFB); }
 .monto-cell { font-weight:700;color:#1D4ED8;white-space:nowrap; }
@@ -223,14 +223,12 @@ function _bindFiltros() {
 
 function _cargar() {
   if (_unsub) { _unsub(); _unsub = null; }
-  let q = query(collection(db, "gastos_empleado"), orderBy("_ts", "desc"), limit(500));
-  if (_filtroStatus) {
-    q = query(collection(db, "gastos_empleado"),
-      where("status", "==", _filtroStatus), orderBy("_ts", "desc"), limit(500));
-  }
+  // Siempre carga todos para KPIs globales correctos; el filtro de status se aplica client-side
+  const q = query(collection(db, "gastos_empleado"), orderBy("_ts", "desc"), limit(500));
   _unsub = onSnapshot(q, snap => {
-    _lastDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    _actualizarKPIs(_lastDocs);
+    const allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _actualizarKPIs(allDocs);
+    _lastDocs = _filtroStatus ? allDocs.filter(d => d.status === _filtroStatus) : allDocs;
     _render(_lastDocs);
   }, err => {
     console.error("[Gastos]", err);
@@ -247,7 +245,9 @@ function _actualizarKPIs(docs) {
   const mesActual = ahora.getMonth();
   const anioActual = ahora.getFullYear();
   const esMesActual = ts => {
+    if (!ts) return false;
     const d = new Date(typeof ts === "number" ? ts : (ts?.toMillis?.() ?? ts));
+    if (isNaN(d)) return false;
     return d.getMonth() === mesActual && d.getFullYear() === anioActual;
   };
 
