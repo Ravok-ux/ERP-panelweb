@@ -308,7 +308,7 @@ function _renderCalendario() {
   const en7 = new Date(hoy); en7.setDate(en7.getDate() + 7);
 
   let lista = _clientes.filter(c => {
-    if (q && !norm(c.nombre).includes(q) && !norm(c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
+    if (q && !norm(c.nombre).includes(q) && !norm(c.ingeniero || c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
     const pv = toDate(c.proximaVisita);
     switch (_filtroFreq) {
       case "VENCIDAS":    return pv && pv < hoy;
@@ -346,7 +346,7 @@ function _renderCalendario() {
     return `<tr>
       <td style="font-weight:600;max-width:200px;overflow:hidden;
         text-overflow:ellipsis;white-space:nowrap">${esc(c.nombre || c.id)}</td>
-      <td style="color:#9CA3AF;font-size:12px">${esc(c.ingenieroAlias || c.vendedor || "—")}</td>
+      <td style="color:#9CA3AF;font-size:12px">${esc(c.ingeniero || c.ingenieroAlias || c.vendedor || "—")}</td>
       <td style="font-size:12px">${esc(freqLabel)}</td>
       <td style="font-size:12px;color:#9CA3AF">${uv ? fmtCorto(uv) : "Nunca"}</td>
       <td style="font-size:12px">${pv ? fmtFecha(pv) : "—"}</td>
@@ -510,7 +510,7 @@ function _bindUI(container) {
       `<div class="vis-dd-item" data-nombre="${esc(c.nombre)}"
         style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary)">
         <span style="font-weight:600">${esc(c.nombre)}</span>
-        ${(c.ingenieroAlias||c.vendedor) ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.ingenieroAlias||c.vendedor)}</span>` : ""}
+        ${(c.ingeniero||c.ingenieroAlias||c.vendedor) ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.ingeniero||c.ingenieroAlias||c.vendedor)}</span>` : ""}
       </div>`).join("");
     visSearchDd.style.display = "block";
     visSearchDd.querySelectorAll(".vis-dd-item").forEach(el =>

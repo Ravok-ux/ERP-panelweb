@@ -96,7 +96,7 @@ function _aplicarFiltros() {
   const q = norm(_fBusq);
   const filtrados = _clientes.filter(c => {
     if (_fColor !== "TODOS" && c.semaforoColor !== _fColor) return false;
-    if (q && !norm(c.nombre).includes(q) && !norm(c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
+    if (q && !norm(c.nombre).includes(q) && !norm(c.ingeniero || c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
     return true;
   });
   _renderTabla(filtrados);
@@ -343,7 +343,7 @@ function _renderTabla(filtrados) {
     return `<tr>
       <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${esc(c.nombre || c.id)}</td>
-      <td style="color:#9CA3AF;font-size:12px">${esc(c.ingenieroAlias || resolverNombre(c.vendedor) || "—")}</td>
+      <td style="color:#9CA3AF;font-size:12px">${esc(c.ingeniero || c.ingenieroAlias || resolverNombre(c.vendedor) || "—")}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:#9CA3AF">${fmt.format(capital)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:${interes>0?"#D97706":"#9CA3AF"}">
         ${interes > 0 ? fmt.format(interes) : "—"}</td>
@@ -418,14 +418,14 @@ function _bindUI(container) {
     const q = norm(_fBusq);
     if (q.length < 2 || !cartSearchDd) { if (cartSearchDd) cartSearchDd.style.display = "none"; return; }
     const matches = _clientes
-      .filter(c => norm(c.nombre).includes(q) || norm(c.ingenieroAlias || c.vendedor || "").includes(q))
+      .filter(c => norm(c.nombre).includes(q) || norm(c.ingeniero || c.ingenieroAlias || c.vendedor || "").includes(q))
       .slice(0, 12);
     if (!matches.length) { cartSearchDd.style.display = "none"; return; }
     cartSearchDd.innerHTML = matches.map(c =>
       `<div class="cart-dd-item" data-nombre="${esc(c.nombre)}"
         style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary)">
         <span style="font-weight:600">${esc(c.nombre)}</span>
-        ${(c.ingenieroAlias||c.vendedor) ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.ingenieroAlias || resolverNombre(c.vendedor))}</span>` : ""}
+        ${(c.ingeniero||c.ingenieroAlias||c.vendedor) ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(c.ingeniero||c.ingenieroAlias||resolverNombre(c.vendedor))}</span>` : ""}
       </div>`).join("");
     cartSearchDd.style.display = "block";
     cartSearchDd.querySelectorAll(".cart-dd-item").forEach(el =>
@@ -568,7 +568,7 @@ async function _guardarConfig(scope) {
 function _exportar() {
   const rows = _clientes.map(c => ({
     cliente:      c.nombre || c.id,
-    ingeniero:    c.ingenieroAlias || c.vendedor || "—",
+    ingeniero:    c.ingeniero || c.ingenieroAlias || c.vendedor || "—",
     capital:      c.saldoCapitalTotal ?? c.saldoPendiente ?? 0,
     interes:      c.interesTotal ?? 0,
     totalAPagar:  c.totalAPagarTotal ?? ((c.saldoCapitalTotal ?? c.saldoPendiente ?? 0) + (c.interesTotal ?? 0)),
