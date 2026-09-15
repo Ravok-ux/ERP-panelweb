@@ -181,10 +181,12 @@ function _medianoches() {
 
 function _escucharFeed() {
   // Solo eventos de hoy (timestamp >= medianoche local)
+  // timestamp en Firestore es un Timestamp object → usar Timestamp.fromMillis
   const medianoches = _medianoches();
+  const tsHoy = Timestamp.fromMillis(medianoches);
   const q = query(
     collection(db, "log_actividades"),
-    where("timestamp", ">=", medianoches),
+    where("timestamp", ">=", tsHoy),
     orderBy("timestamp", "desc"),
     limit(200)
   );
@@ -207,12 +209,13 @@ function _escucharFeed() {
 
 async function _cargarHistorial() {
   const medianoches = _medianoches();
+  const tsHoy = Timestamp.fromMillis(medianoches);
   const el = document.getElementById("feed-list");
   if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-sec);font-size:12px">Cargando historial…</div>`;
 
   const q = query(
     collection(db, "log_actividades"),
-    where("timestamp", "<", medianoches),
+    where("timestamp", "<", tsHoy),
     orderBy("timestamp", "desc"),
     limit(500)
   );

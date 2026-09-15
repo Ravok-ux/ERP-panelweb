@@ -1109,9 +1109,10 @@ function _escucharCharts() {
 function _escucharFeedDash() {
   // Solo eventos de hoy para el mini-feed y el badge
   const medianoches = (() => { const m = new Date(); m.setHours(0,0,0,0); return m.getTime(); })();
+  const tsHoy = Timestamp.fromMillis(medianoches);
   const feedQ = query(
     collection(db, "log_actividades"),
-    where("timestamp", ">=", medianoches),
+    where("timestamp", ">=", tsHoy),
     orderBy("timestamp", "desc"),
     limit(20)
   );
