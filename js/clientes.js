@@ -66,9 +66,13 @@ const _COLS = [
 const fmt   = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 const fmtDt = d => {
   if (!d) return "—";
-  try { return new Date(d?.toDate?.() ?? d).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }); }
-  catch { return "—"; }
+  try {
+    const date = typeof d === "number" ? new Date(d) : new Date(d?.toDate?.() ?? d);
+    if (isNaN(date) || d === 0) return "—";
+    return date.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  } catch { return "—"; }
 };
+const _saldoCliente = c => Number(c.saldoCapitalTotal ?? c.totalAPagarTotal ?? c.saldo) || 0;
 
 let _unsub      = null;
 let _clientes   = [];
@@ -84,6 +88,8 @@ let _fEstado    = "TODOS";   // TODOS | activos | inactivos
 let _fSaldo     = "TODOS";   // TODOS | con_saldo | sin_saldo
 
 let _detalleId  = null;
+let _sortCol    = null;   // key de columna activa
+let _sortDir    = 1;      // 1=asc, -1=desc
 
 // ── Módulo exportado ──────────────────────────────────────────
 export const ClientesModule = {
@@ -111,13 +117,13 @@ function _html() {
   <div style="padding:0 0 24px">
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px">
       ${_kpi("cli-k-total",  "CLIENTES",       "var(--text-primary)")}
       ${_kpi("cli-k-activos","ACTIVOS",        "#16A34A")}
       ${_kpi("cli-k-saldo",  "SALDO TOTAL",    "#2563EB")}
-      ${_kpi("cli-k-visita", "CON VISITA HOY", "#7C3AED")}
+      ${_kpi("cli-k-visita", "VISITA HOY",     "#7C3AED")}
       ${_kpi("cli-k-segs",   "SEGMENTOS",      "#D97706")}
-      ${_kpi("cli-k-abc-a",  "CLIENTES A",     "#B45309")}
+      ${_kpi("cli-k-abc-a",  "CATEGORÍA A",    "#B45309")}
     </div>
 
     <!-- Barra de controles -->
@@ -170,36 +176,41 @@ function _html() {
 
       <!-- Columnas -->
       <button onclick="ClientesUI.abrirConfigCols()"
-        style="padding:7px 12px;background:var(--surface-2);color:var(--text-primary);
-          border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">
+        title="Configurar columnas visibles"
+        style="padding:7px 11px;background:transparent;color:var(--text-sec);
+          border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">
         ⚙ Columnas
       </button>
 
-      <!-- Exportar -->
-      <button onclick="ClientesUI.exportar()" style="padding:7px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬇️ Excel</button>
-
-      <!-- Importar -->
-      <button onclick="ClientesUI.importarExcel()" style="padding:7px 12px;background:#0E7490;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬆️ Importar</button>
-      <input id="cli-file-input" type="file" accept=".xlsx" style="display:none"
-        onchange="ClientesUI._onFileSelected(this)">
-
       <!-- ABC -->
       <button onclick="ClientesUI.recalcularABC()"
-        style="padding:7px 12px;background:var(--surface-2);color:#B45309;
-          border:1px solid #FDE68A;border-radius:6px;cursor:pointer;font-size:13px"
-        title="Clasificar clientes A/B/C por volumen de compra">
-        🏅 ABC
+        title="Clasificar clientes A/B/C por volumen de compra (A=top, C=bajo)"
+        style="padding:7px 11px;background:transparent;color:var(--text-sec);
+          border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">
+        🏅 Clasificar A/B/C
       </button>
 
-      <!-- Nuevo cliente -->
-      <button onclick="ClientesUI.nuevoCliente()"
-        style="padding:7px 14px;background:#1B5E20;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700">
-        + Cliente
-      </button>
+      <!-- Exportar -->
+      <button onclick="ClientesUI.exportar()"
+        title="Exportar lista a Excel"
+        style="padding:7px 11px;background:transparent;color:var(--text-sec);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">⬇️ Excel</button>
+
+      <!-- Importar -->
+      <button onclick="ClientesUI.importarExcel()"
+        title="Importar clientes desde Excel"
+        style="padding:7px 11px;background:transparent;color:var(--text-sec);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">⬆️ Importar</button>
+      <input id="cli-file-input" type="file" accept=".xlsx" style="display:none"
+        onchange="ClientesUI._onFileSelected(this)">
 
       <!-- Contador -->
       <span id="cli-count-txt"
         style="font-size:11px;color:#6B7280;white-space:nowrap;margin-left:auto"></span>
+
+      <!-- Nuevo cliente (acción primaria) -->
+      <button onclick="ClientesUI.nuevoCliente()"
+        style="padding:7px 16px;background:#1B5E20;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;flex-shrink:0">
+        + Cliente
+      </button>
     </div>
 
     <!-- Tabla con doble scroll (arriba y abajo) + header fijo -->
@@ -214,12 +225,12 @@ function _html() {
           <thead>
             <tr style="background:var(--surface-2);border-bottom:2px solid var(--border)">
               <th id="cli-th-clienteId" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ID</th>
-              <th id="cli-th-nombre"    style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">CLIENTE</th>
-              <th id="cli-th-segmento"  style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">SEGMENTO</th>
-              <th id="cli-th-ingeniero" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">INGENIERO</th>
-              <th id="cli-th-zona"      style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ZONA</th>
-              <th id="cli-th-saldo"     style="padding:10px 14px;text-align:right;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">SALDO</th>
-              <th id="cli-th-visita"    style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ÚLTIMA VISITA</th>
+              <th id="cli-th-nombre"    onclick="ClientesUI.sortBy('nombre')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por nombre">CLIENTE <span id="cli-sort-nombre" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-segmento"  onclick="ClientesUI.sortBy('segmento')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por segmento">SEGMENTO <span id="cli-sort-segmento" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-ingeniero" onclick="ClientesUI.sortBy('ingeniero')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por ingeniero">INGENIERO <span id="cli-sort-ingeniero" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-zona"      onclick="ClientesUI.sortBy('zona')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por zona">ZONA <span id="cli-sort-zona" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-saldo"     onclick="ClientesUI.sortBy('saldo')" style="padding:10px 14px;text-align:right;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por saldo">SALDO <span id="cli-sort-saldo" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-visita"    onclick="ClientesUI.sortBy('ultimaVisita')" style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por última visita">ÚLTIMA VISITA <span id="cli-sort-ultimaVisita" style="font-size:10px;opacity:.5"></span></th>
               <th id="cli-th-estado"    style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ESTADO</th>
               <th id="cli-th-acciones"  style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);position:sticky;top:0;background:var(--surface-2);z-index:2"></th>
             </tr>
@@ -419,6 +430,16 @@ function _bindUI() {
     setIngeniero(v){ _fIngeniero = v; _applyFilters(); },
     setEstado(v)   { _fEstado = v; _applyFilters(); },
     setSaldo(v)    { _fSaldo = v; _applyFilters(); },
+    sortBy(col) {
+      if (_sortCol === col) _sortDir *= -1;
+      else { _sortCol = col; _sortDir = 1; }
+      // Actualizar indicadores
+      ["nombre","segmento","ingeniero","zona","saldo","ultimaVisita"].forEach(k => {
+        const el = document.getElementById("cli-sort-" + k);
+        if (el) el.textContent = _sortCol === k ? (_sortDir === 1 ? "▲" : "▼") : "";
+      });
+      _applyFilters();
+    },
 
     exportar() {
       if (!_filtrados.length) { window.toast?.("No hay clientes para exportar.", "info"); return; }
@@ -709,8 +730,8 @@ function _applyFilters() {
   if (_fSegmento  !== "TODOS") lista = lista.filter(c => c.segmento  === _fSegmento);
   if (_fIngeniero !== "TODOS") lista = lista.filter(c => c.ingeniero === _fIngeniero);
 
-  if (_fSaldo === "con_saldo") lista = lista.filter(c => (c.saldo ?? 0) > 0);
-  if (_fSaldo === "sin_saldo") lista = lista.filter(c => !c.saldo || c.saldo === 0);
+  if (_fSaldo === "con_saldo") lista = lista.filter(c => _saldoCliente(c) > 0);
+  if (_fSaldo === "sin_saldo") lista = lista.filter(c => _saldoCliente(c) === 0);
 
   if (_fBusqueda) {
     lista = lista.filter(c =>
@@ -722,6 +743,16 @@ function _applyFilters() {
       norm(c.ciudad).includes(_fBusqueda) ||
       norm(c.ingeniero).includes(_fBusqueda)
     );
+  }
+
+  if (_sortCol) {
+    lista.sort((a, b) => {
+      let va, vb;
+      if (_sortCol === "saldo") { va = _saldoCliente(a); vb = _saldoCliente(b); }
+      else if (_sortCol === "ultimaVisita") { va = a.fechaUltimaVisita || 0; vb = b.fechaUltimaVisita || 0; }
+      else { va = norm(a[_sortCol] ?? ""); vb = norm(b[_sortCol] ?? ""); }
+      return va < vb ? -_sortDir : va > vb ? _sortDir : 0;
+    });
   }
 
   _filtrados = lista;
@@ -737,13 +768,14 @@ function _renderKPIs() {
   set("cli-k-total")(_clientes.length.toLocaleString("es-MX"));
   set("cli-k-activos")(_clientes.filter(c => c.activo !== false).length.toLocaleString("es-MX"));
 
-  const saldoTotal = _filtrados.reduce((s, c) => s + (Number(c.saldo) || 0), 0);
-  set("cli-k-saldo")(fmt.format(saldoTotal));
+  const saldoTotal = _filtrados.reduce((s, c) => s + _saldoCliente(c), 0);
+  set("cli-k-saldo")(saldoTotal > 0 ? fmt.format(saldoTotal) : "$0.00");
 
   const visitasHoy = _filtrados.filter(c => {
-    if (!c.ultimaVisita) return false;
+    const v = c.fechaUltimaVisita || c.ultimaVisita;
+    if (!v) return false;
     try {
-      const d = new Date(c.ultimaVisita?.toDate?.() ?? c.ultimaVisita);
+      const d = typeof v === "number" ? new Date(v) : new Date(v?.toDate?.() ?? v);
       d.setHours(0,0,0,0);
       return d.getTime() === hoy.getTime();
     } catch { return false; }
@@ -774,7 +806,7 @@ function _renderTabla() {
   }
 
   tbody.innerHTML = _filtrados.map((c, i) => {
-    const saldo   = Number(c.saldo)  || 0;
+    const saldo   = _saldoCliente(c);
     const activo  = c.activo !== false;
     const limite  = Number(c.limiteCredito) || 0;
     const abcLetra = _abcMap[c.id] || "";
@@ -792,8 +824,9 @@ function _renderTabla() {
     const segBg = _segColor(c.segmento);
 
     return `<tr style="border-bottom:1px solid var(--border);
-      ${i % 2 === 1 ? "background:var(--surface-2)" : ""}
-      cursor:pointer" onclick="ClientesUI.abrirDetalle('${esc(c.id)}')">
+      ${i % 2 === 1 ? "background:var(--surface-2);" : ""}
+      ${saldo > 0 ? "border-left:3px solid #DC2626;" : "border-left:3px solid transparent;"}
+      cursor:pointer;transition:filter .1s" onclick="ClientesUI.abrirDetalle('${esc(c.id)}')">
       <td style="padding:10px 14px;font-size:11px;font-family:monospace;color:#6B7280;white-space:nowrap">
         ${esc(c.clienteId || "—")}
       </td>
@@ -820,7 +853,7 @@ function _renderTabla() {
         </div>
         <div style="font-size:9px;color:${creditoCol};margin-top:1px;font-weight:600">${creditoPct}% crédito</div>` : ""}
       </td>
-      <td style="padding:10px 14px;text-align:center;font-size:11px;color:#6B7280">${fmtDt(c.ultimaVisita)}</td>
+      <td style="padding:10px 14px;text-align:center;font-size:11px;color:#6B7280">${fmtDt(c.fechaUltimaVisita || c.ultimaVisita)}</td>
       <td style="padding:10px 14px;text-align:center">
         <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;
           background:${activo?"#DCFCE7":"#F3F4F6"};color:${activo?"#16A34A":"#9CA3AF"}">
@@ -871,7 +904,7 @@ async function _abrirDetalle(id) {
     }
   }
 
-  const saldo  = Number(c.saldo) || 0;
+  const saldo  = _saldoCliente(c);
   const activo = c.activo !== false;
   const segCol = _segColor(c.segmento);
 
@@ -939,7 +972,7 @@ async function _abrirDetalle(id) {
       ${_campo("📍 Zona", c.zona)}
       ${_campo("🏙 Ciudad", [c.colonia, c.ciudad].filter(Boolean).join(", ") || null)}
       ${_campo("🏠 Dirección", [c.calle, c.numExt ? `#${c.numExt}` : null].filter(Boolean).join(" ") || c.direccion || null)}
-      ${_campo("📅 Última visita", fmtDt(c.ultimaVisita))}
+      ${_campo("📅 Última visita", fmtDt(c.fechaUltimaVisita || c.ultimaVisita))}
       ${c.tipo        ? _campo("🏗 Tipo de instalación", c.tipo)        : ""}
       ${c.tipoCultivo ? _campo("🌱 Tipo de cultivo",     c.tipoCultivo) : ""}
     </div>
