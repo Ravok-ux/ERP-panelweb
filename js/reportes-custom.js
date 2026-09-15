@@ -323,8 +323,8 @@ async function _generar() {
       const tsF  = fuente.tsField || "_ts";
       const snap = await getDocs(query(
         collection(db, fuente.collection),
-        where(tsF, ">=", ini),
-        where(tsF, "<=", fin),
+        where(tsF, ">=", Timestamp.fromMillis(ini)),
+        where(tsF, "<=", Timestamp.fromMillis(fin)),
         orderBy(tsF, "desc"),
         fsLimit(500)
       ));

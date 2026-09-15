@@ -229,16 +229,17 @@ async function _cargarComisiones() {
   try {
     const [pedidosSnap, abonosSnap] = await Promise.all([
       getDocs(query(collection(db,"pedidos"),
-        where("fechaPedido",">=",desde.getTime()),
-        where("fechaPedido","<=",hasta.getTime()))),
+        where("fechaPedido",">=",Timestamp.fromDate(desde)),
+        where("fechaPedido","<=",Timestamp.fromDate(hasta)))),
       getDocs(query(collection(db,"abonos_remision"),
-        where("fechaAbono",">=",desde.getTime()),
-        where("fechaAbono","<=",hasta.getTime())))
+        where("fechaAbono",">=",Timestamp.fromDate(desde)),
+        where("fechaAbono","<=",Timestamp.fromDate(hasta))))
     ]);
 
     const stats = {};
     pedidosSnap.forEach(d => {
-      const p = d.data(), alias = resolverNombre(p.vendedor || p.alias);
+      const p = d.data();
+      const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
       if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
       stats[alias].vendido  += p.total || 0;
       stats[alias].pedidos  += 1;
@@ -268,17 +269,17 @@ async function _cargarComisiones() {
       const tag  = pct >= 70 ? ["tg","✓ Meta cercana"] : pct >= 40 ? ["ta","⚠ Atención"] : ["tr","✗ Bajo meta"];
       return `<tr>
         <td style="font-weight:800;color:${barC}">${i+1}</td>
-        <td style="font-weight:700">${esc(alias)}</td>
+        <td class="txt" style="font-weight:700">${esc(alias)}</td>
         <td style="font-weight:700;font-variant-numeric:tabular-nums">${_fmt(s.vendido)}</td>
-        <td>${_fmt(META)}</td>
+        <td style="font-variant-numeric:tabular-nums">${_fmt(META)}</td>
         <td>
           <div style="font-size:10px;font-weight:700;color:${barC}">${pct}%</div>
-          <div style="height:4px;background:#E5E7EB;border-radius:2px;margin-top:2px;width:70px">
+          <div style="height:4px;background:#E5E7EB;border-radius:2px;margin-top:2px;width:70px;margin-inline:auto">
             <div style="height:100%;border-radius:2px;width:${pct}%;background:${barC}"></div>
           </div>
         </td>
         <td style="font-variant-numeric:tabular-nums">${_fmt(s.cobrado)}</td>
-        <td style="text-align:center">${s.pedidos}</td>
+        <td>${s.pedidos}</td>
         <td>–</td>
         <td><span style="font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:7px"
           class="rtag-${tag[0]}">${tag[1]}</span></td>
@@ -314,8 +315,8 @@ async function _cargarVentasEjecutivas() {
     // cotizaciones: intentar con número y con Timestamp por si acaso
     const [pedSnap, cotSnap] = await Promise.all([
       getDocs(query(collection(db,"pedidos"),
-        where("fechaPedido",">=",desde.getTime()),
-        where("fechaPedido","<=",hasta.getTime()))),
+        where("fechaPedido",">=",Timestamp.fromDate(desde)),
+        where("fechaPedido","<=",Timestamp.fromDate(hasta)))),
       getDocs(query(collection(db,"cotizaciones"),
         where("creadaEn",">=",Timestamp.fromDate(desde)),
         where("creadaEn","<=",Timestamp.fromDate(hasta)),
@@ -379,12 +380,12 @@ async function _cargarVentasEjecutivas() {
       const convC  = conv >= 50 ? "#16A34A" : conv >= 25 ? "#D97706" : "#DC2626";
       return `<tr>
         <td style="font-weight:800;color:var(--text-sec)">${i+1}</td>
-        <td style="font-weight:700">${esc(alias)}</td>
-        <td style="font-size:11px;color:var(--text-sec)">${esc(s.zona)}</td>
-        <td style="text-align:center">${s.pedidos}</td>
+        <td class="txt" style="font-weight:700">${esc(alias)}</td>
+        <td class="txt" style="font-size:11px;color:var(--text-sec)">${esc(s.zona)}</td>
+        <td>${s.pedidos}</td>
         <td style="font-weight:700;font-variant-numeric:tabular-nums">${_fmt(s.vendido)}</td>
         <td style="font-variant-numeric:tabular-nums">${_fmt(ticket)}</td>
-        <td style="text-align:center">${s.cots}</td>
+        <td>${s.cots}</td>
         <td style="font-weight:700;color:${convC}">${conv}%</td>
       </tr>`;
     }), 8);
@@ -417,8 +418,8 @@ async function _cargarTopProductos() {
   try {
     const snap = await getDocs(query(
       collection(db,"pedidos"),
-      where("fechaPedido",">=",desde.getTime()),
-      where("fechaPedido","<=",hasta.getTime()),
+      where("fechaPedido",">=",Timestamp.fromDate(desde)),
+      where("fechaPedido","<=",Timestamp.fromDate(hasta)),
       limit(2000)
     ));
 
@@ -453,14 +454,14 @@ async function _cargarTopProductos() {
       const barC = i === 0 ? "#16A34A" : i < 3 ? "#D97706" : "#6B7280";
       return `<tr>
         <td style="font-weight:800;color:${barC}">${i+1}</td>
-        <td style="font-weight:600">${esc(nombre)}</td>
+        <td class="txt" style="font-weight:600">${esc(nombre)}</td>
         <td style="font-size:11px;color:var(--text-sec)">${esc(s.unidad)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums">${s.cantidad.toLocaleString("es-MX")}</td>
+        <td style="font-variant-numeric:tabular-nums">${s.cantidad.toLocaleString("es-MX")}</td>
         <td style="font-weight:700;font-variant-numeric:tabular-nums">${_fmt(s.ingresos)}</td>
-        <td style="text-align:center">${s.pedidos}</td>
+        <td>${s.pedidos}</td>
         <td>
-          <div style="display:flex;align-items:center;gap:6px">
-            <div style="flex:1;height:6px;background:#E5E7EB;border-radius:3px;min-width:60px">
+          <div style="display:flex;align-items:center;gap:6px;justify-content:center">
+            <div style="flex:1;height:6px;background:#E5E7EB;border-radius:3px;min-width:60px;max-width:120px">
               <div style="height:100%;border-radius:3px;width:${barW}%;background:${barC}"></div>
             </div>
             <span style="font-size:11px;font-weight:700;color:${barC};white-space:nowrap">${pct}%</span>
@@ -490,10 +491,8 @@ async function _cargarCartera() {
   if (thead) thead.innerHTML = `<tr style="border-bottom:2px solid var(--border)">
     <th style="text-align:left">CLIENTE</th>
     <th style="text-align:left">NOTA</th>
-    <th style="text-align:right">TOTAL</th>
-    <th style="text-align:right">ABONADO</th>
-    <th style="text-align:right">SALDO</th>
-    <th style="text-align:left">STATUS</th>
+    <th>TOTAL</th><th>ABONADO</th><th>SALDO</th>
+    <th>STATUS</th>
     <th style="text-align:left">VENDEDOR</th>
   </tr>`;
 
@@ -525,18 +524,18 @@ async function _cargarCartera() {
       const saldo  = (r.total||0) - (r.totalAbonado||0);
       const isVenc = r.status === "VENCIDA";
       return `<tr style="border-bottom:1px solid var(--border)">
-        <td style="font-weight:600;padding:7px 8px">${esc(r.clienteNombre||"–")}</td>
-        <td style="padding:7px 8px;color:var(--text-sec)">${esc(r.remisionNumero||"–")}</td>
-        <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums">${_fmt(r.total||0)}</td>
-        <td style="padding:7px 8px;text-align:right;color:#16A34A;font-variant-numeric:tabular-nums">${_fmt(r.totalAbonado||0)}</td>
-        <td style="padding:7px 8px;text-align:right;font-weight:700;color:${isVenc?"#DC2626":"#D97706"};font-variant-numeric:tabular-nums">${_fmt(saldo)}</td>
-        <td style="padding:7px 8px">
+        <td class="txt" style="font-weight:600">${esc(r.clienteNombre||"–")}</td>
+        <td class="txt" style="color:var(--text-sec)">${esc(r.remisionNumero||"–")}</td>
+        <td style="font-variant-numeric:tabular-nums">${_fmt(r.total||0)}</td>
+        <td style="color:#16A34A;font-variant-numeric:tabular-nums">${_fmt(r.totalAbonado||0)}</td>
+        <td style="font-weight:700;color:${isVenc?"#DC2626":"#D97706"};font-variant-numeric:tabular-nums">${_fmt(saldo)}</td>
+        <td>
           <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;
             background:${isVenc?"#FEE2E2":"#FEF9C3"};color:${isVenc?"#DC2626":"#92400E"}">
             ${r.status}
           </span>
         </td>
-        <td style="padding:7px 8px;color:var(--text-sec);font-size:11px">${esc(r.aliasVendedor||"–")}</td>
+        <td class="txt" style="color:var(--text-sec);font-size:11px">${esc(r.aliasVendedor||"–")}</td>
       </tr>`;
     }), 7);
 
@@ -566,9 +565,7 @@ async function _cargarVisitas() {
     <th style="text-align:left">FECHA</th>
     <th style="text-align:left">INGENIERO</th>
     <th style="text-align:left">CLIENTE</th>
-    <th style="text-align:left">TIPO</th>
-    <th style="text-align:left">GPS</th>
-    <th style="text-align:left">STATUS</th>
+    <th>TIPO</th><th>GPS</th><th>STATUS</th>
   </tr>`;
 
   try {
@@ -606,14 +603,14 @@ async function _cargarVisitas() {
       const gpsOk   = v.distanciaMetros >= 0 && v.distanciaMetros <= 200;
       const gpsTxt  = sosp ? `⚠ ${v.distanciaMetros?.toFixed(0)||"?"}m` : gpsOk ? "✓ OK" : "–";
       return `<tr style="border-bottom:1px solid var(--border)${sosp?";background:#FFF5F5":""}">
-        <td style="padding:7px 8px;white-space:nowrap;font-size:11px;color:var(--text-sec)">
+        <td class="txt" style="white-space:nowrap;font-size:11px;color:var(--text-sec)">
           ${ts ? ts.toLocaleDateString("es-MX",{day:"2-digit",month:"short"})+" "+ts.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}) : "–"}
         </td>
-        <td style="padding:7px 8px;font-weight:600">${esc(v.aliasVendedor||"–")}</td>
-        <td style="padding:7px 8px">${esc(v.clienteNombre||"–")}</td>
-        <td style="padding:7px 8px;font-size:11px;color:var(--text-sec)">${esc(v.tipo||"–")}</td>
-        <td style="padding:7px 8px;font-size:11px;color:${sosp?"#DC2626":gpsOk?"#16A34A":"#9CA3AF"}">${gpsTxt}</td>
-        <td style="padding:7px 8px">
+        <td class="txt" style="font-weight:600">${esc(v.aliasVendedor||"–")}</td>
+        <td class="txt">${esc(v.clienteNombre||"–")}</td>
+        <td style="font-size:11px;color:var(--text-sec)">${esc(v.tipo||"–")}</td>
+        <td style="font-size:11px;color:${sosp?"#DC2626":gpsOk?"#16A34A":"#9CA3AF"}">${gpsTxt}</td>
+        <td>
           ${sosp ? `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;background:#FEE2E2;color:#DC2626">SOSPECHOSA</span>` : ""}
         </td>
       </tr>`;
@@ -684,7 +681,7 @@ async function _cargarTendencia() {
     const desde = new Date(); desde.setDate(desde.getDate() - 29); desde.setHours(0,0,0,0);
     const snap = await getDocs(query(
       collection(db, "pedidos"),
-      where("fechaPedido", ">=", desde.getTime()),
+      where("fechaPedido", ">=", Timestamp.fromDate(desde)),
       orderBy("fechaPedido", "asc"),
       limit(3000)
     ));
@@ -698,7 +695,8 @@ async function _cargarTendencia() {
     }
     snap.forEach(doc => {
       const p = doc.data();
-      const ts = p.fechaPedido ? new Date(p.fechaPedido) : (p.createdAt ? new Date(p.createdAt) : null);
+      const ts = p.fechaPedido?.toDate?.() ?? (typeof p.fechaPedido === "number" ? new Date(p.fechaPedido) : null)
+               ?? p.createdAt?.toDate?.() ?? (typeof p.createdAt === "number" ? new Date(p.createdAt) : null);
       const key = ts.toISOString().slice(0,10);
       if (diasMap[key]) {
         diasMap[key].pedidos++;
@@ -741,14 +739,14 @@ async function _cargarTendencia() {
         const pct    = Math.round((d.vendido / maxV) * 100);
         const barC   = d.vendido > 0 ? "#16A34A" : "#E5E7EB";
         return `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:5px 8px;font-size:12px;color:var(--text-sec)">${fecha}</td>
-          <td style="padding:5px 8px;text-align:center">${d.pedidos}</td>
-          <td style="padding:5px 8px;font-variant-numeric:tabular-nums;font-weight:${d.vendido?700:400}">
+          <td style="font-size:12px;color:var(--text-sec)">${fecha}</td>
+          <td>${d.pedidos}</td>
+          <td style="font-variant-numeric:tabular-nums;font-weight:${d.vendido?700:400}">
             ${d.vendido ? _fmt(d.vendido) : "–"}</td>
-          <td style="padding:5px 8px;font-variant-numeric:tabular-nums">
+          <td style="font-variant-numeric:tabular-nums">
             ${ticket ? _fmt(ticket) : "–"}</td>
-          <td style="padding:5px 8px">
-            <div style="height:6px;border-radius:3px;width:${pct}%;background:${barC};min-width:${d.vendido?4:0}px"></div>
+          <td>
+            <div style="height:6px;border-radius:3px;width:${pct}%;background:${barC};min-width:${d.vendido?4:0}px;margin-inline:auto"></div>
           </td>
         </tr>`;
       }).join("");

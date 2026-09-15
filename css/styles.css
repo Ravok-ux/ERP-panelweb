@@ -756,8 +756,9 @@ input:not([class]), select:not([class]), textarea:not([class]) {
 .report-table-wrap { padding: 18px 24px; }
 .report-section-title { font-size: 12px; font-weight: 800; color: var(--green-dark); border-bottom: 1.5px solid var(--border); padding-bottom: 6px; margin-bottom: 12px; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.report-table th { background: var(--border-light); color: var(--green-mid); font-size: 9px; font-weight: 700; padding: 7px 10px; text-align: left; letter-spacing: .5px; }
-.report-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); color: var(--text-sec); }
+.report-table th { background: var(--border-light); color: var(--green-mid); font-size: 9px; font-weight: 700; padding: 7px 10px; text-align: center; letter-spacing: .5px; }
+.report-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); color: var(--text-sec); text-align: center; vertical-align: middle; }
+.report-table td.txt { text-align: left; }
 .report-table tr:nth-child(even) td { background: var(--surface-2); }
 
 .report-footer { background: var(--border-light); padding: 10px 24px; display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted); border-top: 1px solid var(--border); }
