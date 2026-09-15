@@ -99,9 +99,9 @@ function _html() {
     </div>
 
     <!-- Título de modo -->
-    <div id="feed-modo-banner" hidden
-      style="background:var(--surface-2);border-bottom:1px solid var(--border);
-             padding:6px 18px;font-size:11px;color:var(--text-sec);display:flex;
+    <div id="feed-modo-banner"
+      style="display:none;background:var(--surface-2);border-bottom:1px solid var(--border);
+             padding:6px 18px;font-size:11px;color:var(--text-sec);
              align-items:center;gap:8px">
       <span>📋 Mostrando historial — eventos de días anteriores agrupados por fecha</span>
       <button onclick="FeedUI.toggleHistorial()"
@@ -137,7 +137,7 @@ function _bindFiltros() {
       _modoHistorial = !_modoHistorial;
       const banner = document.getElementById("feed-modo-banner");
       const btn    = document.getElementById("btn-historial");
-      if (banner) banner.hidden = !_modoHistorial;
+      if (banner) banner.style.display = _modoHistorial ? "flex" : "none";
       if (btn) {
         btn.textContent = _modoHistorial ? "⚡ En vivo" : "📋 Historial";
         btn.style.color = _modoHistorial ? "var(--accent)" : "var(--text-sec)";
