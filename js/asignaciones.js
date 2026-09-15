@@ -194,7 +194,7 @@ async function _cargarUsuariosIngenieros() {
   } catch { _usuariosIng = []; }
 }
 
-function _escucharClientes() {
+async function _escucharClientes() {
   await _cargarUsuariosIngenieros();
   cargarNombres();
   _unsubClientes = onSnapshot(
