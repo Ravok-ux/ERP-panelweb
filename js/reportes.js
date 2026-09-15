@@ -770,7 +770,7 @@ async function _cargarTendencia() {
       [_fmt(totalV),         "TOTAL 30 DÍAS"],
       [String(totalP),       "PEDIDOS"],
       [totalP ? _fmt(totalV/totalP) : "–", "TICKET PROM."],
-      [maxDiaD.slice(5),     "MEJOR DÍA"]
+      [maxDiaD !== "–" ? maxDiaD.slice(8)+"-"+maxDiaD.slice(5,7)+"-"+maxDiaD.slice(0,4) : "–", "MEJOR DÍA"]
     ]);
 
     // Gráfica de línea — ventas
