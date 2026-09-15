@@ -671,27 +671,46 @@ function _renderFilaTres(cobHoy, cobMes, meta, gastos) {
 function _escucharClientesSnapshot() {
   const mesInicio = _inicioMes();
 
-  // Estado compartido entre los dos listeners
-  let totalClientes = 0, nuevos = 0;
+  // Estado compartido entre los listeners
+  let totalClientes = 0, nuevos = 0, sinVisita = 0;
   let remDist = { CRÍTICO: 0, GRAVE: 0, MODERADO: 0, LEVE: 0, POR_VENCER: 0 };
   let top5Deudores = [];
+  let umbraldias = 30;
 
-  // 1. Clientes → conteo total + nuevos este mes
+  // Leer umbral configurable (no bloquea el render)
+  getDoc(doc(db, "config_dashboard", "default")).then(d => {
+    if (d.exists()) umbraldias = d.data().diasSinVisita || 30;
+  }).catch(() => {});
+
+  function _toMs(uv) {
+    if (!uv) return null;
+    if (uv?.toDate) return uv.toDate().getTime();
+    if (typeof uv === "number") return uv;
+    const d = new Date(uv);
+    return isNaN(d) ? null : d.getTime();
+  }
+
+  // 1. Clientes → conteo total + nuevos este mes + sin visita reciente
+  // "sin visita" se calcula desde ultimaVisita del propio documento (fuente de verdad),
+  // lo que incluye clientes nunca visitados y los que llevan más de umbral días sin visita.
   const cliUnsub = onSnapshot(collection(db, "clientes"), snap => {
     totalClientes = snap.size;
-    nuevos = 0;
+    nuevos = 0; sinVisita = 0;
+    const umbralMs = Date.now() - umbraldias * 86400000;
     snap.forEach(d => {
-      const ts = d.data()._ts?.toDate?.() ?? (d.data()._ts ? new Date(d.data()._ts) : null);
-      if (ts && ts >= mesInicio) nuevos++;
+      const data = d.data();
+      const tsAlta = data._ts?.toDate?.() ?? (data._ts ? new Date(data._ts) : null);
+      if (tsAlta && tsAlta >= mesInicio) nuevos++;
+      const uvMs = _toMs(data.ultimaVisita);
+      if (uvMs === null || uvMs < umbralMs) sinVisita++;
     });
-    _renderSemaforoChips(remDist, nuevos, totalClientes);
+    _renderSemaforoChips(remDist, nuevos, totalClientes, sinVisita, umbraldias);
   }, _logErr("clientes-snapshot"));
 
   // 2. Remisiones activas → semáforo calculado + top deudores (tiempo real)
   const remQ = query(collection(db, "remisiones_credito"), where("status", "!=", "PAGADO"), limit(500));
   const remUnsub = onSnapshot(remQ, snap => {
     const ahora = new Date();
-    // Agrupar por clienteId: acumular saldo y máximo días de atraso
     const porCliente = {};
     snap.forEach(d => {
       const r = d.data();
@@ -704,7 +723,6 @@ function _escucharClientesSnapshot() {
       porCliente[cid].diasMax  = Math.max(porCliente[cid].diasMax, diasAtraso);
     });
 
-    // Calcular semáforo por días de atraso
     remDist = { CRÍTICO: 0, GRAVE: 0, MODERADO: 0, LEVE: 0, POR_VENCER: 0 };
     const conDeuda = [];
     Object.values(porCliente).forEach(c => {
@@ -718,40 +736,14 @@ function _escucharClientesSnapshot() {
     });
 
     top5Deudores = conDeuda.sort((a, b) => b.total - a.total).slice(0, 5);
-    _renderSemaforoChips(remDist, nuevos, totalClientes);
+    _renderSemaforoChips(remDist, nuevos, totalClientes, sinVisita, umbraldias);
     _renderTopDeudores(top5Deudores);
   }, _logErr("remisiones-semaforo"));
 
-  // 3. Clientes sin visita reciente
-  let umbraldias = 30;
-  getDoc(doc(db, "config_dashboard", "default")).then(d => {
-    if (d.exists()) umbraldias = d.data().diasSinVisita || 30;
-  }).catch(() => {});
-
-  const visitasQ = query(
-    collection(db, "visitas"),
-    where("fecha", ">=", Timestamp.fromDate(new Date(Date.now() - 60 * 86400000))),
-    limit(500)
-  );
-  const sinVisUnsub = onSnapshot(visitasQ, snap => {
-    const umbral = new Date(Date.now() - umbraldias * 86400000);
-    const ultimaVisita = {};
-    snap.forEach(d => {
-      const v = d.data();
-      const ts = v.fecha?.toDate?.() ?? (v.fecha ? new Date(v.fecha) : null);
-      if (!ts || !v.clienteId) return;
-      if (!ultimaVisita[v.clienteId] || ts > ultimaVisita[v.clienteId])
-        ultimaVisita[v.clienteId] = ts;
-    });
-    const sinVisita = Object.values(ultimaVisita).filter(t => t < umbral).length;
-    const chip = document.getElementById("chip-sin-visita");
-    if (chip) chip.textContent = `📍 ${sinVisita} sin visita +${umbraldias}d`;
-  }, _logErr("sin-visita"));
-
-  return () => { cliUnsub(); remUnsub(); sinVisUnsub(); };
+  return () => { cliUnsub(); remUnsub(); };
 }
 
-function _renderSemaforoChips(dist, nuevos, total) {
+function _renderSemaforoChips(dist, nuevos, total, sinVisita, umbraldias) {
   const el = document.getElementById("dash-semaforo-chips");
   if (!el) return;
   const SEM = [
@@ -767,9 +759,12 @@ function _renderSemaforoChips(dist, nuevos, total) {
       ${dist[s.key] || 0} ${s.label}
     </span>`).join("");
 
+  const svColor = (sinVisita ?? 0) > 0 ? "#F79646" : "#888";
   el.innerHTML = chips +
     `<span style="font-size:11px;color:#888;margin-left:6px">· ${nuevos} nuevos este mes</span>
-     <span id="chip-sin-visita" style="font-size:11px;color:#888;margin-left:6px">📍 …</span>`;
+     <span id="chip-sin-visita" style="font-size:11px;color:${svColor};margin-left:6px">
+       📍 ${sinVisita ?? "…"} sin visita +${umbraldias ?? 30}d
+     </span>`;
 }
 
 function _renderTopDeudores(top5) {
