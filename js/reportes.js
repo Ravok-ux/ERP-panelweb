@@ -496,22 +496,55 @@ async function _cargarCartera() {
     <th style="text-align:left">VENDEDOR</th>
   </tr>`;
 
+  // Colores y labels de semáforo según status del APK
+  const STATUS_COLOR = {
+    CRITICO:   { bg:"#FEE2E2", fg:"#B22222" },
+    GRAVE:     { bg:"#FFEDD5", fg:"#C2410C" },
+    MODERADO:  { bg:"#DBEAFE", fg:"#1D4ED8" },
+    LEVE:      { bg:"#FEF9C3", fg:"#92400E" },
+    POR_VENCER:{ bg:"#DCFCE7", fg:"#166534" },
+  };
+  const SEVERITY = { CRITICO:0, GRAVE:1, MODERADO:2, LEVE:3, POR_VENCER:4 };
+
   try {
+    // Fetch todas las remisiones — el status se calcula si no lo trae el APK
     const snap = await getDocs(query(
       collection(db,"remisiones_credito"),
-      where("status","in",["ACTIVA","VENCIDA"]),
       limit(500)
     ));
 
-    const rows = snap.docs.map(d => d.data());
+    const hoy = new Date();
+    const rows = snap.docs.map(d => {
+      const r = d.data();
+      const saldo = r.xPagarVigente ?? ((r.montoOriginal||0) - (r.totalAbonado||0));
+      // Calcular status si el APK no lo escribió aún
+      let status = r.status;
+      if (!status) {
+        if (saldo <= 0) {
+          status = "LIQUIDADO";
+        } else {
+          const fvRaw = r.fechaVencimiento;
+          const fv = fvRaw?.toDate?.() ?? (fvRaw ? new Date(fvRaw) : null);
+          if (!fv || fv > hoy) {
+            status = "POR_VENCER";
+          } else {
+            const dias = Math.floor((hoy - fv) / 86400000);
+            status = dias >= 61 ? "CRITICO" : dias >= 43 ? "GRAVE" : dias >= 29 ? "MODERADO" : dias >= 15 ? "LEVE" : "POR_VENCER";
+          }
+        }
+      }
+      return { ...r, _saldo: saldo, _status: status };
+    }).filter(r => r._status !== "LIQUIDADO" && r._saldo > 0);
+
     rows.sort((a,b) => {
-      if (a.status !== b.status) return a.status === "VENCIDA" ? -1 : 1;
-      return (a.clienteNombre||"").localeCompare(b.clienteNombre||"");
+      const sa = SEVERITY[a._status] ?? 5, sb = SEVERITY[b._status] ?? 5;
+      if (sa !== sb) return sa - sb;
+      return String(a.clienteNombre||a.clienteId||"").localeCompare(String(b.clienteNombre||b.clienteId||""));
     });
 
-    const totalSaldo   = rows.reduce((s,r) => s + ((r.total||0) - (r.totalAbonado||0)), 0);
+    const totalSaldo   = rows.reduce((s,r) => s + r._saldo, 0);
     const totalAbonado = rows.reduce((s,r) => s + (r.totalAbonado||0), 0);
-    const vencidas     = rows.filter(r => r.status === "VENCIDA").length;
+    const vencidas     = rows.filter(r => ["CRITICO","GRAVE","MODERADO","LEVE"].includes(r._status)).length;
 
     _renderKPIs([
       [String(rows.length), "NOTAS ACTIVAS"],
@@ -521,31 +554,33 @@ async function _cargarCartera() {
     ]);
 
     _renderTabla(rows.length === 0 ? null : rows.map(r => {
-      const saldo  = (r.total||0) - (r.totalAbonado||0);
-      const isVenc = r.status === "VENCIDA";
+      const colores = STATUS_COLOR[r._status] || { bg:"#F3F4F6", fg:"#6B7280" };
+      const nombre  = esc(r.clienteNombre || (r.clienteId ? `Cliente #${r.clienteId}` : "–"));
+      const nota    = esc(r.folio || r.remisionNumero || "–");
+      const ing     = esc(resolverNombre(r.ingenieroAlias || r.ingeniero || r.aliasVendedor || "–"));
       return `<tr style="border-bottom:1px solid var(--border)">
-        <td class="txt" style="font-weight:600">${esc(r.clienteNombre||"–")}</td>
-        <td class="txt" style="color:var(--text-sec)">${esc(r.remisionNumero||"–")}</td>
-        <td style="font-variant-numeric:tabular-nums">${_fmt(r.total||0)}</td>
+        <td class="txt" style="font-weight:600">${nombre}</td>
+        <td class="txt" style="color:var(--text-sec)">${nota}</td>
+        <td style="font-variant-numeric:tabular-nums">${_fmt(r.montoOriginal||0)}</td>
         <td style="color:#16A34A;font-variant-numeric:tabular-nums">${_fmt(r.totalAbonado||0)}</td>
-        <td style="font-weight:700;color:${isVenc?"#DC2626":"#D97706"};font-variant-numeric:tabular-nums">${_fmt(saldo)}</td>
+        <td style="font-weight:700;color:${colores.fg};font-variant-numeric:tabular-nums">${_fmt(r._saldo)}</td>
         <td>
           <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;
-            background:${isVenc?"#FEE2E2":"#FEF9C3"};color:${isVenc?"#DC2626":"#92400E"}">
-            ${r.status}
+            background:${colores.bg};color:${colores.fg}">
+            ${r._status.replace("_"," ")}
           </span>
         </td>
-        <td class="txt" style="color:var(--text-sec);font-size:11px">${esc(r.aliasVendedor||"–")}</td>
+        <td class="txt" style="color:var(--text-sec);font-size:11px">${ing}</td>
       </tr>`;
     }), 7);
 
     _csvData = [
-      ["Cliente","Nota","Total","Abonado","Saldo","Status","Vendedor"],
+      ["Cliente","Nota","Original","Abonado","Saldo","Status","Ingeniero"],
       ...rows.map(r => [
-        r.clienteNombre||"–", r.remisionNumero||"–",
-        r.total||0, r.totalAbonado||0,
-        (r.total||0)-(r.totalAbonado||0),
-        r.status, r.aliasVendedor||"–"
+        r.clienteNombre || `Cliente #${r.clienteId}` || "–",
+        r.folio || r.remisionNumero || "–",
+        r.montoOriginal||0, r.totalAbonado||0, r._saldo,
+        r._status, resolverNombre(r.ingenieroAlias||r.ingeniero||r.aliasVendedor||"–")
       ])
     ];
   } catch (e) { _renderError(e, 7); }
