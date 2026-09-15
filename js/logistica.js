@@ -327,10 +327,10 @@ function _renderVisitas(rows) {
           status: "COMPLETADA", notas: notas||"",
           checkInTs: Date.now(), completadaEn: Date.now()
         });
-        // Actualizar ultimaVisita en el cliente
+        // Actualizar fechaUltimaVisita en el cliente (campo real usado por la APK)
         const row = rows.find(r => r.id === id);
         if (row?.clienteId) {
-          await updateDoc(doc(db,"clientes",row.clienteId), { ultimaVisita: Date.now() });
+          await updateDoc(doc(db,"clientes",row.clienteId), { fechaUltimaVisita: Date.now() });
         }
         window.toast?.("Visita completada","success");
       } else {
@@ -356,7 +356,10 @@ function _escucharClientes() {
   _clientesUnsub = onSnapshot(q, snap => {
     let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(r => r.frecuenciaVisita); // solo clientes con frecuencia asignada
-    if (ingId) rows = rows.filter(r => r.ingenieroId === ingId || r.ingenieroAlias === ingId);
+    if (ingId) {
+    const ingAlias = _ingenieros.find(i => i.uid === ingId)?.alias || "";
+    rows = rows.filter(r => r.ingenieroId === ingId || (ingAlias && r.ingenieroAlias === ingAlias));
+  }
     if (frec)  rows = rows.filter(r => r.frecuenciaVisita === frec);
     rows.sort((a, b) => (a.nombre||"").localeCompare(b.nombre||""));
     _renderClientesFrecuencia(rows);
@@ -375,9 +378,10 @@ function _renderClientesFrecuencia(rows) {
   const ahora = Date.now();
   tbody.innerHTML = rows.map(r => {
     const dias   = FRECUENCIA_DIAS[r.frecuenciaVisita] || 30;
-    const ultima = r.ultimaVisita || 0;
-    const proxTs = ultima + dias * 86400000;
-    const faltan = Math.ceil((proxTs - ahora) / 86400000);
+    const ultima = r.fechaUltimaVisita || r.ultimaVisita || 0;
+    const nuncaVisitado = !ultima;
+    const proxTs = ultima > 0 ? ultima + dias * 86400000 : 0;
+    const faltan = nuncaVisitado ? -9999 : Math.ceil((proxTs - ahora) / 86400000);
     const atrasado = faltan < 0;
     const hoy      = faltan === 0;
     const colorDias = atrasado ? "#DC2626" : hoy ? "#D97706" : faltan <= 2 ? "#D97706" : "#16A34A";
@@ -386,10 +390,10 @@ function _renderClientesFrecuencia(rows) {
       <td style="font-weight:700">${esc(r.nombre||"–")}</td>
       <td style="font-size:12px">${esc(resolverNombre(r.ingenieroAlias))}</td>
       <td><span class="badge badge-gray" style="font-size:10px">${esc(FREQ_LABEL[r.frecuenciaVisita]||r.frecuenciaVisita)}</span></td>
-      <td style="font-size:11px;color:var(--text-sec)">${ultima ? fmtFecha(ultima) : "Nunca"}</td>
-      <td style="font-size:11px">${fmtFecha(proxTs)}</td>
+      <td style="font-size:11px;color:var(--text-sec)">${ultima > 0 ? fmtFecha(ultima) : "Nunca"}</td>
+      <td style="font-size:11px">${nuncaVisitado ? "—" : fmtFecha(proxTs)}</td>
       <td style="font-weight:700;color:${colorDias}">
-        ${atrasado ? `⚠️ ${Math.abs(faltan)} días atrasado` : hoy ? "📍 HOY" : `${faltan} días`}
+        ${nuncaVisitado ? "🆕 Primera visita pendiente" : atrasado ? `⚠️ ${Math.abs(faltan)} días atrasado` : hoy ? "📍 HOY" : `${faltan} días`}
       </td>
     </tr>`;
   }).join("");
@@ -429,11 +433,12 @@ async function _generarVisitasDelDia() {
     for (const c of clientes) {
       if (yaExisten.has(c.id)) continue;
       const dias   = FRECUENCIA_DIAS[c.frecuenciaVisita] || 30;
-      const ultima = c.ultimaVisita || 0;
-      const proxTs = ultima + dias * 86400000;
+      const ultima = c.fechaUltimaVisita || c.ultimaVisita || 0;
+      const proxTs = ultima > 0 ? ultima + dias * 86400000 : 0;
       // Incluir si la próxima visita cae dentro del día seleccionado o está atrasada y el día es hoy/futuro
-      const proxFecha = new Date(proxTs).toISOString().slice(0,10);
-      if (proxFecha !== fecha) continue;
+      const proxFecha = proxTs > 0 ? new Date(proxTs).toISOString().slice(0,10) : "0000-00-00";
+      if (proxTs > 0 && proxFecha !== fecha) continue;
+      if (proxTs === 0 && fecha !== new Date().toISOString().slice(0,10)) continue; // nunca visitado → solo hoy
 
       batch.push(addDoc(collection(db,"visitas_programadas"), {
         clienteId:       c.id,
@@ -444,7 +449,7 @@ async function _generarVisitasDelDia() {
         frecuencia:      c.frecuenciaVisita,
         fecha,
         fechaTs,
-        ultimaVisita:    c.ultimaVisita || null,
+        ultimaVisita:    ultima || null,
         status:          "PENDIENTE",
         generadoEn:      ahora,
         _ts:             ahora
@@ -618,10 +623,12 @@ async function _cargarAtrasados() {
     const atrasados = todos
       .map(c => {
         const dias   = FRECUENCIA_DIAS[c.frecuenciaVisita] || 30;
-        const ultima = c.ultimaVisita || 0;
-        const proxTs = ultima + dias * 86_400_000;
-        const retraso = Math.floor((ahora - proxTs) / 86_400_000);
-        return { ...c, dias, proxTs, retraso };
+        const ultima = c.fechaUltimaVisita || c.ultimaVisita || 0;
+        const proxTs = ultima > 0 ? ultima + dias * 86_400_000 : 0;
+        const retraso = proxTs > 0
+          ? Math.floor((ahora - proxTs) / 86_400_000)
+          : dias; // nunca visitado → contar como un período completo de retraso
+        return { ...c, dias, ultima, proxTs, retraso };
       })
       .filter(c => c.retraso > 0)
       .sort((a, b) => b.retraso - a.retraso);
@@ -646,7 +653,7 @@ async function _cargarAtrasados() {
         <td style="font-weight:700">${esc(c.nombre||"–")}</td>
         <td style="font-size:12px">${esc(resolverNombre(c.ingenieroAlias))}</td>
         <td><span class="badge badge-gray" style="font-size:10px">${esc(FREQ_LABEL[c.frecuenciaVisita]||c.frecuenciaVisita)}</span></td>
-        <td style="font-size:11px;color:var(--text-sec)">${c.ultimaVisita ? fmtFecha(c.ultimaVisita) : "Nunca"}</td>
+        <td style="font-size:11px;color:var(--text-sec)">${c.ultima > 0 ? fmtFecha(c.ultima) : "Nunca"}</td>
         <td style="font-weight:800;color:${color(c.retraso)}">⚠️ ${c.retraso} día${c.retraso!==1?"s":""}</td>
       </tr>`;
 
@@ -742,19 +749,19 @@ async function _generarVisitasSemana() {
       if (yaExisten.has(c.id)) continue;
 
       const diasFrec = FRECUENCIA_DIAS[c.frecuenciaVisita] || 30;
-      const ultima   = c.ultimaVisita || 0;
-      const proxTs   = ultima + diasFrec * 86_400_000;
-      const proxIso  = new Date(proxTs).toISOString().slice(0,10);
+      const ultima   = c.fechaUltimaVisita || c.ultimaVisita || 0;
+      const proxTs   = ultima > 0 ? ultima + diasFrec * 86_400_000 : 0;
+      const proxIso  = proxTs > 0 ? new Date(proxTs).toISOString().slice(0,10) : "0000-00-00";
 
       let fechaAsignar = null;
       let fechaTsAsignar = null;
 
-      if (proxTs >= desdeTs && proxTs <= hastaTs) {
+      if (proxTs > 0 && proxTs >= desdeTs && proxTs <= hastaTs) {
         // Próxima visita cae dentro de la semana — asignar en esa fecha exacta
         fechaAsignar   = proxIso;
         fechaTsAsignar = new Date(proxTs).setHours(0,0,0,0);
-      } else if (proxTs < desdeTs) {
-        // Atrasado — asignar al día de hoy si cae en la semana, si no al lunes
+      } else if (proxTs === 0 || proxTs < desdeTs) {
+        // Nunca visitado o atrasado — asignar al día de hoy si cae en la semana, si no al lunes
         const refDia = ahora >= desdeTs && ahora <= hastaTs ? hoyIso : lunes.toISOString().slice(0,10);
         fechaAsignar   = refDia;
         const [y,m,d]  = refDia.split("-").map(Number);
@@ -772,7 +779,7 @@ async function _generarVisitasSemana() {
         frecuencia:       c.frecuenciaVisita,
         fecha:            fechaAsignar,
         fechaTs:          fechaTsAsignar,
-        ultimaVisita:     c.ultimaVisita || null,
+        ultimaVisita:     ultima || null,
         status:           "PENDIENTE",
         generadoEn:       ahora,
         _ts:              ahora
