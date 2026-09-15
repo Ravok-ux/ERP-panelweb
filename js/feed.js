@@ -4,7 +4,8 @@
 
 import { db } from "./firebase-config.js";
 import {
-  collection, query, orderBy, limit, where, onSnapshot, getDocs
+  collection, query, orderBy, limit, where, onSnapshot, getDocs,
+  startAfter, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -13,7 +14,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
 let _unsubs = [];
 let _filtroTipo   = "TODOS";
 let _filtroAlias  = "TODOS";
-let _aliases = new Set();
+let _aliases      = new Set();
+let _modoHistorial = false;   // true = mostrando días anteriores
 
 export const FeedModule = {
   mount(container) {
@@ -30,10 +32,11 @@ export const FeedModule = {
   destroy() {
     _unsubs.forEach(fn => fn && fn());
     _unsubs = [];
-    _filtroTipo  = "TODOS";
-    _filtroAlias = "TODOS";
-    _aliases     = new Set();
-    _ultimoSnap  = null;
+    _filtroTipo    = "TODOS";
+    _filtroAlias   = "TODOS";
+    _aliases       = new Set();
+    _ultimoSnap    = null;
+    _modoHistorial = false;
   }
 };
 
@@ -87,6 +90,25 @@ function _html() {
       <div style="flex:1"></div>
       <span id="feed-last-ts" style="font-size:11px;color:var(--text-sec);margin-right:6px"></span>
       <span id="feed-count" style="font-size:11px;color:var(--text-sec)">– eventos</span>
+      <button id="btn-historial" onclick="FeedUI.toggleHistorial()"
+        style="margin-left:10px;padding:4px 10px;font-size:11px;border-radius:6px;
+               border:1px solid var(--border);background:var(--surface-2);color:var(--text-sec);
+               cursor:pointer;white-space:nowrap">
+        📋 Historial
+      </button>
+    </div>
+
+    <!-- Título de modo -->
+    <div id="feed-modo-banner" hidden
+      style="background:var(--surface-2);border-bottom:1px solid var(--border);
+             padding:6px 18px;font-size:11px;color:var(--text-sec);display:flex;
+             align-items:center;gap:8px">
+      <span>📋 Mostrando historial — eventos de días anteriores agrupados por fecha</span>
+      <button onclick="FeedUI.toggleHistorial()"
+        style="margin-left:auto;font-size:10px;padding:2px 8px;border-radius:4px;
+               border:1px solid var(--border);background:var(--surface);color:var(--text-sec);cursor:pointer">
+        ← Volver a Hoy
+      </button>
     </div>
 
     <!-- Lista -->
@@ -103,11 +125,29 @@ function _bindFiltros() {
       _filtroTipo = tipo;
       document.querySelectorAll("[data-tipo]").forEach(b =>
         b.classList.toggle("active", b.dataset.tipo === tipo));
-      _renderFeed(_ultimoSnap);
+      if (_modoHistorial) _cargarHistorial();
+      else _renderFeed(_ultimoSnap);
     },
     setAlias(alias) {
       _filtroAlias = alias;
-      _renderFeed(_ultimoSnap);
+      if (_modoHistorial) _cargarHistorial();
+      else _renderFeed(_ultimoSnap);
+    },
+    toggleHistorial() {
+      _modoHistorial = !_modoHistorial;
+      const banner = document.getElementById("feed-modo-banner");
+      const btn    = document.getElementById("btn-historial");
+      if (banner) banner.hidden = !_modoHistorial;
+      if (btn) {
+        btn.textContent = _modoHistorial ? "⚡ En vivo" : "📋 Historial";
+        btn.style.color = _modoHistorial ? "var(--accent)" : "var(--text-sec)";
+        btn.style.borderColor = _modoHistorial ? "var(--accent)" : "var(--border)";
+      }
+      if (_modoHistorial) {
+        _cargarHistorial();
+      } else {
+        _renderFeed(_ultimoSnap);
+      }
     }
   };
 }
@@ -133,29 +173,96 @@ async function _cargarIngenieros() {
 // ── Listener ──────────────────────────────────────────────────
 let _ultimoSnap = null;
 
+function _medianoches() {
+  const m = new Date();
+  m.setHours(0, 0, 0, 0);
+  return m.getTime();
+}
+
 function _escucharFeed() {
+  // Solo eventos de hoy (timestamp >= medianoche local)
+  const medianoches = _medianoches();
   const q = query(
     collection(db, "log_actividades"),
+    where("timestamp", ">=", medianoches),
     orderBy("timestamp", "desc"),
     limit(200)
   );
 
   const unsub = onSnapshot(q, snap => {
     _ultimoSnap = snap;
-
-    // Recolectar aliases únicos
     snap.forEach(d => {
       const alias = d.data().alias;
       if (alias) _aliases.add(alias);
     });
     _updateAliasSelect();
-    _renderFeed(snap);
+    if (!_modoHistorial) _renderFeed(snap);
   }, err => {
     console.error("[Feed]", err);
     window.toast?.("Error al cargar el feed. Verifica la conexión.", "error");
   });
 
   _unsubs.push(unsub);
+}
+
+async function _cargarHistorial() {
+  const medianoches = _medianoches();
+  const el = document.getElementById("feed-list");
+  if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-sec);font-size:12px">Cargando historial…</div>`;
+
+  const q = query(
+    collection(db, "log_actividades"),
+    where("timestamp", "<", medianoches),
+    orderBy("timestamp", "desc"),
+    limit(500)
+  );
+  try {
+    const snap = await getDocs(q);
+    _renderHistorial(snap.docs);
+  } catch (e) {
+    console.error("[Feed historial]", e);
+    if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-sec);font-size:12px">Error cargando historial</div>`;
+  }
+}
+
+function _renderHistorial(docs) {
+  const el = document.getElementById("feed-list");
+  if (!el) return;
+
+  let filtered = docs;
+  if (_filtroTipo  !== "TODOS") filtered = filtered.filter(d => d.data().tipo  === _filtroTipo);
+  if (_filtroAlias !== "TODOS") filtered = filtered.filter(d => d.data().alias === _filtroAlias);
+
+  const cntEl = document.getElementById("feed-count");
+  if (cntEl) cntEl.textContent = `${filtered.length} eventos`;
+
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>
+      <div class="empty-state-title">Sin eventos anteriores</div>
+      <div class="empty-state-sub">No hay historial para este filtro</div></div>`;
+    return;
+  }
+
+  // Agrupar por fecha
+  const grupos = {};
+  filtered.forEach(d => {
+    const a  = d.data();
+    const ts = typeof a.timestamp === "number" ? a.timestamp : (a.timestamp?.toMillis?.() ?? 0);
+    const date = new Date(ts);
+    const key  = date.toLocaleDateString("es-MX", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(d);
+  });
+
+  el.innerHTML = Object.entries(grupos).map(([fecha, items]) => `
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-sec);text-transform:capitalize;
+                  padding:6px 0 8px;border-bottom:1px solid var(--border);margin-bottom:8px">
+        ${fecha}
+      </div>
+      ${items.map(d => _cardHTML(d.data())).join("")}
+    </div>
+  `).join("");
 }
 
 function _renderFeed(snap) {
@@ -184,39 +291,17 @@ function _renderFeed(snap) {
   }
 
   if (docs.length === 0) {
+    const esHoy = !_modoHistorial;
     el.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">⚡</div>
-        <div class="empty-state-title">Sin actividad para este filtro</div>
-        <div class="empty-state-sub">Cambia el tipo o el ingeniero</div>
+        <div class="empty-state-icon">${esHoy ? "⚡" : "📋"}</div>
+        <div class="empty-state-title">${esHoy ? "Sin actividad hoy" : "Sin actividad anterior"}</div>
+        <div class="empty-state-sub">${esHoy ? "Aquí aparecerán los eventos del día en tiempo real" : "No hay eventos para este filtro"}</div>
       </div>`;
     return;
   }
 
-  el.innerHTML = docs.map(d => {
-    const a   = d.data();
-    const c   = EV_COLOR[a.tipo]      || "#6B7280";
-    const ico = EV_ICON[a.tipo]       || "•";
-    const pc  = EV_PILL_CLASS[a.tipo] || "pill-off";
-    const ts  = _fmtTs(a.timestamp?.toDate?.() || new Date());
-    const det = _detalle(a);
-
-    return `
-      <div class="feed-card" style="border-radius:10px;padding:12px 16px;border:1px solid var(--border);
-        display:flex;gap:12px;align-items:center;margin-bottom:7px;cursor:pointer">
-        <div style="width:36px;height:36px;border-radius:8px;background:${c}1A;
-          display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${ico}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${esc(a.alias) || "–"} · ${_tipoLabel(a.tipo)}</div>
-          <div style="font-size:11px;color:var(--text-sec);margin-top:2px">${det}</div>
-        </div>
-        <div style="font-size:10px;color:var(--text-sec);white-space:nowrap;text-align:right">
-          <div>${ts.hora}</div>
-          <div style="margin-top:1px">${ts.fecha}</div>
-        </div>
-        <span class="pill ${pc}">${TIPO_LABEL[a.tipo] || a.tipo}</span>
-      </div>`;
-  }).join("");
+  el.innerHTML = docs.map(d => _cardHTML(d.data())).join("");
 }
 
 function _updateAliasSelect() {
@@ -226,6 +311,32 @@ function _updateAliasSelect() {
   sel.innerHTML = `<option value="TODOS">Todos</option>` +
     [..._aliases].sort().map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join("");
   sel.value = _aliases.has(current) ? current : "TODOS";
+}
+
+// ── Card HTML reutilizable ────────────────────────────────────
+function _cardHTML(a) {
+  const c   = EV_COLOR[a.tipo]      || "#6B7280";
+  const ico = EV_ICON[a.tipo]       || "•";
+  const pc  = EV_PILL_CLASS[a.tipo] || "pill-off";
+  const ts  = typeof a.timestamp === "number"
+    ? _fmtTs(new Date(a.timestamp))
+    : _fmtTs(a.timestamp?.toDate?.() || new Date());
+  const det = _detalle(a);
+  return `
+    <div class="feed-card" style="border-radius:10px;padding:12px 16px;border:1px solid var(--border);
+      display:flex;gap:12px;align-items:center;margin-bottom:7px;cursor:pointer">
+      <div style="width:36px;height:36px;border-radius:8px;background:${c}1A;
+        display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${ico}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${esc(a.alias) || "–"} · ${_tipoLabel(a.tipo)}</div>
+        <div style="font-size:11px;color:var(--text-sec);margin-top:2px">${det}</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-sec);white-space:nowrap;text-align:right">
+        <div>${ts.hora}</div>
+        <div style="margin-top:1px">${ts.fecha}</div>
+      </div>
+      <span class="pill ${pc}">${TIPO_LABEL[a.tipo] || a.tipo}</span>
+    </div>`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
