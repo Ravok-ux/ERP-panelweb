@@ -39,8 +39,10 @@ function _html() {
         <option value="VALIDADO">Validados</option>
         <option value="DIFERENCIA">Con diferencia</option>
       </select>
-      <input id="caja-filtro-alias" type="text" placeholder="Filtrar vendedor…"
-        style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:.9rem;width:150px" />
+      <select id="caja-filtro-alias"
+        style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:.9rem">
+        <option value="">Todos</option>
+      </select>
     </div>
   </div>
 
@@ -97,10 +99,9 @@ function _bindEvents() {
     _filtroStatus = e.target.value;
     _cargarCortes();
   });
-  let timer;
-  _container.querySelector("#caja-filtro-alias").addEventListener("input", e => {
-    clearTimeout(timer);
-    timer = setTimeout(() => { _filtroAlias = norm(e.target.value.trim()); _render(_lastDocs); }, 300);
+  _container.querySelector("#caja-filtro-alias").addEventListener("change", e => {
+    _filtroAlias = e.target.value;
+    _render(_lastDocs);
   });
 }
 
@@ -114,12 +115,24 @@ function _cargarCortes() {
   }
   _unsub = onSnapshot(q, snap => {
     _lastDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _actualizarDropdownAlias(_lastDocs);
     _render(_lastDocs);
   });
 }
 
 function _fmt(n) {
   return `$${(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+}
+
+function _actualizarDropdownAlias(docs) {
+  const sel = _container?.querySelector("#caja-filtro-alias");
+  if (!sel) return;
+  const prevVal = sel.value;
+  const aliases = [...new Set(docs.map(d => d.alias).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  sel.innerHTML = '<option value="">Todos</option>' +
+    aliases.map(a => `<option value="${a}">${a}</option>`).join("");
+  if (prevVal && aliases.includes(prevVal)) sel.value = prevVal;
+  else _filtroAlias = "";
 }
 
 function _render(docs) {
@@ -129,7 +142,7 @@ function _render(docs) {
   if (!tbody) return;
 
   const filtrados = _filtroAlias
-    ? docs.filter(d => norm(d.alias || "").includes(_filtroAlias))
+    ? docs.filter(d => d.alias === _filtroAlias)
     : docs;
 
   if (filtrados.length === 0) {

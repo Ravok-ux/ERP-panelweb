@@ -193,9 +193,10 @@ service cloud.firestore {
 
     // ── /comentarios_cliente ──────────────────────────────────────────────────
     match /comentarios_cliente/{comentarioId} {
-      // Lectura: MESA_CONTROL, ADMINISTRADOR, GERENTE_ZONA, GERENTE, SUPER_ADMIN
+      // Lectura: roles de gestión + ingenieros (para Vista 360° en APK)
       allow read: if cuentaActiva() && miRol() in [
-        'SUPER_ADMIN','GERENTE','GERENTE_ZONA','ADMINISTRADOR','MESA_CONTROL'
+        'SUPER_ADMIN','GERENTE','GERENTE_ZONA','ADMINISTRADOR','MESA_CONTROL',
+        'INGENIERO','RECUPERADOR'
       ];
 
       // Escritura: mismos roles; valida campos y longitudes
@@ -1257,6 +1258,92 @@ service cloud.firestore {
                     && request.resource.data.uid is string
                     && request.resource.data.keys().hasAll(['uid','_ts']);
       allow update: if cuentaActiva() && (esAdminOSuperior() || miRol() == 'MESA_CONTROL');
+      allow delete: if esSuperAdmin();
+    }
+
+    // ── MÓDULO FINANZAS ───────────────────────────────────────────────────────
+    // Acceso restringido a SUPER_ADMIN, GERENTE, ADMINISTRADOR
+
+    // Catálogo de cuentas contables (plan de cuentas)
+    match /cuentas_contables/{docId} {
+      allow read:           if cuentaActiva() && esAdminOSuperior();
+      allow create, update: if cuentaActiva() && esAdminOSuperior()
+                            && strValido(request.resource.data.codigo, 20)
+                            && strValido(request.resource.data.nombre, 100)
+                            && request.resource.data.tipo in ['ACTIVO','PASIVO','CAPITAL','INGRESO','GASTO'];
+      allow delete:         if cuentaActiva() && esSuperAdmin();
+    }
+
+    // Pólizas contables con sus movimientos (partida doble)
+    match /polizas/{docId} {
+      allow read:           if cuentaActiva() && esAdminOSuperior();
+      allow create, update: if cuentaActiva() && esAdminOSuperior()
+                            && request.resource.data.tipo in ['DIARIO','INGRESOS','EGRESOS','APERTURA','CIERRE']
+                            && request.resource.data.movimientos is list;
+      allow delete:         if cuentaActiva() && esSuperAdmin();
+    }
+
+    // Facturas de proveedor (cuentas por pagar)
+    match /facturas_proveedor/{docId} {
+      allow read:           if cuentaActiva() && esAdminOSuperior();
+      allow create, update: if cuentaActiva() && esAdminOSuperior()
+                            && strValido(request.resource.data.proveedor, 100)
+                            && request.resource.data.total is number;
+      allow delete:         if cuentaActiva() && esSuperAdmin();
+    }
+
+    // Conciliaciones bancarias (historial de cierres)
+    match /conciliaciones_bancarias/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.movsBanco is number
+                    && strValido(request.resource.data.banco, 80);
+      allow update, delete: if esSuperAdmin();
+    }
+
+    // Presupuesto vs real por partida y mes
+    match /presupuestos/{docId} {
+      allow read:           if cuentaActiva() && esAdminOSuperior();
+      allow create, update: if cuentaActiva() && esAdminOSuperior()
+                            && strValido(request.resource.data.categoria, 80)
+                            && request.resource.data.presupuesto is number;
+      allow delete:         if cuentaActiva() && esSuperAdmin();
+    }
+
+    // Centros de costo
+    match /centros_costo/{docId} {
+      allow read:           if cuentaActiva() && esAdminOSuperior();
+      allow create, update: if cuentaActiva() && esAdminOSuperior()
+                            && strValido(request.resource.data.codigo, 20)
+                            && strValido(request.resource.data.nombre, 100);
+      allow delete:         if cuentaActiva() && esSuperAdmin();
+    }
+
+    // Movimientos imputados a centros de costo
+    match /movimientos_cc/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.tipo in ['INGRESO','GASTO']
+                    && request.resource.data.monto is number
+                    && request.resource.data.monto > 0;
+      allow update, delete: if esSuperAdmin();
+    }
+
+    // ── /cobranza ─────────────────────────────────────────────────────────────
+    // Lectura: admins (para conciliación bancaria); escritura: vía módulos existentes
+    match /cobranza/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esRolConocido();
+      allow update: if cuentaActiva() && esAdminOSuperior();
+      allow delete: if esSuperAdmin();
+    }
+
+    // ── /movimientos_caja ─────────────────────────────────────────────────────
+    // Lectura: admins (para conciliación bancaria); escritura: vía módulos existentes
+    match /movimientos_caja/{docId} {
+      allow read:   if cuentaActiva() && esAdminOSuperior();
+      allow create: if cuentaActiva() && esRolConocido();
+      allow update: if cuentaActiva() && esAdminOSuperior();
       allow delete: if esSuperAdmin();
     }
 

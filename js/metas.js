@@ -92,7 +92,8 @@ export const MetasModule = {
         .mf-actions{ display:flex; gap:8px; margin-top:14px; }
         .btn-primary   { background:#1565C0; color:#fff; border:none;
                          padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
-        .btn-secondary { background:transparent; border:1px solid var(--border,#e2e8f0);
+        .btn-secondary { background:transparent; border:1px solid var(--border,#30363d);
+                         color:var(--text-primary,#E6EDF3);
                          padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
         .btn-danger    { background:#ef4444; color:#fff; border:none;
                          padding:5px 10px; border-radius:6px; cursor:pointer; font-size:.8rem; }

@@ -109,24 +109,24 @@ export const AutorizacionesModule = {
         .aut-total  { font-size:1rem; font-weight:700; color:var(--accent,#3b82f6); }
         .aut-meta   { font-size:.8rem; color:var(--text-sec); }
         .aut-timer  { font-size:.78rem; font-weight:600; padding:2px 8px; border-radius:12px;
-                      background:#fef3c7; color:#92400e; display:inline-block; }
-        .aut-timer.urgente { background:#fee2e2; color:#991b1b; }
+                      background:var(--badge-amber-bg,#fef3c7); color:var(--badge-amber-text,#92400e); display:inline-block; }
+        .aut-timer.urgente { background:var(--badge-red-bg,#fee2e2); color:var(--badge-red-text,#991b1b); }
         .aut-saldo-box { display:flex; gap:12px; flex-wrap:wrap; background:var(--bg,#f8fafc);
                          border:1px solid var(--border,#e2e8f0); border-radius:8px;
                          padding:8px 12px; font-size:.8rem; }
         .aut-saldo-item { display:flex; flex-direction:column; gap:2px; }
         .aut-saldo-lbl  { color:var(--text-sec); font-size:.72rem; text-transform:uppercase; }
         .aut-saldo-val  { font-weight:700; }
-        .aut-saldo-val.rojo { color:#DC2626; }
-        .aut-saldo-val.verde { color:#16a34a; }
+        .aut-saldo-val.rojo { color:var(--badge-red-text,#DC2626); }
+        .aut-saldo-val.verde { color:var(--badge-green-text,#16a34a); }
         .aut-items  { font-size:.8rem; border-top:1px solid var(--border,#e2e8f0); padding-top:8px; }
         .aut-items-title { font-weight:600; margin-bottom:4px; }
         .aut-item-row { display:flex; justify-content:space-between; padding:2px 0; }
         .aut-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
         .aut-pill   { display:inline-block; border-radius:20px; padding:2px 10px; font-size:.76rem; font-weight:600; }
-        .aut-pill.pend { background:#fef3c7; color:#92400e; }
-        .aut-pill.ok   { background:#dcfce7; color:#166534; }
-        .aut-pill.rec  { background:#fee2e2; color:#991b1b; }
+        .aut-pill.pend { background:var(--badge-amber-bg,#fef3c7); color:var(--badge-amber-text,#92400e); }
+        .aut-pill.ok   { background:var(--badge-green-bg,#dcfce7); color:var(--badge-green-text,#166534); }
+        .aut-pill.rec  { background:var(--badge-red-bg,#fee2e2); color:var(--badge-red-text,#991b1b); }
         .aut-resolucion { font-size:.8rem; color:var(--text-sec); border-top:1px solid var(--border,#e2e8f0); padding-top:8px; }
         .aut-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4);
                              display:flex; align-items:center; justify-content:center; z-index:300; }
@@ -135,7 +135,8 @@ export const AutorizacionesModule = {
         .aut-modal-title { font-weight:700; font-size:.95rem; }
         .aut-btn-primary  { background:var(--accent,#3b82f6); color:#fff; border:none;
                         padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
-        .aut-btn-secondary{ background:transparent; border:1px solid var(--border,#e2e8f0);
+        .aut-btn-secondary{ background:transparent; border:1px solid var(--border,#30363d);
+                        color:var(--text-primary,#E6EDF3);
                         padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
         .aut-btn-danger   { background:#ef4444; color:#fff; border:none;
                         padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
@@ -172,7 +173,7 @@ function _suscribirPendientes() {
   _unsubPendientes = onSnapshot(q, snap => {
     snap.docChanges().forEach(ch => {
       if (ch.type === "removed") delete _pendientes[ch.doc.id];
-      else _pendientes[ch.doc.id] = { id: ch.doc.id, ...ch.doc.data() };
+      else _pendientes[ch.doc.id] = { ...ch.doc.data(), id: ch.doc.id };
     });
     _renderPendientes();
   }, err => {
@@ -192,7 +193,7 @@ function _suscribirHistorial() {
   );
   _unsubHistorial = onSnapshot(q, snap => {
     _historial = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
+      .map(d => ({ ...d.data(), id: d.id }))
       .filter(p => (p.fechaAutorizacion || 0) >= hace30)
       .sort((a, b) => (b.fechaAutorizacion || 0) - (a.fechaAutorizacion || 0))
       .slice(0, 50);

@@ -130,7 +130,8 @@ export const FormulariosModule = {
         .frm-resp-label { font-weight:600; min-width:120px; color:var(--text-sec); }
         .btn-primary   { background:var(--accent,#3b82f6); color:#fff; border:none;
                          padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
-        .btn-secondary { background:transparent; border:1px solid var(--border,#e2e8f0);
+        .btn-secondary { background:transparent; border:1px solid var(--border,#30363d);
+                         color:var(--text-primary,#E6EDF3);
                          padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
         .btn-danger    { background:#ef4444; color:#fff; border:none;
                          padding:5px 10px; border-radius:6px; cursor:pointer; font-size:.8rem; }

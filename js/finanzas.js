@@ -319,6 +319,11 @@ function _secHead(title) {
   return `<div class="fin-sec"><span class="fin-sec-title">${title}</span><span class="fin-sec-line"></span></div>`;
 }
 
+function _showError(divId, msg) {
+  const d = el(divId);
+  if (d) d.innerHTML = `<div class="fin-empty" style="color:#ef4444">⚠️ ${msg}<br><span style="font-size:11px;opacity:.7">Revisa permisos de Firestore o la consola.</span></div>`;
+}
+
 function _badgeStyle(text, color = '#64748b', bg = '#f1f5f9') {
   return `<span class="fin-badge" style="background:${bg};color:${color}">${text}</span>`;
 }
@@ -344,10 +349,14 @@ function _modal(id, title, bodyHtml, footHtml, width = '480px') {
 function _montarGL() {
   const c = el('fin-content');
   c.innerHTML = `
+    <div id="gl-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="fin-card">
         ${_secHead('Catálogo de Cuentas')}
-        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+          <input id="gl-cuentas-buscar" class="input" placeholder="🔍 Buscar cuenta…"
+            style="flex:1;font-size:13px" oninput="window._glFiltrarCuentas()">
+          <button class="fin-btn fin-btn-secondary fin-btn-sm" title="Exportar CSV" onclick="window._glExportCuentas()">⬇ CSV</button>
           <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._glNuevaCuenta()">+ Cuenta</button>
         </div>
         <div id="gl-cuentas-lista"><div class="fin-loading">Cargando…</div></div>
@@ -361,6 +370,7 @@ function _montarGL() {
           </select>
           <input type="month" id="gl-filtro-mes" value="${hoy().slice(0,7)}"
             onchange="window._glFiltrarPolizas()" class="input" style="flex:1;font-size:13px">
+          <button class="fin-btn fin-btn-secondary fin-btn-sm" title="Exportar CSV" onclick="window._glExportPolizas()">⬇ CSV</button>
           <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._glNuevaPoliza()">+ Póliza</button>
         </div>
         <div id="gl-polizas-lista"><div class="fin-loading">Cargando…</div></div>
@@ -368,66 +378,128 @@ function _montarGL() {
     </div>
     <div class="fin-card" style="margin-top:16px">
       ${_secHead('Libro Mayor')}
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
-        <select id="gl-cuenta-sel" class="input" style="flex:1;font-size:13px" onchange="window._glVerLibro()">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <select id="gl-cuenta-sel" class="input" style="flex:2;min-width:200px;font-size:13px" onchange="window._glVerLibro()">
           <option value="">— Seleccionar cuenta —</option>
         </select>
-        <input type="month" id="gl-libro-mes" value="${hoy().slice(0,7)}"
-          onchange="window._glVerLibro()" class="input" style="font-size:13px">
+        <input type="date" id="gl-libro-desde" value="${hoy().slice(0,8)}01"
+          onchange="window._glVerLibro()" class="input" style="font-size:13px" title="Desde">
+        <input type="date" id="gl-libro-hasta" value="${hoy()}"
+          onchange="window._glVerLibro()" class="input" style="font-size:13px" title="Hasta">
+        <button class="fin-btn fin-btn-secondary fin-btn-sm" onclick="window._glExportLibro()">⬇ CSV</button>
       </div>
       <div id="gl-libro-contenido"><div class="fin-empty">Selecciona una cuenta para ver el libro mayor.</div></div>
     </div>`;
 
   _glCargarCuentas();
   _glCargarPolizas();
-  window._glNuevaCuenta   = () => _glModalCuenta(null);
-  window._glNuevaPoliza   = () => _glModalPoliza(null);
+  window._glNuevaCuenta    = () => _glModalCuenta(null);
+  window._glNuevaPoliza    = () => _glModalPoliza(null);
   window._glFiltrarPolizas = () => _glCargarPolizas();
-  window._glVerLibro      = () => _glCargarLibro();
+  window._glFiltrarCuentas = () => _glRenderCuentas();
+  window._glVerLibro       = () => _glCargarLibro();
+  window._glExportCuentas  = () => _exportCSV('cuentas_contables', _cuentasCache,
+    ['codigo','nombre','tipo','saldo'], ['Código','Nombre','Tipo','Saldo']);
+  window._glExportPolizas  = () => {
+    const rows = Array.from(document.querySelectorAll('#gl-polizas-lista tbody tr'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).slice(0,4).map(td => td.textContent.trim()));
+    _exportCSVRaw(['Fecha','Tipo','Concepto','Total'], rows, 'polizas');
+  };
+  window._glExportLibro = () => {
+    const rows = Array.from(document.querySelectorAll('#gl-libro-contenido tbody tr'))
+      .filter(tr => !tr.classList.contains('total-row'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()));
+    _exportCSVRaw(['Fecha','Concepto','Cargo','Abono','Saldo'], rows, 'libro_mayor');
+  };
 }
 
 function _glCargarCuentas() {
   const q = query(collection(db,'cuentas_contables'), orderBy('codigo'));
   const unsub = onSnapshot(q, snap => {
-    const cuentas = snap.docs.map(d => ({id:d.id,...d.data()}));
-    _cuentasCache = cuentas;
+    _cuentasCache = snap.docs.map(d => ({id:d.id,...d.data()}));
     const sel = el('gl-cuenta-sel');
     if (sel) {
       const prev = sel.value;
       sel.innerHTML = '<option value="">— Seleccionar cuenta —</option>' +
-        cuentas.map(c => `<option value="${c.id}">${c.codigo} — ${c.nombre}</option>`).join('');
+        _cuentasCache.map(c => `<option value="${c.id}">${c.codigo} — ${c.nombre}</option>`).join('');
       if (prev) sel.value = prev;
     }
-    const lista = el('gl-cuentas-lista');
-    if (!lista) return;
-    if (!cuentas.length) { lista.innerHTML = '<div class="fin-empty">Sin cuentas registradas</div>'; return; }
-
-    const TIPO_COLORS = {ACTIVO:'#3b82f6',PASIVO:'#ef4444',CAPITAL:'#8b5cf6',INGRESO:'#10b981',GASTO:'#f59e0b'};
-    lista.innerHTML = `<table class="fin-tbl">
-      <thead><tr>
-        <th>Código</th><th>Nombre</th><th>Tipo</th><th class="r">Saldo</th><th></th>
-      </tr></thead>
-      <tbody>${cuentas.map(c => {
-        const tc = TIPO_COLORS[c.tipo] || '#64748b';
-        return `<tr>
-          <td><code style="font-size:11px;background:var(--surface-2);padding:2px 5px;border-radius:4px">${c.codigo}</code></td>
-          <td style="font-weight:500">${c.nombre}</td>
-          <td>${_badgeStyle(c.tipo, tc, tc+'18')}</td>
-          <td class="r" style="font-weight:600">$${fmt(c.saldo||0)}</td>
-          <td><div class="fin-acts">
-            <button class="fin-btn-icon" title="Editar" onclick="window._glEditCuenta('${c.id}')">✏️</button>
-            <button class="fin-btn-icon" title="Eliminar" onclick="window._glDelCuenta('${c.id}','${c.nombre.replace(/'/g,"\\'")}')">🗑️</button>
-          </div></td>
-        </tr>`;
-      }).join('')}</tbody></table>`;
-    window._glEditCuenta = (id) => _glModalCuenta(cuentas.find(c=>c.id===id));
+    _glRenderKPIs();
+    _glRenderCuentas();
+    window._glEditCuenta = (id) => _glModalCuenta(_cuentasCache.find(c=>c.id===id));
     window._glDelCuenta  = (id,nombre) => {
       window.modal(`¿Eliminar cuenta "${nombre}"?`, async () => {
         await deleteDoc(doc(db,'cuentas_contables',id));
       });
     };
-  }, e => console.error('[finanzas] cuentas_contables:', e));
+  }, e => { console.error('[finanzas] cuentas_contables:', e); _showError('gl-cuentas-lista', e.message); });
   _unsubs.push(unsub);
+}
+
+function _glRenderKPIs() {
+  const kpis = el('gl-kpis');
+  if (!kpis) return;
+  const totales = {ACTIVO:0, PASIVO:0, CAPITAL:0, INGRESO:0, GASTO:0};
+  _cuentasCache.forEach(c => { if (totales[c.tipo] !== undefined) totales[c.tipo] += c.saldo||0; });
+  const util = totales.INGRESO - totales.GASTO;
+  kpis.innerHTML = [
+    ['Activos',   '$'+fmt(totales.ACTIVO),  '#3b82f6'],
+    ['Pasivos',   '$'+fmt(totales.PASIVO),  '#ef4444'],
+    ['Capital',   '$'+fmt(totales.CAPITAL), '#8b5cf6'],
+    ['Ingresos',  '$'+fmt(totales.INGRESO), '#10b981'],
+    ['Gastos',    '$'+fmt(totales.GASTO),   '#f59e0b'],
+    ['Utilidad',  '$'+fmt(util),            util>=0?'#10b981':'#ef4444'],
+  ].map(([l,v,color]) => `<div class="fin-kpi" style="--kpi-color:${color}">
+    <div class="fin-kpi-label">${l}</div>
+    <div class="fin-kpi-val">${v}</div>
+  </div>`).join('');
+}
+
+function _glRenderCuentas() {
+  const lista = el('gl-cuentas-lista');
+  if (!lista) return;
+  const q   = (el('gl-cuentas-buscar')?.value || '').toLowerCase();
+  const all = q ? _cuentasCache.filter(c =>
+    c.codigo?.toLowerCase().includes(q) || c.nombre?.toLowerCase().includes(q)
+  ) : _cuentasCache;
+
+  if (!all.length) {
+    lista.innerHTML = `<div class="fin-empty">${q ? 'Sin resultados para "'+q+'"' : 'Sin cuentas registradas'}</div>`;
+    return;
+  }
+
+  const TIPO_COLORS = {ACTIVO:'#3b82f6',PASIVO:'#ef4444',CAPITAL:'#8b5cf6',INGRESO:'#10b981',GASTO:'#f59e0b'};
+  const grupos = {};
+  TIPOS_CUENTA.forEach(t => { grupos[t] = []; });
+  all.forEach(c => { (grupos[c.tipo] || (grupos['OTRO']??[])).push(c); });
+
+  let html = '';
+  TIPOS_CUENTA.forEach(tipo => {
+    const rows = grupos[tipo];
+    if (!rows?.length) return;
+    const color   = TIPO_COLORS[tipo] || '#64748b';
+    const subtotal = rows.reduce((s,c) => s+(c.saldo||0), 0);
+    html += `<div style="margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;
+        background:${color}12;border-radius:6px;margin-bottom:2px">
+        <span style="width:3px;height:14px;background:${color};border-radius:2px;flex-shrink:0"></span>
+        <span style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em;flex:1">${tipo}</span>
+        <span style="font-size:11px;font-weight:700;color:${color};font-variant-numeric:tabular-nums">$${fmt(subtotal)}</span>
+      </div>
+      <table class="fin-tbl" style="margin-bottom:6px">
+        <tbody>${rows.map(c => `<tr>
+          <td style="width:90px"><code style="font-size:11px;background:var(--surface-2);padding:2px 5px;border-radius:4px">${c.codigo}</code></td>
+          <td style="font-weight:500">${c.nombre}</td>
+          <td class="r" style="font-weight:600;font-variant-numeric:tabular-nums">$${fmt(c.saldo||0)}</td>
+          <td style="width:60px"><div class="fin-acts">
+            <button class="fin-btn-icon" title="Editar" onclick="window._glEditCuenta('${c.id}')">✏️</button>
+            <button class="fin-btn-icon" title="Eliminar" onclick="window._glDelCuenta('${c.id}','${c.nombre.replace(/'/g,"\\'")}')">🗑️</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  });
+  lista.innerHTML = `<div style="max-height:340px;overflow-y:auto">${html}</div>`;
 }
 
 function _glCargarPolizas() {
@@ -460,32 +532,35 @@ function _glCargarPolizas() {
           <td style="color:var(--text-muted)">${p.concepto||'—'}</td>
           <td class="r" style="font-weight:600">$${fmt(p.total)}</td>
           <td><div class="fin-acts">
+            <button class="fin-btn-icon" title="Editar" onclick="window._glEditPoliza('${p.id}')">✏️</button>
             <button class="fin-btn-icon" title="Ver" onclick="window._glVerPoliza('${p.id}')">👁️</button>
             <button class="fin-btn-icon" title="Eliminar" onclick="window._glDelPoliza('${p.id}')">🗑️</button>
           </div></td>
         </tr>`;
       }).join('')}</tbody></table>`;
+    window._glEditPoliza = (id) => _glModalPoliza(polizas.find(p=>p.id===id), false);
     window._glVerPoliza  = (id) => _glModalPoliza(polizas.find(p=>p.id===id), true);
     window._glDelPoliza  = (id) => {
       window.modal('¿Eliminar póliza?', async () => {
         await deleteDoc(doc(db,'polizas',id));
       });
     };
-  }, e => console.error('[finanzas] polizas:', e));
+  }, e => { console.error('[finanzas] polizas:', e); _showError('gl-polizas-lista', e.message); });
   _unsubPolizas = unsub;
   _unsubs.push(unsub);
 }
 
 async function _glCargarLibro() {
   const cuentaId = el('gl-cuenta-sel')?.value;
-  const mes      = el('gl-libro-mes')?.value || hoy().slice(0,7);
+  const desde    = el('gl-libro-desde')?.value || hoy().slice(0,8)+'01';
+  const hasta    = el('gl-libro-hasta')?.value || hoy();
   const div      = el('gl-libro-contenido');
   if (!div) return;
   if (!cuentaId) { div.innerHTML = '<div class="fin-empty">Selecciona una cuenta</div>'; return; }
   div.innerHTML = '<div class="fin-loading">Calculando…</div>';
 
-  const inicio = new Date(mes+'-01');
-  const fin    = new Date(inicio.getFullYear(), inicio.getMonth()+1, 0, 23,59,59);
+  const inicio = new Date(desde+'T00:00:00');
+  const fin    = new Date(hasta+'T23:59:59');
   const snap   = await getDocs(query(collection(db,'polizas'),
     where('fecha','>=',Timestamp.fromDate(inicio)),
     where('fecha','<=',Timestamp.fromDate(fin)), orderBy('fecha')));
@@ -584,28 +659,66 @@ function _glModalPoliza(poliza, soloVer=false) {
       <div></div>
     </div>
     <div id="mp-lineas">${lineas.map((l,i)=>_glLineaPoliza(l,i,soloVer)).join('')}</div>
-    ${!soloVer?`<button class="fin-btn fin-btn-secondary fin-btn-sm" style="margin-top:8px" onclick="window._glAgregarLinea()">+ Línea</button>`:''}`;
+    ${!soloVer?`<button class="fin-btn fin-btn-secondary fin-btn-sm" style="margin-top:8px" onclick="window._glAgregarLinea()">+ Línea</button>`:''}
+    <div id="mp-balance" style="margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;
+      font-weight:700;display:flex;justify-content:space-between;align-items:center;
+      background:var(--surface-2);border:1px solid var(--border)">
+      <span>Cargos: <span id="mp-bal-cargos">$0.00</span></span>
+      <span>Abonos: <span id="mp-bal-abonos">$0.00</span></span>
+      <span id="mp-bal-diff" style="color:#10b981">✓ Balanceado</span>
+    </div>`;
   const foot = `
     <button class="fin-btn fin-btn-secondary" onclick="document.getElementById('modal-poliza').remove()">Cerrar</button>
     ${!soloVer?`<button class="fin-btn fin-btn-primary" onclick="window._glGuardarPoliza('${poliza?.id||''}')">Guardar</button>`:''}`;
   _modal('modal-poliza', (soloVer?'Ver':editar?'Editar':'Nueva')+' Póliza', body, foot, '560px');
 
   let numLineas = lineas.length;
-  window._glAgregarLinea  = () => el('mp-lineas').insertAdjacentHTML('beforeend', _glLineaPoliza({},numLineas++,false));
+  window._glAgregarLinea  = () => {
+    el('mp-lineas').insertAdjacentHTML('beforeend', _glLineaPoliza({},numLineas++,false));
+    window._glActualizarBalance();
+  };
+  window._glActualizarBalance = () => {
+    let cargos = 0, abonos = 0;
+    document.querySelectorAll('.mp-linea').forEach(row => {
+      cargos += parseFloat(row.querySelector('.mp-cargo')?.value)||0;
+      abonos += parseFloat(row.querySelector('.mp-abono')?.value)||0;
+    });
+    const diff = cargos - abonos;
+    const ok   = Math.abs(diff) < 0.01;
+    const ec = el('mp-bal-cargos'), ea = el('mp-bal-abonos'), ed = el('mp-bal-diff');
+    if (ec) ec.textContent = '$'+fmt(cargos);
+    if (ea) ea.textContent = '$'+fmt(abonos);
+    if (ed) {
+      ed.textContent = ok ? '✓ Balanceado' : `⚠ Diferencia: $${fmt(Math.abs(diff))}`;
+      ed.style.color = ok ? '#10b981' : '#ef4444';
+    }
+    const bal = el('mp-balance');
+    if (bal) bal.style.borderColor = ok ? '#10b98144' : '#ef444444';
+  };
+  setTimeout(() => window._glActualizarBalance?.(), 50);
+
   window._glGuardarPoliza = async (id) => {
     const movimientos = [];
-    let total = 0;
+    let totalCargos = 0, totalAbonos = 0;
     document.querySelectorAll('.mp-linea').forEach(row => {
       const cargo = parseFloat(row.querySelector('.mp-cargo').value)||0;
       const abono = parseFloat(row.querySelector('.mp-abono').value)||0;
       movimientos.push({cuentaId:row.querySelector('.mp-cuenta').value, cargo, abono});
-      total += cargo;
+      totalCargos += cargo;
+      totalAbonos += abono;
     });
+    if (Math.abs(totalCargos - totalAbonos) > 0.01) {
+      window.toast(`Póliza no balanceada — Cargos $${fmt(totalCargos)} ≠ Abonos $${fmt(totalAbonos)}`, 'error');
+      return;
+    }
+    if (!movimientos.length || !movimientos.some(m => m.cuentaId)) {
+      window.toast('Agrega al menos un movimiento con cuenta', 'error'); return;
+    }
     const data = {
       tipo:       el('mp-tipo').value,
       fecha:      Timestamp.fromDate(new Date(el('mp-fecha').value + 'T12:00:00')),
       concepto:   el('mp-concepto').value.trim(),
-      movimientos, total, usuario: Sesion.alias||Sesion.uid||'',
+      movimientos, total: totalCargos, usuario: Sesion.alias||Sesion.uid||'',
     };
     if (id) await updateDoc(doc(db,'polizas',id), data);
     else await addDoc(collection(db,'polizas'), {...data, creadoEn:serverTimestamp()});
@@ -621,8 +734,8 @@ function _glLineaPoliza(l, i, disabled) {
     <select class="input mp-cuenta" style="font-size:12px" ${disabled?'disabled':''}>
       <option value="">— Cuenta —</option>${opts}
     </select>
-    <input type="number" class="input mp-cargo" style="font-size:12px" placeholder="Cargo" value="${l.cargo||''}" ${disabled?'disabled':''}>
-    <input type="number" class="input mp-abono" style="font-size:12px" placeholder="Abono" value="${l.abono||''}" ${disabled?'disabled':''}>
+    <input type="number" class="input mp-cargo" style="font-size:12px" placeholder="Cargo" value="${l.cargo||''}" ${disabled?'disabled':''} oninput="window._glActualizarBalance?.()">
+    <input type="number" class="input mp-abono" style="font-size:12px" placeholder="Abono" value="${l.abono||''}" ${disabled?'disabled':''} oninput="window._glActualizarBalance?.()">
     ${disabled?'<span></span>':`<button class="fin-btn-icon" style="margin-top:0" title="Eliminar" onclick="this.parentElement.remove()">✕</button>`}
   </div>`;
 }
@@ -647,6 +760,7 @@ function _montarAP() {
           </select>
           <input type="month" id="ap-filtro-mes" value="${hoy().slice(0,7)}"
             onchange="window._apRecargar()" class="input" style="flex:1;font-size:13px">
+          <button class="fin-btn fin-btn-secondary fin-btn-sm" onclick="window._apExportFacturas()">⬇ CSV</button>
           <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._apNuevaFactura()">+ Factura</button>
         </div>
         <div id="ap-facturas-lista"><div class="fin-loading">Cargando…</div></div>
@@ -658,8 +772,13 @@ function _montarAP() {
     </div>`;
 
   _apCargarFacturas();
-  window._apNuevaFactura = () => _apModalFactura(null);
-  window._apRecargar     = () => _apCargarFacturas();
+  window._apNuevaFactura   = () => _apModalFactura(null);
+  window._apRecargar       = () => _apCargarFacturas();
+  window._apExportFacturas = () => {
+    const rows = Array.from(document.querySelectorAll('#ap-facturas-lista tbody tr'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).slice(0,5).map(td => td.textContent.trim()));
+    _exportCSVRaw(['Proveedor','Vencimiento','Total','Pagado','Estado'], rows, 'facturas_proveedor');
+  };
 }
 
 function _apCargarFacturas() {
@@ -750,19 +869,21 @@ function _apCargarFacturas() {
           <td class="r" style="color:#10b981">$${fmt(f.pagado||0)}</td>
           <td>${_badgeStyle(stLabel, stColor, stColor+'18')}</td>
           <td><div class="fin-acts">
+            <button class="fin-btn-icon" title="Editar" onclick="window._apEditFact('${f.id}')">✏️</button>
             <button class="fin-btn-icon" title="Pagar" onclick="window._apPagar('${f.id}')">💳</button>
             <button class="fin-btn-icon" title="Eliminar" onclick="window._apDelFact('${f.id}')">🗑️</button>
           </div></td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
-    window._apPagar   = (id) => _apModalPago(facturas.find(f=>f.id===id));
-    window._apDelFact = (id) => {
+    window._apEditFact = (id) => _apModalFactura(facturas.find(f=>f.id===id));
+    window._apPagar    = (id) => _apModalPago(facturas.find(f=>f.id===id));
+    window._apDelFact  = (id) => {
       window.modal('¿Eliminar factura?', async () => {
         await deleteDoc(doc(db,'facturas_proveedor',id));
       });
     };
-  }, e => console.error('[finanzas] facturas_proveedor:', e));
+  }, e => { console.error('[finanzas] facturas_proveedor:', e); _showError('ap-facturas-lista', e.message); });
   _unsubFacturas = unsub;
   _unsubs.push(unsub);
 }
@@ -793,7 +914,7 @@ function _apModalFactura(factura) {
   const foot = `
     <button class="fin-btn fin-btn-secondary" onclick="document.getElementById('modal-ap').remove()">Cancelar</button>
     <button class="fin-btn fin-btn-primary" onclick="window._apGuardar('${factura?.id||''}')">Guardar</button>`;
-  _modal('modal-ap', 'Nueva Factura de Proveedor', body, foot, '520px');
+  _modal('modal-ap', (factura ? 'Editar' : 'Nueva') + ' Factura de Proveedor', body, foot, '520px');
 
   window._apGuardar = async (id) => {
     const subtotal = parseFloat(el('ap-subtotal').value)||0;
@@ -1037,7 +1158,7 @@ function _concCargarHistorial() {
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
-  }, e => console.error('[finanzas] conciliaciones_bancarias:', e));
+  }, e => { console.error('[finanzas] conciliaciones_bancarias:', e); _showError('conc-historial', e.message); });
   _unsubs.push(unsub);
 }
 
@@ -1056,10 +1177,20 @@ function _montarEstados() {
         </select>
         <input type="month" id="ef-mes" class="input" style="font-size:13px" value="${hoy().slice(0,7)}" onchange="window._efGenerar()">
         <button class="fin-btn fin-btn-primary" onclick="window._efGenerar()">📊 Generar</button>
+        <button class="fin-btn fin-btn-secondary" onclick="window._efExportar()">⬇ CSV</button>
       </div>
     </div>
-    <div id="ef-contenido"><div class="fin-empty">Selecciona tipo y período, luego presiona Generar.</div></div>`;
-  window._efGenerar = () => _efGenerar();
+    <div id="ef-contenido"><div class="fin-loading">Calculando…</div></div>`;
+  window._efGenerar  = () => _efGenerar();
+  window._efExportar = () => {
+    const rows = Array.from(document.querySelectorAll('#ef-contenido tbody tr'))
+      .filter(tr => !tr.classList.contains('total-row'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()));
+    const tipo = el('ef-tipo')?.value||'balance';
+    const mes  = el('ef-mes')?.value||hoy().slice(0,7);
+    _exportCSVRaw(['Código','Cuenta','Saldo Acum.','Período','Total'], rows, `estado_${tipo}_${mes}`);
+  };
+  _efGenerar();
 }
 
 async function _efGenerar() {
@@ -1166,7 +1297,10 @@ function _montarPresupuesto() {
   c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <input type="month" id="pres-mes" class="input" style="font-size:13px" value="${hoy().slice(0,7)}" onchange="window._presCargar()">
-      <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._presNueva()">+ Partida</button>
+      <div style="display:flex;gap:8px">
+        <button class="fin-btn fin-btn-secondary fin-btn-sm" onclick="window._presExportar()">⬇ CSV</button>
+        <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._presNueva()">+ Partida</button>
+      </div>
     </div>
     <div id="pres-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
@@ -1178,8 +1312,15 @@ function _montarPresupuesto() {
     </div>`;
 
   _presCargar();
-  window._presNueva  = () => _presModal(null);
-  window._presCargar = () => _presCargar();
+  window._presNueva     = () => _presModal(null);
+  window._presCargar    = () => _presCargar();
+  window._presExportar  = () => {
+    const rows = Array.from(document.querySelectorAll('#pres-tabla-wrap tbody tr'))
+      .filter(tr => !tr.classList.contains('total-row'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).slice(0,5).map(td => td.textContent.trim()));
+    const mes = el('pres-mes')?.value||hoy().slice(0,7);
+    _exportCSVRaw(['Categoría','Centro Costo','Presupuesto','Real','Var%'], rows, `presupuesto_${mes}`);
+  };
 }
 
 function _presCargar() {
@@ -1188,7 +1329,7 @@ function _presCargar() {
   const q   = query(collection(db,'presupuestos'), where('mes','==',mes), orderBy('categoria'));
   const unsub = onSnapshot(q,
     snap => _presRenderizar(snap.docs.map(d=>({id:d.id,...d.data()})), mes),
-    e => console.error('[finanzas] presupuestos:', e));
+    e => { console.error('[finanzas] presupuestos:', e); _showError('pres-tabla-wrap', e.message); });
   _unsubPresupuesto = unsub;
   _unsubs.push(unsub);
 }
@@ -1330,6 +1471,7 @@ function _montarCentros() {
           ${_secHead('P&L por Centro de Costo')}
           <input type="month" id="cc-mes" class="input" style="font-size:13px;width:160px" value="${hoy().slice(0,7)}"
             onchange="window._ccCargarPL()">
+          <button class="fin-btn fin-btn-secondary fin-btn-sm" onclick="window._ccExportPL()">⬇ CSV</button>
         </div>
         <div id="cc-pl-contenido"><div class="fin-empty">Selecciona un período.</div></div>
       </div>
@@ -1360,6 +1502,13 @@ function _montarCentros() {
   window._ccNuevo    = () => _ccModal(null);
   window._ccCargarPL = () => _ccCargarPL();
   window._ccImputar  = () => _ccImputar();
+  window._ccExportPL = () => {
+    const rows = Array.from(document.querySelectorAll('#cc-pl-contenido tbody tr'))
+      .filter(tr => !tr.classList.contains('total-row'))
+      .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()));
+    const mes = el('cc-mes')?.value||hoy().slice(0,7);
+    _exportCSVRaw(['Código','Centro de Costo','Ingresos','Gastos','Utilidad','Margen'], rows, `pl_centros_${mes}`);
+  };
 }
 
 function _ccCargarLista() {
@@ -1390,7 +1539,7 @@ function _ccCargarLista() {
         await deleteDoc(doc(db,'centros_costo',id));
       });
     };
-  }, e => console.error('[finanzas] centros_costo:', e));
+  }, e => { console.error('[finanzas] centros_costo:', e); _showError('cc-lista', e.message); });
   _unsubs.push(unsub);
 }
 
@@ -1506,4 +1655,34 @@ function _ccModal(cc) {
     else await addDoc(collection(db,'centros_costo'), {...data, creadoEn:serverTimestamp()});
     el('modal-cc').remove();
   };
+}
+
+// ─── Exportación CSV ─────────────────────────────────────────────────────────
+function _exportCSV(nombre, rows, campos, encabezados) {
+  const enc  = encabezados || campos;
+  const csv  = [enc, ...rows.map(r => campos.map(f => {
+    const v = r[f] ?? '';
+    return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+  }))].map(r => r.join(',')).join('\n');
+  _descargaCSV(csv, nombre + '_' + hoy() + '.csv');
+}
+
+function _exportCSVRaw(encabezados, rows, nombre) {
+  const csv = [encabezados, ...rows].map(r =>
+    r.map(v => (String(v).includes(',') || String(v).includes('"'))
+      ? `"${String(v).replace(/"/g,'""')}"` : v
+    ).join(',')
+  ).join('\n');
+  _descargaCSV(csv, nombre + '_' + hoy() + '.csv');
+}
+
+function _descargaCSV(csv, filename) {
+  const bom  = '﻿';
+  const blob = new Blob([bom + csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

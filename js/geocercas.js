@@ -92,12 +92,14 @@ export const GeocercasModule = {
         .geo-field label { display:block; font-size:.8rem; font-weight:600;
                            margin-bottom:3px; color:var(--text-sec); }
         .geo-field input,.geo-field textarea,.geo-field select
-                    { width:100%; padding:6px 8px; border:1px solid var(--border,#e2e8f0);
+                    { width:100%; padding:6px 8px; border:1px solid var(--border,#30363d);
+                      background:var(--card-bg,#161B22); color:var(--text-primary,#E6EDF3);
                       border-radius:6px; font-size:.88rem; box-sizing:border-box; }
         .geo-form-actions { display:flex; gap:8px; margin-top:12px; }
         .btn-primary{ background:var(--accent,#3b82f6); color:#fff; border:none;
                       padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
-        .btn-secondary{ background:transparent; border:1px solid var(--border,#e2e8f0);
+        .btn-secondary{ background:transparent; border:1px solid var(--border,#30363d);
+                        color:var(--text-primary,#E6EDF3);
                         padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.88rem; }
         .btn-danger { background:#ef4444; color:#fff; border:none;
                       padding:5px 10px; border-radius:6px; cursor:pointer; font-size:.8rem; }

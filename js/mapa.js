@@ -7,7 +7,7 @@ import { estaEnJornadaHoy } from "./app.js";
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, onSnapshot, query, orderBy, limit,
-  getDocs
+  getDocs, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let _map       = null;
@@ -404,8 +404,11 @@ function _escucharKPIsMapa() {
 }
 
 function _escucharFeedMapa() {
+  const medianoches = (() => { const m = new Date(); m.setHours(0,0,0,0); return m.getTime(); })();
+  const tsHoy = Timestamp.fromMillis(medianoches);
   const feedQ = query(
     collection(db, "log_actividades"),
+    where("timestamp", ">=", tsHoy),
     orderBy("timestamp", "desc"),
     limit(15)
   );

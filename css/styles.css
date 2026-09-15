@@ -26,8 +26,16 @@
   --bg:           #F0F2F0;
   --surface:      #FFFFFF;
   --surface-2:    #F9FAFB;
+  --card-bg:      #FFFFFF;
   --border:       #E5E7EB;
   --border-light: #F3F4F6;
+  /* Semánticos — badges/pills */
+  --badge-amber-bg:   #FEF3C7;
+  --badge-amber-text: #92400E;
+  --badge-green-bg:   #DCFCE7;
+  --badge-green-text: #166534;
+  --badge-red-bg:     #FEE2E2;
+  --badge-red-text:   #991B1B;
 
   /* Texto */
   --text-primary: #111827;
@@ -1031,6 +1039,7 @@ input:not([class]), select:not([class]), textarea:not([class]) {
     --bg:           #0D1117;
     --surface:      #161B22;
     --surface-2:    #0D1117;
+    --card-bg:      #161B22;
     --border:       #30363D;
     --border-light: #21262D;
     --text-primary: #E6EDF3;
@@ -1047,6 +1056,12 @@ input:not([class]), select:not([class]), textarea:not([class]) {
     --primary-hover:#86EFAC;
     --text:         #E6EDF3;
     --text-light:   #8B949E;
+    --badge-amber-bg:   rgba(217,119,6,.18);
+    --badge-amber-text: #FCD34D;
+    --badge-green-bg:   rgba(22,101,52,.25);
+    --badge-green-text: #86EFAC;
+    --badge-red-bg:     rgba(239,68,68,.18);
+    --badge-red-text:   #FCA5A5;
     color-scheme: dark;
   }
 }
@@ -1056,6 +1071,7 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   --bg:           #0D1117;
   --surface:      #161B22;
   --surface-2:    #0D1117;
+  --card-bg:      #161B22;
   --border:       #30363D;
   --border-light: #21262D;
   --text-primary: #E6EDF3;
@@ -1075,6 +1091,12 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   --primary-hover:#86EFAC;
   --text:         #E6EDF3;
   --text-light:   #8B949E;
+  --badge-amber-bg:   rgba(217,119,6,.18);
+  --badge-amber-text: #FCD34D;
+  --badge-green-bg:   rgba(22,101,52,.25);
+  --badge-green-text: #86EFAC;
+  --badge-red-bg:     rgba(239,68,68,.18);
+  --badge-red-text:   #FCA5A5;
   color-scheme: dark;
 }
 
@@ -1961,4 +1983,19 @@ input:not([class]), select:not([class]), textarea:not([class]) {
 [data-com-tab].active {
   color: #6366F1;
   border-bottom-color: #6366F1;
+}
+
+/* ── Botones secundarios inline — garantía dark ── */
+/* Módulos con .btn-secondary / .aut-btn-secondary sin color explícito */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-secondary,
+  :root:not([data-theme="light"]) .aut-btn-secondary {
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+  }
+}
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .aut-btn-secondary {
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
 }

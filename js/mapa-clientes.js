@@ -148,7 +148,61 @@ async function _iniciar(container) {
     maxZoom: 19
   }).addTo(_map);
 
-  _clusterGroup = L.markerClusterGroup({ maxClusterRadius: 50 });
+  // Mejora #1: cluster con sectores de color por estado legal
+  _clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    iconCreateFunction(cluster) {
+      const markers = cluster.getAllChildMarkers();
+      const total   = markers.length;
+      const grupos  = { juicio:0, promesa:0, acuerdo:0, irrec:0, gestion:0 };
+      markers.forEach(m => {
+        const e = m.options?.icon?.options?.html || "";
+        if (e.includes("#DC2626")) grupos.juicio++;
+        else if (e.includes("#EA580C")) grupos.promesa++;
+        else if (e.includes("#818CF8")) grupos.acuerdo++;
+        else if (e.includes("#9CA3AF")) grupos.irrec++;
+        else grupos.gestion++;
+      });
+
+      // Sectores SVG (donut)
+      const r = 18, cx = 22, cy = 22, stroke = 5;
+      const circ = 2 * Math.PI * r;
+      const slices = [
+        { n: grupos.juicio,  color: "#DC2626" },
+        { n: grupos.promesa, color: "#EA580C" },
+        { n: grupos.acuerdo, color: "#818CF8" },
+        { n: grupos.irrec,   color: "#9CA3AF" },
+        { n: grupos.gestion, color: "#16A34A" },
+      ].filter(s => s.n > 0);
+
+      let offset = 0;
+      const arcs = slices.map(s => {
+        const dash = (s.n / total) * circ;
+        const arc  = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+          stroke="${s.color}" stroke-width="${stroke}"
+          stroke-dasharray="${dash} ${circ - dash}"
+          stroke-dashoffset="${-offset}"
+          transform="rotate(-90 ${cx} ${cy})"/>`;
+        offset += dash;
+        return arc;
+      }).join("");
+
+      const size = total > 99 ? 52 : total > 9 ? 48 : 44;
+      const fontSize = total > 99 ? 10 : 12;
+      return L.divIcon({
+        html: `<svg width="${size}" height="${size}" viewBox="0 0 44 44">
+          <circle cx="${cx}" cy="${cy}" r="${r+3}" fill="rgba(17,24,39,0.85)"/>
+          ${arcs}
+          <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
+            fill="#F9FAFB" font-size="${fontSize}" font-weight="800"
+            font-family="system-ui,sans-serif">${total}</text>
+        </svg>`,
+        className: "",
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+    }
+  });
   _map.addLayer(_clusterGroup);
 
   _inyectarCSS();
@@ -192,9 +246,15 @@ function _construirUI(container) {
   panel.id = "mc-panel";
   panel.innerHTML = `
     <div id="mc-panel-hdr">
-      <span style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#9CA3AF;text-transform:uppercase">Clientes en mapa</span>
-      <span id="mc-contador" style="font-size:11px;font-weight:700;color:#E5E7EB">…</span>
-      <span id="mc-min-btn" title="Minimizar">&#8722;</span>
+      <div style="display:flex;align-items:center;gap:5px;min-width:0">
+        <span style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#9CA3AF;text-transform:uppercase;white-space:nowrap">Clientes en mapa</span>
+        <span id="mc-filtros-badge" style="display:none;background:#2563EB;color:#fff;font-size:8px;
+          font-weight:800;border-radius:10px;padding:1px 5px;white-space:nowrap"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span id="mc-contador" style="font-size:11px;font-weight:700;color:#E5E7EB">…</span>
+        <span id="mc-min-btn" title="Minimizar">&#8722;</span>
+      </div>
     </div>
     <div id="mc-panel-body">
       <div class="mc-section-title">👷 Ingenieros</div>
@@ -216,19 +276,19 @@ function _construirUI(container) {
             data-estado="${v}" style="--cc:${c};border-color:${c};color:${c}">${l}</div>`).join("")}
       </div>
 
-      <div class="mc-section-title" style="margin-top:8px">🔥 Mapa de calor</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <div class="mc-chip mc-chip-calor ${_calorActivo?"activo":""}" id="mc-btn-calor"
-          style="border-color:#BE185D;color:#BE185D">
-          &#9632; Calor
-        </div>
-        ${_calorActivo ? `
-          <div id="mc-heat-chips" style="display:flex;gap:5px;flex-wrap:wrap">
-            ${[["urgencia","Urgencia visita","#B71C1C"],["morosidad","Morosidad","#4A148C"],
-               ["cobranza","Cobranza","#1B5E20"],["saldo","Saldo pendiente","#E65100"]]
-              .map(([v,l,c]) => `<div class="mc-chip mc-chip-heat ${v===_calorCapa?"activo":""}"
-                data-heat="${v}" style="--cc:${c};border-color:${c};color:${c}">${l}</div>`).join("")}
-          </div>` : ""}
+      <div style="height:1px;background:rgba(255,255,255,.07);margin:10px 0 8px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span class="mc-section-title" style="margin-bottom:0">🔥 Mapa de calor</span>
+        <label class="mc-toggle" title="Activar mapa de calor">
+          <input type="checkbox" id="mc-calor-chk" ${_calorActivo?"checked":""}>
+          <span class="mc-toggle-track"></span>
+        </label>
+      </div>
+      <div id="mc-heat-chips" style="display:flex;gap:5px;flex-wrap:wrap;${_calorActivo?"":"opacity:.4;pointer-events:none"}">
+        ${[["urgencia","Urgencia","#B71C1C"],["morosidad","Morosidad","#4A148C"],
+           ["cobranza","Cobranza","#1B5E20"],["saldo","Saldo","#E65100"]]
+          .map(([v,l,c]) => `<div class="mc-chip mc-chip-heat ${v===_calorCapa?"activo":""}"
+            data-heat="${v}" style="--cc:${c};border-color:${c};color:${c}">${l}</div>`).join("")}
       </div>
     </div>`;
   container.querySelector("#mc-root").appendChild(panel);
@@ -288,6 +348,7 @@ function _bindPanelEvents(container) {
     }
     _renderMarcadores();
     _actualizarLeyenda();
+    _actualizarBadgeFiltros();
   });
 
   // Chips de estado
@@ -298,21 +359,26 @@ function _bindPanelEvents(container) {
     chip.classList.add("activo");
     _filtroEstado = chip.dataset.estado;
     _renderMarcadores();
+    _actualizarBadgeFiltros();
   });
 
-  // Toggle calor
-  container.querySelector("#mc-btn-calor")?.addEventListener("click", e => {
-    _calorActivo = !_calorActivo;
-    e.currentTarget.classList.toggle("activo", _calorActivo);
+  // Toggle calor — mejora #5: checkbox switch
+  container.querySelector("#mc-calor-chk")?.addEventListener("change", e => {
+    _calorActivo = e.target.checked;
+    const heatChips = container.querySelector("#mc-heat-chips");
+    if (heatChips) {
+      heatChips.style.opacity = _calorActivo ? "1" : ".4";
+      heatChips.style.pointerEvents = _calorActivo ? "" : "none";
+    }
     if (_calorActivo) {
       _mostrarCalor(_calorCapa);
       _clusterGroup.remove();
     } else {
       if (_heatLayer) { _map.removeLayer(_heatLayer); _heatLayer = null; }
       _clusterGroup.addTo(_map);
-      container.querySelector("#mc-heat-chips")?.remove();
     }
     _actualizarLeyenda();
+    _actualizarBadgeFiltros();
   });
 
   // Chips de heat
@@ -353,8 +419,22 @@ function _bindPanelEvents(container) {
         item.addEventListener("click", () => {
           const en = _allEntries[+item.dataset.idx];
           if (!en) return;
+          // Mejora #4: quitar ring anterior
+          if (_markerSeleccionado) {
+            const prevEl = _markerSeleccionado.getElement()?.querySelector(".mc-pin");
+            if (prevEl) prevEl.style.animation = "";
+          }
           _map.setView([en.data.lat, en.data.lng], 16);
-          _clusterGroup.zoomToShowLayer(en.marker, () => en.marker.openPopup());
+          _clusterGroup.zoomToShowLayer(en.marker, () => {
+            en.marker.openPopup();
+            // Añadir ring pulsante al pin encontrado
+            const pinEl = en.marker.getElement()?.querySelector(".mc-pin");
+            if (pinEl) {
+              pinEl.style.boxShadow = `0 0 0 4px ${en.color}99`;
+              pinEl.style.animation = "mc-pulse 1.2s ease-in-out infinite";
+            }
+            _markerSeleccionado = en.marker;
+          });
           res.style.display = "none";
           container.querySelector("#mc-search-input").value = "";
         });
@@ -364,9 +444,12 @@ function _bindPanelEvents(container) {
 }
 
 // ── Render de marcadores ──────────────────────────────────────
+let _markerSeleccionado = null; // mejora #4: pin seleccionado en búsqueda
+
 function _renderMarcadores() {
   _clusterGroup.clearLayers();
   _allEntries = [];
+  _markerSeleccionado = null;
   const ahora = Date.now();
   const hoyInicio = new Date(); hoyInicio.setHours(0,0,0,0);
 
@@ -388,7 +471,7 @@ function _renderMarcadores() {
 
     const icon = L.divIcon({
       className: "",
-      html: `<div style="
+      html: `<div class="mc-pin" style="
         width:14px;height:14px;border-radius:50%;background:${color};
         border:2.5px solid rgba(255,255,255,0.8);
         ${visitadoHoy ? `box-shadow:0 0 0 3px ${color}66;` : ""}
@@ -411,18 +494,53 @@ function _renderMarcadores() {
       <div style="font-size:10px;color:#6B7280;margin-top:1px">${diasTexto(c.diasVisita)}</div>
     `, { sticky: true, offset: [10,0] });
 
-    const entry = { marker, data: c, idx };
+    const entry = { marker, data: c, idx, color };
     _allEntries.push(entry);
     _clusterGroup.addLayer(marker);
   });
 
-  // Actualizar contador
-  const ctr = document.querySelector("#mc-contador");
-  if (ctr) ctr.textContent = `${visible.length} cliente${visible.length !== 1 ? "s" : ""}`;
+  // Mejora #7: contador desglosado por estado legal
+  _actualizarContador(visible);
 
-  if (visible.length > 0 && _filtroEstado !== "todos") {
+  // fitBounds: al filtrar por estado O por ingeniero específico (mejora #2)
+  const fitNeeded = _filtroEstado !== "todos" || !_ingSeleccionados.has("TODOS");
+  if (visible.length > 0 && fitNeeded) {
     try { _map.fitBounds(_clusterGroup.getBounds(), { padding: [50,50], maxZoom:13 }); } catch(_){}
   }
+}
+
+// Mejora #7: contador desglosado
+function _actualizarContador(visible) {
+  const ctr = document.querySelector("#mc-contador");
+  if (!ctr) return;
+  if (!visible || visible.length === 0) { ctr.textContent = "0 clientes"; return; }
+
+  const grupos = {};
+  const labelCorto = {
+    "En juicio": "Juicio", "Promesa de pago": "Promesa",
+    "Acuerdo firmado": "Acuerdo", "Irrecuperable": "Irrec.", "En gestión": "Gestión"
+  };
+  const colorMap = {
+    "En juicio": "#DC2626", "Promesa de pago": "#EA580C",
+    "Acuerdo firmado": "#818CF8", "Irrecuperable": "#9CA3AF", "En gestión": "#16A34A"
+  };
+  visible.forEach(c => {
+    const k = c.estadoLegal || "En gestión";
+    grupos[k] = (grupos[k] || 0) + 1;
+  });
+
+  const total = visible.length;
+  const desglose = Object.entries(grupos)
+    .sort((a,b) => b[1]-a[1])
+    .filter(([k]) => k !== "En gestión" || Object.keys(grupos).length === 1)
+    .slice(0,3)
+    .map(([k,n]) => {
+      const c = colorMap[k] || "#9CA3AF";
+      return `<span style="color:${c};font-weight:700;font-size:9px">${n} ${labelCorto[k]||k}</span>`;
+    }).join('<span style="color:#374151;margin:0 2px">·</span>');
+
+  ctr.innerHTML = `<span style="font-size:11px;font-weight:700;color:#E5E7EB">${total} cliente${total!==1?"s":""}</span>` +
+    (desglose ? `<div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:2px">${desglose}</div>` : "");
 }
 
 // ── Popup HTML ────────────────────────────────────────────────
@@ -524,21 +642,43 @@ function _actualizarLeyenda() {
     return;
   }
 
-  if (_ingSeleccionados.has("TODOS")) {
-    const ings = [...new Set(_clientes.map(c => c.ingeniero).filter(Boolean))].sort();
-    el.innerHTML = `<div style="font-size:10px;font-weight:700;color:#9CA3AF;
-        text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Ingenieros</div>` +
-      ings.map(a => `<div style="display:flex;align-items:center;gap:5px;font-size:11px;
-          color:var(--text-primary);margin-bottom:3px">
-          <span style="width:10px;height:10px;border-radius:50%;background:${colorDeIngeniero(a)};flex-shrink:0"></span>
+  // Mejora #3: leyenda = semáforo de urgencia de visita, no lista de ingenieros
+  const ahora = Date.now();
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  let visitadosHoy = 0, semanaPlus = 0, quincenaPlus = 0, sinVisita = 0;
+  (_allEntries.length ? _allEntries.map(e => e.data) : _clientes).forEach(c => {
+    const fuv = c.fechaUltimaVisita || 0;
+    if (!fuv) { sinVisita++; return; }
+    const dias = Math.floor((ahora - fuv) / 86400000);
+    if (dias === 0) visitadosHoy++;
+    else if (dias <= 7) semanaPlus++;
+    else if (dias <= 14) quincenaPlus++;
+    else sinVisita++;
+  });
+  el.innerHTML = `
+    <div style="font-size:9px;font-weight:800;color:#6B7280;text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:7px">Urgencia de visita</div>
+    ${[
+      [visitadosHoy,  "#16A34A", "✅ Visitado hoy"],
+      [semanaPlus,    "#D97706", "📅 &lt;7 días"],
+      [quincenaPlus,  "#EA580C", "⚠️ 7–14 días"],
+      [sinVisita,     "#DC2626", "🔴 +14 días / sin visita"]
+    ].filter(([n]) => n > 0).map(([n,c,l]) =>
+      `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>
+        <span style="font-size:10px;color:#D1D5DB;flex:1">${l}</span>
+        <span style="font-size:10px;font-weight:700;color:${c};font-variant-numeric:tabular-nums">${n}</span>
+      </div>`
+    ).join("")}`;
+
+  // Ingenieros activos (solo si hay filtro específico)
+  if (!_ingSeleccionados.has("TODOS")) {
+    el.innerHTML += `<div style="height:1px;background:rgba(255,255,255,.07);margin:7px 0 6px"></div>` +
+      [..._ingSeleccionados].map(a => `<div style="display:flex;align-items:center;gap:5px;
+          font-size:10px;color:#D1D5DB;margin-bottom:2px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colorDeIngeniero(a)};flex-shrink:0"></span>
           ${_esc(a)}
         </div>`).join("");
-  } else {
-    el.innerHTML = [..._ingSeleccionados].map(a => `<div style="display:flex;align-items:center;
-        gap:5px;font-size:11px;color:var(--text-primary);margin-bottom:3px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${colorDeIngeniero(a)};flex-shrink:0"></span>
-        ${_esc(a)}
-      </div>`).join("");
   }
 }
 
@@ -614,7 +754,29 @@ function _inyectarCSS() {
       box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:200px;min-width:140px;
     }
     #mc-leyenda-items > div { color:#E5E7EB !important; }
-    #mc-contador { margin-left:auto; font-variant-numeric:tabular-nums; }
+    #mc-contador { font-variant-numeric:tabular-nums; text-align:right; }
+
+    /* Toggle switch (mejora #5) */
+    .mc-toggle { position:relative;display:inline-block;width:32px;height:18px;cursor:pointer;flex-shrink:0 }
+    .mc-toggle input { opacity:0;width:0;height:0;position:absolute }
+    .mc-toggle-track {
+      position:absolute;inset:0;border-radius:9px;background:rgba(255,255,255,.15);
+      transition:background .2s;
+    }
+    .mc-toggle-track::after {
+      content:"";position:absolute;left:3px;top:3px;
+      width:12px;height:12px;border-radius:50%;background:#9CA3AF;
+      transition:transform .2s,background .2s;
+    }
+    .mc-toggle input:checked + .mc-toggle-track { background:#BE185D44; }
+    .mc-toggle input:checked + .mc-toggle-track::after { transform:translateX(14px);background:#BE185D; }
+
+    /* Pulse ring para pin seleccionado en búsqueda (mejora #4) */
+    @keyframes mc-pulse {
+      0%  { box-shadow:0 0 0 0 var(--pulse-c,#4ADE8066); }
+      70% { box-shadow:0 0 0 8px transparent; }
+      100%{ box-shadow:0 0 0 0 transparent; }
+    }
 
     /* Leaflet popup dark override */
     .leaflet-popup-content-wrapper {
@@ -632,6 +794,22 @@ function _inyectarCSS() {
     .leaflet-tooltip-top::before { border-top-color:rgba(17,24,39,0.95) !important; }
   `;
   document.head.appendChild(s);
+}
+
+// ── Badge de filtros activos (mejora #6) ─────────────────────
+function _actualizarBadgeFiltros() {
+  const badge = document.querySelector("#mc-filtros-badge");
+  if (!badge) return;
+  let count = 0;
+  if (!_ingSeleccionados.has("TODOS")) count += _ingSeleccionados.size;
+  if (_filtroEstado !== "todos") count++;
+  if (_calorActivo) count++;
+  if (count > 0) {
+    badge.textContent = `${count} filtro${count > 1 ? "s" : ""} activo${count > 1 ? "s" : ""}`;
+    badge.style.display = "inline-block";
+  } else {
+    badge.style.display = "none";
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────
