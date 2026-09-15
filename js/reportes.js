@@ -212,6 +212,27 @@ function _setLoading(cols = 6) {
     </td></tr>`;
 }
 
+// ── Helper: query pedidos en rango (Timestamp + número) ──────
+// Firestore filtra por tipo: where(>=Timestamp) nunca devuelve docs
+// con fechaPedido guardado como número (ms). Esta función hace ambas
+// queries y elimina duplicados por docId.
+async function _queryPedidosRango(desde, hasta) {
+  const [tsSnap, numSnap] = await Promise.all([
+    getDocs(query(collection(db,"pedidos"),
+      where("fechaPedido",">=",Timestamp.fromDate(desde)),
+      where("fechaPedido","<=",Timestamp.fromDate(hasta)))),
+    getDocs(query(collection(db,"pedidos"),
+      where("fechaPedido",">=",desde.getTime()),
+      where("fechaPedido","<=",hasta.getTime()))).catch(()=>({docs:[]}))
+  ]);
+  const seen = new Set();
+  const docs = [];
+  for (const d of [...tsSnap.docs, ...(numSnap.docs||[])]) {
+    if (!seen.has(d.id)) { seen.add(d.id); docs.push(d); }
+  }
+  return docs;
+}
+
 // ── REPORTE 1: Comisiones / Rendimiento ───────────────────────
 async function _cargarComisiones() {
   _setText("rp-titulo", "Reporte de comisiones y rendimiento");
@@ -227,10 +248,8 @@ async function _cargarComisiones() {
   </tr>`;
 
   try {
-    const [pedidosSnap, abonosSnap] = await Promise.all([
-      getDocs(query(collection(db,"pedidos"),
-        where("fechaPedido",">=",Timestamp.fromDate(desde)),
-        where("fechaPedido","<=",Timestamp.fromDate(hasta)))),
+    const [pedidosDocs, abonosSnap] = await Promise.all([
+      _queryPedidosRango(desde, hasta),
       getDocs(query(collection(db,"abonos_remision"),
         where("fechaAbono",">=",Timestamp.fromDate(desde)),
         where("fechaAbono","<=",Timestamp.fromDate(hasta))))
@@ -238,7 +257,7 @@ async function _cargarComisiones() {
 
     const STATI_OK = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     const stats = {};
-    pedidosSnap.forEach(d => {
+    pedidosDocs.forEach(d => {
       const p = d.data();
       if (!STATI_OK.has(p.status)) return;
       const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
@@ -315,10 +334,8 @@ async function _cargarVentasEjecutivas() {
 
   try {
     // cotizaciones: intentar con número y con Timestamp por si acaso
-    const [pedSnap, cotSnap] = await Promise.all([
-      getDocs(query(collection(db,"pedidos"),
-        where("fechaPedido",">=",Timestamp.fromDate(desde)),
-        where("fechaPedido","<=",Timestamp.fromDate(hasta)))),
+    const [pedidosDocs2, cotSnap] = await Promise.all([
+      _queryPedidosRango(desde, hasta),
       getDocs(query(collection(db,"cotizaciones"),
         where("creadaEn",">=",Timestamp.fromDate(desde)),
         where("creadaEn","<=",Timestamp.fromDate(hasta)),
@@ -332,7 +349,7 @@ async function _cargarVentasEjecutivas() {
     // Agrupar pedidos por ingeniero
     const STATI_OK_V = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     const stats = {};
-    pedSnap.forEach(d => {
+    pedidosDocs2.forEach(d => {
       const p = d.data();
       if (!STATI_OK_V.has(p.status)) return;
       const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
@@ -726,12 +743,8 @@ async function _cargarTendencia() {
 
   try {
     const desde = new Date(); desde.setDate(desde.getDate() - 29); desde.setHours(0,0,0,0);
-    const snap = await getDocs(query(
-      collection(db, "pedidos"),
-      where("fechaPedido", ">=", Timestamp.fromDate(desde)),
-      orderBy("fechaPedido", "asc"),
-      limit(3000)
-    ));
+    const hasta = new Date(); hasta.setHours(23,59,59,999);
+    const pedidosDocs3 = await _queryPedidosRango(desde, hasta);
 
     // Agrupar por día
     const diasMap = {};
@@ -741,7 +754,7 @@ async function _cargarTendencia() {
       diasMap[d.toISOString().slice(0,10)] = { pedidos: 0, vendido: 0 };
     }
     const STATI_OK = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
-    snap.forEach(doc => {
+    pedidosDocs3.forEach(doc => {
       const p = doc.data();
       if (!STATI_OK.has(p.status)) return;
       const ts = p.fechaPedido?.toDate?.() ?? (typeof p.fechaPedido === "number" ? new Date(p.fechaPedido) : null)
