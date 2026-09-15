@@ -236,12 +236,14 @@ async function _cargarComisiones() {
         where("fechaAbono","<=",Timestamp.fromDate(hasta))))
     ]);
 
+    const STATI_OK = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     const stats = {};
     pedidosSnap.forEach(d => {
       const p = d.data();
+      if (!STATI_OK.has(p.status)) return;
       const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
       if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
-      stats[alias].vendido  += p.total || 0;
+      stats[alias].vendido  += p.monto || p.total || 0;
       stats[alias].pedidos  += 1;
     });
     abonosSnap.forEach(d => {
@@ -328,13 +330,15 @@ async function _cargarVentasEjecutivas() {
     ]);
 
     // Agrupar pedidos por ingeniero
+    const STATI_OK_V = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     const stats = {};
     pedSnap.forEach(d => {
       const p = d.data();
+      if (!STATI_OK_V.has(p.status)) return;
       const alias = resolverNombre(p.ingenieroAlias || p.vendedor || p.alias || "–");
       if (!stats[alias]) stats[alias] = { pedidos:0, vendido:0, zona: p.zona || p.zonaAsignada || "–", cots:0, convertidas:0 };
       stats[alias].pedidos++;
-      stats[alias].vendido += p.total || 0;
+      stats[alias].vendido += p.monto || p.total || 0;
     });
 
     // Cotizaciones
@@ -736,17 +740,19 @@ async function _cargarTendencia() {
       const d = new Date(desde); d.setDate(desde.getDate() + i);
       diasMap[d.toISOString().slice(0,10)] = { pedidos: 0, vendido: 0 };
     }
+    const STATI_OK = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     snap.forEach(doc => {
       const p = doc.data();
+      if (!STATI_OK.has(p.status)) return;
       const ts = p.fechaPedido?.toDate?.() ?? (typeof p.fechaPedido === "number" ? new Date(p.fechaPedido) : null)
                ?? p.createdAt?.toDate?.() ?? (typeof p.createdAt === "number" ? new Date(p.createdAt) : null);
       const key = ts.toISOString().slice(0,10);
       if (diasMap[key]) {
         diasMap[key].pedidos++;
-        diasMap[key].vendido += p.total || 0;
+        diasMap[key].vendido += p.monto || p.total || 0;
       }
       const alias = resolverNombre(p.vendedor || p.alias || p.ingenieroAlias || "–");
-      ingMap[alias] = (ingMap[alias] || 0) + (p.total || 0);
+      ingMap[alias] = (ingMap[alias] || 0) + (p.monto || p.total || 0);
     });
 
     const dias    = Object.entries(diasMap).sort((a,b) => a[0].localeCompare(b[0]));
