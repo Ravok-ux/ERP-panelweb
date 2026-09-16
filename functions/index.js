@@ -2776,12 +2776,12 @@ exports.backfillHistorialVentas = onRequest(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// CF: onJornadaCerrada
-//    Trigger: ubicaciones/{uid} updated — enJornada cambia true → false
-//    Genera automáticamente un corte_caja con totalSistema = suma de
-//    abonos del ingeniero en el día. Queda en PENDIENTE para validación.
+// DESHABILITADO — onJornadaCerrada era el trigger incorrecto.
+// enJornada:false = cierre de rastreo GPS diario, NO liquidación de período.
+// La liquidación la inicia el ingeniero explícitamente desde el APK
+// con el botón "Liquidación de período", que escribe directamente a cortes_caja.
 // ═══════════════════════════════════════════════════════════════
-exports.onJornadaCerrada = onDocumentUpdated(
+/* exports.onJornadaCerrada = onDocumentUpdated(
   { document: "ubicaciones/{uid}", region: "us-central1" },
   async (event) => {
     const antes   = event.data.before.data();
@@ -2868,4 +2868,4 @@ exports.onJornadaCerrada = onDocumentUpdated(
 
     logger.info(`[onJornadaCerrada] Corte AUTO: ${alias} — $${totalSistema}`);
   }
-);
+); */

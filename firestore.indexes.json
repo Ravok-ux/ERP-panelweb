@@ -89,6 +89,14 @@
       ]
     },
     {
+      "collectionGroup": "abonos_remision",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ingenieroAlias", "order": "ASCENDING" },
+        { "fieldPath": "_ts",            "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "cortes_caja",
       "queryScope": "COLLECTION",
       "fields": [
