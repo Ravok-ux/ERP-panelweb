@@ -208,10 +208,11 @@ function _aplanarAbonos() {
     abonos.forEach((ab, idx) => {
       const fechaAbono = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
 
-      // Calcular interés ANTES de este abono (usando solo abonos previos)
-      // para que saldoCapital refleje el estado real en esa fecha
+      // Calcular interés ANTES de este abono (usando solo abonos previos).
+      // Forzamos status != PAGADO para que calcularRemision compute el interés
+      // histórico aunque la nota ya esté saldada hoy.
       const totalAbonadoAntes = abonos.slice(0, idx).reduce((s, a) => s + a.monto, 0);
-      const notaAntes = { ...r, totalAbonado: totalAbonadoAntes };
+      const notaAntes = { ...r, totalAbonado: totalAbonadoAntes, status: "ACTIVO" };
       const calcAntes = calcularRemision(notaAntes, fechaAbono);
 
       // interesGenerado acumulado hasta esta fecha menos lo ya cobrado en abonos previos
