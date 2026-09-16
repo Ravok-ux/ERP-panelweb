@@ -212,11 +212,15 @@ function _aplanarAbonos() {
       const fechaAbono   = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
       const calc         = calcularRemision(notaConAbono, fechaAbono);
 
-      // Cuánto del abono fue a capital vs interés
-      // El abono primero cubre el interés generado en esa fecha, luego el capital
+      // Cuánto del abono fue a capital vs interés.
+      // interesGenerado es el total acumulado desde el origen hasta la fecha del abono.
+      // Restamos el interés ya cobrado en abonos anteriores para obtener solo el incremental.
       const interesEnFecha = calc.interesGenerado;
-      const capitalAntes   = Math.max(0, r.montoOriginal - abonos.slice(0, idx).reduce((s,a) => s+a.monto, 0));
-      const interesAbono   = Math.min(ab.monto, Math.max(0, interesEnFecha));
+      const interesYaCobrado = rows
+        .filter(row => row.remisionId === r.id)
+        .reduce((s, row) => s + row.interesAbono, 0);
+      const interesDisponible = Math.max(0, interesEnFecha - interesYaCobrado);
+      const interesAbono   = Math.min(ab.monto, interesDisponible);
       const capitalAbono   = Math.max(0, ab.monto - interesAbono);
 
       rows.push({
