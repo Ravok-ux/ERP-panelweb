@@ -222,7 +222,12 @@ async function _cargarProductos() {
   if (_productos.length) return;
   const snap = await getDocs(collection(db, "productos"));
   _productos = snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
+    .map(d => {
+      const data = d.data();
+      // Normalizar: algunos docs usan `codigo`, otros `codigoN10`
+      if (!data.codigoN10 && data.codigo) data.codigoN10 = data.codigo;
+      return { id: d.id, ...data };
+    })
     .filter(p => p.activo !== false)
     .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
 }
@@ -630,9 +635,23 @@ async function _confirmarEntrada(entrada) {
       stock:         stockNuevo,
       stockActual:   stockNuevo,
       costoPromedio: nuevoCosto,
+      _ts:           ahora,
     });
 
-    // 3. Kardex
+    // 3. Sincronizar colección `inventario` (leída por inventario.js)
+    // Key = codigoN10 cuando existe; si no, se omite (el módulo Inventario
+    // solo muestra productos que ya tienen una entrada en esa colección)
+    if (item.codigoN10) {
+      const invRef = doc(db, "inventario", item.codigoN10);
+      batch.set(invRef, {
+        nombre:      item.nombre,
+        stockActual: stockNuevo,
+        unidad:      item.unidad || "",
+        _ts:         ahora,
+      }, { merge: true });
+    }
+
+    // 4. Kardex
     const movRef = doc(collection(db, "movimientos_stock"));
     batch.set(movRef, {
       tipo:           "ENTRADA_ALMACEN",
