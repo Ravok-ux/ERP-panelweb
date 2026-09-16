@@ -339,7 +339,7 @@ function _html() {
       <div class="kpi-row" id="kpi-row">
         ${_kpiSkeleton("💰", "Vendido hoy",     "green")}
         ${_kpiSkeleton("📈", "Interés en riesgo","red")}
-        ${_kpiSkeleton("🛒", "Pedidos activos",  "amber")}
+        ${_kpiSkeleton("🛒", "Pedidos en curso",  "amber")}
         ${_kpiSkeleton("👷", "En campo",          "violet")}
       </div>
 
@@ -491,7 +491,7 @@ function _escucharKPIs() {
       if (["CONFIRMADO","EN_RUTA","ENTREGADO"].includes(p.status)) activos++;
     });
     _renderKPI(0, "💰", "Vendido hoy",     "$" + Math.round(vendido).toLocaleString("es-MX"),   "+18%", "up",  "#16A34A");
-    _renderKPI(2, "🛒", "Pedidos activos", String(activos),
+    _renderKPI(2, "🛒", "Pedidos en curso", String(activos),
       `${activos} en curso`, "nt", "#D97706");
   }, _logErr("KPIs-pedidos"));
 }
