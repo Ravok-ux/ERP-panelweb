@@ -84,8 +84,24 @@
       "collectionGroup": "cortes_caja",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "uid",  "order": "ASCENDING" },
-        { "fieldPath": "_ts",  "order": "DESCENDING" }
+        { "fieldPath": "uid",      "order": "ASCENDING" },
+        { "fieldPath": "_ts",      "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cortes_caja",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid",      "order": "ASCENDING" },
+        { "fieldPath": "fechaStr", "order": "ASCENDING" },
+        { "fieldPath": "origen",   "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "abonos_remision",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_ts", "order": "ASCENDING" }
       ]
     },
     {

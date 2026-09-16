@@ -2774,3 +2774,98 @@ exports.backfillHistorialVentas = onRequest(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════
+// CF: onJornadaCerrada
+//    Trigger: ubicaciones/{uid} updated — enJornada cambia true → false
+//    Genera automáticamente un corte_caja con totalSistema = suma de
+//    abonos del ingeniero en el día. Queda en PENDIENTE para validación.
+// ═══════════════════════════════════════════════════════════════
+exports.onJornadaCerrada = onDocumentUpdated(
+  { document: "ubicaciones/{uid}", region: "us-central1" },
+  async (event) => {
+    const antes   = event.data.before.data();
+    const despues = event.data.after.data();
+
+    if (antes.enJornada !== true || despues.enJornada !== false) return;
+
+    const uid   = event.params.uid;
+    const alias = despues.alias || despues.nombre || uid;
+
+    const ahora     = new Date();
+    const inicioDia = new Date(ahora); inicioDia.setHours(0, 0, 0, 0);
+    const finDia    = new Date(ahora); finDia.setHours(23, 59, 59, 999);
+    const hoyStr    = ahora.toISOString().slice(0, 10);
+
+    const existing = await db.collection("cortes_caja")
+      .where("uid", "==", uid)
+      .where("fechaStr", "==", hoyStr)
+      .where("origen", "==", "AUTO")
+      .get();
+    if (!existing.empty) {
+      logger.info(`[onJornadaCerrada] Corte AUTO ya existe: ${alias} ${hoyStr}`);
+      return;
+    }
+
+    let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, totalSistema = 0;
+
+    // Intentar desde coleccion standalone abonos_remision
+    const abonosSnap = await db.collection("abonos_remision")
+      .where("_ts", ">=", inicioDia.getTime())
+      .where("_ts", "<=", finDia.getTime())
+      .get();
+
+    const abonosDia = abonosSnap.docs.filter(d => {
+      const a = d.data();
+      return a.alias === alias || a.uid === uid || a.quienRegistro === alias || a.quienRegistro === uid;
+    });
+
+    if (abonosDia.length > 0) {
+      abonosDia.forEach(d => {
+        const a = d.data();
+        const monto = a.monto || 0;
+        const forma = (a.formaPago || a.metodoPago || "EFECTIVO").toUpperCase();
+        if (forma.includes("TARJETA") || forma.includes("CARD")) totalTarjeta += monto;
+        else if (forma.includes("TRANSFER") || forma.includes("BANCO")) totalTransferencia += monto;
+        else totalEfectivo += monto;
+        totalSistema += monto;
+      });
+    } else {
+      // Fallback: arrays embedded en remisiones_credito
+      const remSnap = await db.collection("remisiones_credito").get();
+      remSnap.docs.forEach(d => {
+        const r = d.data();
+        if (r.ingenieroAlias !== alias && r.ingenieroAlias !== uid) return;
+        (r.abonos || []).forEach(ab => {
+          if (!ab.fecha) return;
+          const fechaAb = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
+          if (fechaAb < inicioDia || fechaAb > finDia) return;
+          const monto = ab.monto || 0;
+          const forma = (ab.formaPago || "EFECTIVO").toUpperCase();
+          if (forma.includes("TARJETA")) totalTarjeta += monto;
+          else if (forma.includes("TRANSFER")) totalTransferencia += monto;
+          else totalEfectivo += monto;
+          totalSistema += monto;
+        });
+      });
+    }
+
+    await db.collection("cortes_caja").add({
+      uid,
+      alias,
+      totalDeclarado: Math.round(totalSistema * 100) / 100,
+      totalSistema:   Math.round(totalSistema * 100) / 100,
+      efectivo:       Math.round(totalEfectivo * 100) / 100,
+      tarjeta:        Math.round(totalTarjeta * 100) / 100,
+      transferencia:  Math.round(totalTransferencia * 100) / 100,
+      status:         "PENDIENTE",
+      turno:          "JORNADA",
+      fechaStr:       hoyStr,
+      origen:         "AUTO",
+      _ts:            Date.now(),
+      timestamp:      FieldValue.serverTimestamp(),
+    });
+
+    logger.info(`[onJornadaCerrada] Corte AUTO: ${alias} — $${totalSistema}`);
+  }
+);
