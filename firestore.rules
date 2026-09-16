@@ -251,10 +251,10 @@ service cloud.firestore {
                          tieneFlag('PUEDE_EDITAR_PRECIO')
                        )
                      ) ||
-                     // ALMACENISTA puede actualizar stock (ajustes de inventario)
+                     // ALMACENISTA puede actualizar stock y costo promedio (entradas de inventario)
                      (miRol() == 'ALMACENISTA'
                        && request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['stock','stockActual','_ts'])
+                           .hasOnly(['stock','stockActual','costoPromedio','_ts'])
                      ) ||
                      // APK seed: solo merge de campos de catálogo (no precio ni costo)
                      tieneFlag('PUEDE_CREAR_PEDIDOS') // proxy para APK autenticado
@@ -548,7 +548,7 @@ service cloud.firestore {
                         && request.resource.data.tipo in [
                             'ENTRADA','SALIDA','AJUSTE','DEVOLUCION','TRASLADO',
                             'AJUSTE_ENTRADA','AJUSTE_SALIDA','AJUSTE_INVENTARIO','EDITAR_MINIMO',
-                            'REABASTO_SURTIDO'
+                            'REABASTO_SURTIDO','ENTRADA_ALMACEN'
                         ]
                         && request.resource.data.cantidad is number)
                       ||
@@ -975,6 +975,25 @@ service cloud.firestore {
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.status in ['VALIDADO','DIFERENCIA'];
 
+      allow delete: if false;
+    }
+
+    // ── /entradas_almacen ─────────────────────────────────────────────────────
+    // Entradas de inventario al almacén sin orden de compra
+    // Flujo: BORRADOR → COTEJO → CONFIRMADO
+    match /entradas_almacen/{entradaId} {
+      // Admins y almacenistas leen todo
+      allow read: if cuentaActiva()
+                  && (esAdminOSuperior() || miRol() == 'ALMACENISTA');
+      // Crear borrador: admin o almacenista
+      allow create: if cuentaActiva()
+                    && (esAdminOSuperior() || miRol() == 'ALMACENISTA')
+                    && request.resource.data.keys().hasAll(['estado','proveedor','items','_ts','creadoPor'])
+                    && request.resource.data.estado == 'BORRADOR';
+      // Actualizar (cambio de estado, cotejo, confirmación)
+      allow update: if cuentaActiva()
+                    && (esAdminOSuperior() || miRol() == 'ALMACENISTA')
+                    && request.resource.data.estado in ['BORRADOR','COTEJO','CONFIRMADO'];
       allow delete: if false;
     }
 
