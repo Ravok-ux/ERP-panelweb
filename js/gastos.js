@@ -340,7 +340,9 @@ function _render(docs) {
         ? await window.modal({ title: "Aprobar gasto", message: `¿Aprobar el gasto de ${alias} por $${Number(monto).toLocaleString("es-MX", { minimumFractionDigits: 2 })}?`, confirmLabel: "Aprobar" })
         : confirm(`¿Aprobar el gasto de ${alias} por $${Number(monto).toLocaleString("es-MX", { minimumFractionDigits: 2 })}?`);
       if (!ok) return;
-      await _setStatus({ id, empleadoUid: uid, empleadoAlias: alias, status: "APROBADO" });
+      btn.disabled = true; btn.textContent = "…";
+      try { await _setStatus({ id, empleadoUid: uid, empleadoAlias: alias, status: "APROBADO" }); }
+      catch(e) { btn.disabled = false; btn.textContent = "✓ Aprobar"; window.toast?.("Error: " + e.message, "error"); }
     });
   });
 
@@ -351,7 +353,9 @@ function _render(docs) {
         ? await window.promptModal({ title: "Rechazar gasto", label: `Motivo — ${alias} · $${Number(monto).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, placeholder: "Escribe el motivo…", confirmLabel: "Rechazar" })
         : prompt(`Motivo de rechazo para el gasto de ${alias}:`);
       if (motivo === null || !motivo.trim()) return;
-      await _setStatus({ id, empleadoUid: uid, empleadoAlias: alias, status: "RECHAZADO", motivoRechazo: motivo.trim() });
+      btn.disabled = true; btn.textContent = "…";
+      try { await _setStatus({ id, empleadoUid: uid, empleadoAlias: alias, status: "RECHAZADO", motivoRechazo: motivo.trim() }); }
+      catch(e) { btn.disabled = false; btn.textContent = "✗ Rechazar"; window.toast?.("Error: " + e.message, "error"); }
     });
   });
 }

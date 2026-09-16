@@ -12,7 +12,7 @@ import {
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, query, orderBy, limit, onSnapshot,
-  doc, getDoc, setDoc, updateDoc, serverTimestamp
+  doc, getDoc, setDoc, updateDoc, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const fmt    = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
@@ -179,7 +179,7 @@ function _html() {
       <div id="rst-abono-preview" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="RemisionesUI.cerrarAbono()">Cancelar</button>
-        <button class="btn-primary" style="width:auto;padding:8px 20px"
+        <button id="rst-abono-guardar" class="btn-primary" style="width:auto;padding:8px 20px"
           onclick="RemisionesUI.guardarAbono()">Guardar abono</button>
       </div>
     </div>
@@ -320,13 +320,31 @@ function _bindUI() {
       if (monto <= 0) { window.toast?.("Ingresa un monto válido.", "error"); return; }
 
       const fecha = new Date(fechaStr + "T12:00:00");
-      const { update, liquidada } = calcularAbono(_abonoTarget, { monto, recibo, fecha });
+
+      // Pre-calcular para preview de liquidación
+      const { liquidada } = calcularAbono(_abonoTarget, { monto, recibo, fecha });
+
+      // Confirmación extra si la nota se liquida
+      if (liquidada) {
+        const ok = window.modal
+          ? await window.modal({ title: "Liquidar nota", message: `Este abono de ${fmt.format(monto)} liquida la nota completa. ¿Confirmas?`, confirmLabel: "Liquidar" })
+          : confirm(`¿Liquidar la nota con ${fmt.format(monto)}?`);
+        if (!ok) return;
+      }
+
+      const btn = document.getElementById("rst-abono-guardar");
+      if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
 
       try {
-        await updateDoc(doc(db, "remisiones_credito", _abonoTarget.id), {
-          ...update,
-          modificadoPor: Sesion.alias,
-          modificadoEn: serverTimestamp(),
+        // runTransaction garantiza que dos abonos simultáneos no se sobreescriban
+        await runTransaction(db, async tx => {
+          const ref      = doc(db, "remisiones_credito", _abonoTarget.id);
+          const snap     = await tx.get(ref);
+          if (!snap.exists()) throw new Error("Remisión no encontrada.");
+          // Recalcular sobre el estado fresco del documento
+          const fresco   = { id: snap.id, ...snap.data() };
+          const { update: upd } = calcularAbono(fresco, { monto, recibo, fecha });
+          tx.update(ref, { ...upd, modificadoPor: Sesion.alias, modificadoEn: serverTimestamp() });
         });
         window.toast?.(
           liquidada
@@ -337,6 +355,8 @@ function _bindUI() {
         this.cerrarAbono();
       } catch(e) {
         window.toast?.("Error: " + e.message, "error");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Guardar abono"; }
       }
     },
   };

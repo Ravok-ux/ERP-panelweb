@@ -226,10 +226,10 @@ async function _calcularSistema(alias) {
 
   let ef = 0, tj = 0, tr = 0;
 
-  // Sumar abonos del día desde remisiones_credito (embedded)
+  // 1) Abonos del día desde remisiones_credito (cobros de crédito embebidos)
   const remSnap = await getDocs(query(
     collection(db, "remisiones_credito"),
-    where("ingenieroAlias", "in", [alias])
+    where("ingenieroAlias", "==", alias)
   ));
 
   remSnap.docs.forEach(d => {
@@ -245,6 +245,36 @@ async function _calcularSistema(alias) {
       else ef += monto;
     });
   });
+
+  // 2) Pedidos de contado entregados hoy (ingenieroAlias o alias en el campo)
+  const [pedSnap1, pedSnap2] = await Promise.all([
+    getDocs(query(collection(db, "pedidos"),
+      where("ingenieroAlias", "==", alias),
+      where("status", "==", "ENTREGADO"),
+      where("entregadoEn", ">=", inicioDia.getTime())
+    )),
+    getDocs(query(collection(db, "pedidos"),
+      where("alias", "==", alias),
+      where("status", "==", "ENTREGADO"),
+      where("entregadoEn", ">=", inicioDia.getTime())
+    )),
+  ]);
+
+  const pedidosIds = new Set();
+  const procesarPedido = d => {
+    if (pedidosIds.has(d.id)) return;
+    pedidosIds.add(d.id);
+    const p = d.data();
+    const tipoPago = (p.tipoPago || p.tipoVenta || "").toUpperCase();
+    if (tipoPago.includes("CREDITO")) return; // el crédito ya va por remisiones
+    const monto = Number(p.total || p.monto || 0);
+    const forma = (p.metodoPago || p.formaPago || "EFECTIVO").toUpperCase();
+    if (forma.includes("TARJETA")) tj += monto;
+    else if (forma.includes("TRANSFER")) tr += monto;
+    else ef += monto;
+  };
+  pedSnap1.docs.forEach(procesarPedido);
+  pedSnap2.docs.forEach(procesarPedido);
 
   _sistemaCache = { alias, ef, tj, tr };
 
@@ -270,7 +300,7 @@ function _actualizarTotalesModal() {
 
 async function _guardarCorte() {
   const alias = _container.querySelector("#caja-f-alias").value;
-  if (!alias) { alert("Selecciona un vendedor."); return; }
+  if (!alias) { window.toast?.("Selecciona un vendedor.", "error"); return; }
 
   const ef  = parseFloat(_container.querySelector("#caja-f-ef").value) || 0;
   const tj  = parseFloat(_container.querySelector("#caja-f-tj").value) || 0;
@@ -306,7 +336,7 @@ async function _guardarCorte() {
     ["caja-f-ef","caja-f-tj","caja-f-tr"].forEach(id => { _container.querySelector(`#${id}`).value = ""; });
     _container.querySelector("#caja-f-alias").value = "";
   } catch(e) {
-    alert("Error al guardar: " + e.message);
+    window.toast?.("Error al guardar: " + e.message, "error");
   } finally {
     btn.disabled = false; btn.textContent = "Guardar corte";
   }
@@ -402,10 +432,19 @@ function _render(docs) {
 }
 
 async function _setStatus(id, status) {
-  await updateDoc(doc(db, "cortes_caja", id), {
-    status,
-    validadoPor:  Sesion.uid,
-    validadoAlias: Sesion.alias || "",
-    timestampValidacion: serverTimestamp(),
-  });
+  const label = status === "VALIDADO" ? "validar" : "marcar con diferencia";
+  const ok = window.modal
+    ? await window.modal({ title: "Confirmar acción", message: `¿Deseas ${label} este corte de caja?`, confirmLabel: status === "VALIDADO" ? "Validar" : "Confirmar diferencia" })
+    : confirm(`¿${label.charAt(0).toUpperCase() + label.slice(1)} este corte?`);
+  if (!ok) return;
+  try {
+    await updateDoc(doc(db, "cortes_caja", id), {
+      status,
+      validadoPor:  Sesion.uid,
+      validadoAlias: Sesion.alias || "",
+      timestampValidacion: serverTimestamp(),
+    });
+  } catch(e) {
+    window.toast?.("Error: " + e.message, "error");
+  }
 }

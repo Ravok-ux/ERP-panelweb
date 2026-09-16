@@ -1052,14 +1052,47 @@ async function _concProcesar(texto) {
 
   const inicio = new Date(mes+'-01');
   const fin    = new Date(inicio.getFullYear(), inicio.getMonth()+1, 0, 23,59,59);
-  const [snapCobranza, snapCaja] = await Promise.all([
-    getDocs(query(collection(db,'cobranza'), where('fecha','>=',Timestamp.fromDate(inicio)), where('fecha','<=',Timestamp.fromDate(fin)))),
-    getDocs(query(collection(db,'movimientos_caja'), where('fecha','>=',Timestamp.fromDate(inicio)), where('fecha','<=',Timestamp.fromDate(fin)))),
+  const inicioMs = inicio.getTime();
+  const finMs    = fin.getTime();
+
+  // Leer abonos del período desde remisiones_credito (array embebido)
+  // y cortes de caja validados del período
+  const [snapRem, snapCortes] = await Promise.all([
+    getDocs(query(collection(db,'remisiones_credito'), where('fechaCreacion','>=',Timestamp.fromDate(inicio)))),
+    getDocs(query(collection(db,'cortes_caja'), where('status','==','VALIDADO'))),
   ]);
-  const movsInterno = [
-    ...snapCobranza.docs.map(d=>({...d.data(),_col:'cobranza',id:d.id})),
-    ...snapCaja.docs.map(d=>({...d.data(),_col:'caja',id:d.id})),
-  ];
+
+  const movsInterno = [];
+
+  // Aplanar abonos embebidos en remisiones del período
+  snapRem.docs.forEach(d => {
+    const r = d.data();
+    (r.abonos || []).forEach((ab, idx) => {
+      if (!ab.fecha) return;
+      const fechaAbMs = new Date(ab.fecha + (ab.fecha.includes('T') ? '' : 'T12:00:00')).getTime();
+      if (fechaAbMs < inicioMs || fechaAbMs > finMs) return;
+      movsInterno.push({
+        id: d.id + '_' + idx,
+        monto: ab.monto || 0,
+        referencia: ab.recibo || ab.referencia || '',
+        fecha: ab.fecha,
+        _col: 'remision',
+        ingenieroAlias: r.ingenieroAlias || '',
+        clienteNombre: r.clienteNombre || '',
+        formaPago: ab.formaPago || 'EFECTIVO',
+      });
+    });
+  });
+
+  // Cortes de caja del período (transferencias y tarjetas)
+  snapCortes.docs.forEach(d => {
+    const c = d.data();
+    if (!c.fechaStr) return;
+    const fechaCorteMs = new Date(c.fechaStr + 'T12:00:00').getTime();
+    if (fechaCorteMs < inicioMs || fechaCorteMs > finMs) return;
+    if ((c.tarjeta || 0) > 0) movsInterno.push({ id: d.id+'_tj', monto: c.tarjeta, referencia: c.alias, fecha: c.fechaStr, _col: 'caja_tarjeta' });
+    if ((c.transferencia || 0) > 0) movsInterno.push({ id: d.id+'_tr', monto: c.transferencia, referencia: c.alias, fecha: c.fechaStr, _col: 'caja_transferencia' });
+  });
 
   const usados = new Set();
   const conciliados=[], sinMatch=[], noEnBanco=[];

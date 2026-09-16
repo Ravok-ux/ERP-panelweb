@@ -448,6 +448,7 @@ function _bindAcciones() {
       const diaEl = document.getElementById("com-dia-liq");
       if (diaEl) { diaEl.value = String(c.diaLiquidacion ?? 1); ComisionesUI._previewPeriodo(); }
       _renderTramos();
+      _unsubAlias?.(); _unsubAlias = null;
       document.getElementById("modal-alias").classList.add("hidden");
       document.getElementById("modal-comision").classList.remove("hidden");
     },
@@ -592,6 +593,7 @@ function _bindAcciones() {
       document.getElementById("cob-comision").value  = c.comisionPor  ?? 10;
     } catch (_) {}
     _actualizarEjemploCobranza();
+    _unsubAlias?.(); _unsubAlias = null;
     document.getElementById("modal-alias").classList.add("hidden");
     document.getElementById("modal-cobranza").classList.remove("hidden");
   }
@@ -610,6 +612,9 @@ function _bindAcciones() {
   }
 
   // Escuchar ingenieros disponibles para el selector
+  // Guardar unsub del listener de ingenieros para cancelarlo al cerrar modal
+  let _unsubAlias = null;
+
   function _escucharIngenieros(onSelect) {
     const q = query(collection(db, "usuarios"), orderBy("alias"));
     const list = document.getElementById("alias-list");
@@ -617,7 +622,9 @@ function _bindAcciones() {
 
     window._comAliasCallback = onSelect || (alias => ComisionesUI.editarConfig(alias));
 
-    onSnapshot(q, snap => {
+    // Cancelar listener previo antes de abrir uno nuevo
+    _unsubAlias?.();
+    _unsubAlias = onSnapshot(q, snap => {
       const ingenieros = snap.docs
         .filter(d => ["INGENIERO","RECUPERADOR"].includes(d.data().rol) && d.data().activo !== false);
       list.innerHTML = ingenieros.length === 0
