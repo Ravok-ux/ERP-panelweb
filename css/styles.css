@@ -289,6 +289,19 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   font-size: 9px; font-weight: 800; border-radius: 10px;
   padding: 1px 5px; min-width: 16px; text-align: center; line-height: 14px;
 }
+.sb-badge.aut-alarm {
+  background: #EF4444;
+  box-shadow: 0 0 0 2px #EF444466;
+  animation: aut-pulse 1.2s ease-in-out infinite;
+}
+@keyframes aut-pulse {
+  0%,100% { box-shadow: 0 0 0 2px #EF444466; }
+  50%      { box-shadow: 0 0 0 5px #EF444400; }
+}
+@keyframes dash-alarm {
+  0%,100% { box-shadow: 0 0 0 0 #EF444400; }
+  50%      { box-shadow: 0 0 4px 0 #EF444470; }
+}
 
 .sb-user {
   padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.06);
@@ -389,7 +402,7 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   flex: 1; overflow: hidden; position: relative;
 }
 .view {
-  display: none; height: 100%; overflow: auto;
+  display: none; height: 100%; overflow-x: hidden; overflow-y: auto;
   flex-direction: column;
 }
 .view.active { display: flex; }

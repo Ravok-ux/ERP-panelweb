@@ -248,13 +248,14 @@ async function _cargarComisiones() {
   </tr>`;
 
   try {
-    const [pedidosDocs, abonosSnap] = await Promise.all([
+    // Abonos están embebidos en remisiones_credito (campo abonos[])
+    // No existe colección abonos_remision independiente
+    const [pedidosDocs, remSnap] = await Promise.all([
       _queryPedidosRango(desde, hasta),
-      getDocs(query(collection(db,"abonos_remision"),
-        where("fechaAbono",">=",Timestamp.fromDate(desde)),
-        where("fechaAbono","<=",Timestamp.fromDate(hasta))))
+      getDocs(query(collection(db,"remisiones_credito"), limit(2000)))
     ]);
 
+    const desdeMs = desde.getTime(), hastaMs = hasta.getTime();
     const STATI_OK = new Set(["CONFIRMADO","ENTREGADO","confirmado","entregado","Confirmado","Entregado"]);
     const stats = {};
     pedidosDocs.forEach(d => {
@@ -265,10 +266,17 @@ async function _cargarComisiones() {
       stats[alias].vendido  += p.monto || p.total || 0;
       stats[alias].pedidos  += 1;
     });
-    abonosSnap.forEach(d => {
-      const a = d.data(), alias = resolverNombre(a.quienRegistro || a.ingenieroAlias || a.alias || "–");
-      if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
-      stats[alias].cobrado += a.monto || 0;
+    remSnap.forEach(d => {
+      const r = d.data();
+      const abonos = r.abonos ?? [];
+      abonos.forEach(a => {
+        // fecha abono es ISO string: "2026-09-15"
+        const abonoMs = new Date(a.fecha + (a.fecha?.includes("T") ? "" : "T12:00:00")).getTime();
+        if (!abonoMs || abonoMs < desdeMs || abonoMs > hastaMs) return;
+        const alias = resolverNombre(a.quienRegistro || r.ingenieroAlias || r.aliasVendedor || "–");
+        if (!stats[alias]) stats[alias] = { vendido:0, cobrado:0, pedidos:0 };
+        stats[alias].cobrado += a.monto || 0;
+      });
     });
 
     const META = _getMeta();
@@ -437,15 +445,11 @@ async function _cargarTopProductos() {
   </tr>`;
 
   try {
-    const snap = await getDocs(query(
-      collection(db,"pedidos"),
-      where("fechaPedido",">=",Timestamp.fromDate(desde)),
-      where("fechaPedido","<=",Timestamp.fromDate(hasta)),
-      limit(2000)
-    ));
+    // Dual query para cubrir timestamps Firestore (APK) y ms numéricos (panel web)
+    const pedidosDocs4 = await _queryPedidosRango(desde, hasta);
 
     const productos = {};
-    snap.forEach(d => {
+    pedidosDocs4.forEach(d => {
       const p = d.data();
       const items = p.items || p.productos || [];
       items.forEach(it => {

@@ -29,7 +29,11 @@ const STATUS_COLOR = {
   RECHAZADO:  "#DC2626"
 };
 const fmt = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
-const fmtDt = d => new Date(d?.toDate?.() ?? d).toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" });
+const fmtDt = d => {
+  if (d == null) return "—";
+  const dt = new Date(d?.toDate?.() ?? d);
+  return isNaN(dt) ? "—" : dt.toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" });
+};
 
 export const PedidosModule = {
   mount(container) {
@@ -402,6 +406,16 @@ async function _avanzarStatus(pedidoId, nuevoStatus) {
             bloqueadoPor:  Sesion.uid,
             _tsBloqueo:    serverTimestamp()
           });
+          // Evento feed — alerta de autorización requerida
+          addDoc(collection(db, "log_actividades"), {
+            tipo:      "PEDIDO_PENDIENTE_AUTH",
+            folio:     pedidoId,
+            cliente:   c.nombre || "–",
+            alias:     Sesion.alias ?? null,
+            uid:       Sesion.uid  ?? null,
+            motivo:    "SEMAFORO_" + c.semaforoColor,
+            timestamp: Date.now(),
+          }).catch(() => {});
           window.toast?.("Pedido enviado a autorización por semáforo " + c.semaforoColor, "warn");
           return;
         }

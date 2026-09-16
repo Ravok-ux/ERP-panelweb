@@ -1133,11 +1133,15 @@ function _escucharFeedDash() {
       const a   = d.data();
       const cfg = _eventConfig(a.tipo);
       const ts  = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
+      const isAlarm = a.tipo === "PEDIDO_PENDIENTE_AUTH";
+      const extraStyle = isAlarm
+        ? `background:#EF444412;border-width:2px;animation:dash-alarm 1.4s ease-in-out infinite`
+        : "";
       return `
-        <div class="feed-event" style="border-color:${cfg.color}">
+        <div class="feed-event" style="border-color:${cfg.color};${extraStyle}">
           <div class="ev-icon">${cfg.icon}</div>
           <div class="ev-body">
-            <div class="ev-who">${esc(a.alias) || "–"}</div>
+            <div class="ev-who" style="${isAlarm ? "color:#EF4444;font-weight:800" : ""}">${isAlarm ? "AUTORIZACIÓN" : (esc(a.alias) || "–")}</div>
             <div class="ev-what">${esc(_resumenActividad(a))}</div>
             <div class="ev-time">${ts}</div>
           </div>
@@ -1227,6 +1231,7 @@ function _tiempoRelativo(date) {
 }
 
 const EVENTOS = {
+  PEDIDO_PENDIENTE_AUTH: { icon:"🚨", color:"#EF4444" },
   PEDIDO_CONFIRMADO:  { icon:"🛒", color:"#16A34A" },
   PEDIDO_EN_RUTA:     { icon:"🚚", color:"#D97706" },
   PEDIDO_ENTREGADO:   { icon:"✅", color:"#16A34A" },
@@ -1241,6 +1246,7 @@ function _eventConfig(tipo) { return EVENTOS[tipo] || { icon:"•", color:"#6B72
 
 function _resumenActividad(a) {
   switch(a.tipo) {
+    case "PEDIDO_PENDIENTE_AUTH": return `⚠️ ${a.cliente || "–"} requiere autorización`;
     case "PEDIDO_CONFIRMADO": return `Pedido ${a.folio || "–"} · ${_fmt(a.total || 0)}`;
     case "ABONO_REGISTRADO":  return `Abono ${_fmt(a.monto || 0)} → ${a.remision || "–"}`;
     case "REMISION_CREADA":   return `Remisión ${a.remision || "–"} · ${_fmt(a.total || 0)}`;

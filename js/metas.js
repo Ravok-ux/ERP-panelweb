@@ -8,7 +8,7 @@ import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import {
   collection, doc, addDoc, setDoc, deleteDoc,
-  onSnapshot, query, where, getDocs,
+  onSnapshot, query, where, getDocs, limit,
   serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -117,8 +117,8 @@ export const MetasModule = {
         .sort();
     });
 
-    // Suscribirse a metas
-    _unsubMetas = onSnapshot(collection(db, "metas"), snap => {
+    // Suscribirse a metas — limit para no cargar toda la colección histórica
+    _unsubMetas = onSnapshot(query(collection(db, "metas"), limit(300)), snap => {
       snap.docChanges().forEach(ch => {
         if (ch.type === "removed") delete _metas[ch.doc.id];
         else _metas[ch.doc.id] = { id: ch.doc.id, ...ch.doc.data() };
@@ -255,33 +255,48 @@ async function _cargarProgreso(m) {
   const tsFin    = Timestamp.fromDate(ff);
 
   try {
-    // Pedidos en el período para este ingeniero (status no cancelado)
-    const qPed = query(
-      collection(db, "pedidos"),
-      where("ingenieroAlias", "==", m.alias),
-      where("fechaPedido", ">=", fi.getTime()),
-      where("fechaPedido", "<=", ff.getTime())
-    );
-    const snapPed = await getDocs(qPed);
+    // Dual query para cubrir fechaPedido como Timestamp (APK) y como ms (panel web)
+    const [snapPedTs, snapPedNum] = await Promise.all([
+      getDocs(query(collection(db, "pedidos"),
+        where("ingenieroAlias", "==", m.alias),
+        where("fechaPedido", ">=", Timestamp.fromDate(fi)),
+        where("fechaPedido", "<=", Timestamp.fromDate(ff)))),
+      getDocs(query(collection(db, "pedidos"),
+        where("ingenieroAlias", "==", m.alias),
+        where("fechaPedido", ">=", fi.getTime()),
+        where("fechaPedido", "<=", ff.getTime()))).catch(() => ({ docs: [] }))
+    ]);
+    const pedSeen = new Set();
+    const pedDocs = [...snapPedTs.docs, ...(snapPedNum.docs || [])].filter(d => {
+      if (pedSeen.has(d.id)) return false;
+      pedSeen.add(d.id);
+      return true;
+    });
+
     let totalVendido = 0;
     let numPedidos = 0;
-    snapPed.forEach(d => {
+    pedDocs.forEach(d => {
       const p = d.data();
       if (p.status !== "CANCELADO" && p.status !== "RECHAZADO") {
-        totalVendido += p.total || 0;
+        totalVendido += p.total || p.monto || 0;
         numPedidos++;
       }
     });
 
-    // Visitas en el período
-    const qVis = query(
-      collection(db, "visitas"),
-      where("aliasVendedor", "==", m.alias),
-      where("timestamp", ">=", fi.getTime()),
-      where("timestamp", "<=", ff.getTime())
-    );
-    const snapVis = await getDocs(qVis);
-    const numVisitas = snapVis.size;
+    // Dual query para visitas (timestamp puede ser ms o Firestore Timestamp)
+    const [snapVisTs, snapVisNum] = await Promise.all([
+      getDocs(query(collection(db, "visitas"),
+        where("aliasVendedor", "==", m.alias),
+        where("timestamp", ">=", Timestamp.fromDate(fi)),
+        where("timestamp", "<=", Timestamp.fromDate(ff)))),
+      getDocs(query(collection(db, "visitas"),
+        where("aliasVendedor", "==", m.alias),
+        where("timestamp", ">=", fi.getTime()),
+        where("timestamp", "<=", ff.getTime()))).catch(() => ({ docs: [] }))
+    ]);
+    const visSeen = new Set();
+    const numVisitas = [...snapVisTs.docs, ...(snapVisNum.docs || [])]
+      .filter(d => { if (visSeen.has(d.id)) return false; visSeen.add(d.id); return true; }).length;
 
     const meta = m.metaMonto || 0;
     const pct = meta > 0 ? Math.min((totalVendido / meta) * 100, 100) : 0;

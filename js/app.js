@@ -255,6 +255,26 @@ const MODULES = {
 let vistaActual = null;
 let _unsubscribers = [];
 
+// ── Badge persistente de Autorizaciones ───────────────────────
+let _autUnsub = null;
+function iniciarAutBg() {
+  if (_autUnsub) return;
+  import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(({ collection, query, where, onSnapshot }) => {
+    const q = query(collection(db, "pedidos"), where("status", "==", "PENDIENTE_AUTORIZACION"));
+    _autUnsub = onSnapshot(q, snap => {
+      const badge = document.getElementById("aut-badge");
+      if (!badge) return;
+      const n = snap.size;
+      badge.textContent = n;
+      badge.classList.toggle("hidden", n === 0);
+      badge.classList.toggle("aut-alarm", n > 0);
+    }, err => console.warn("[AutBg]", err));
+  });
+}
+function detenerAutBg() {
+  if (_autUnsub) { _autUnsub(); _autUnsub = null; }
+}
+
 // ── Iniciar app ────────────────────────────────────────────────
 Auth.observarSesion(
   () => {
@@ -262,6 +282,8 @@ Auth.observarSesion(
     _initShell();
     // Listeners de fondo del chat: badge + sonido desde cualquier vista
     setTimeout(() => iniciarChatBg(), 1200);
+    // Badge persistente de Autorizaciones pendientes
+    setTimeout(() => iniciarAutBg(), 1500);
     aplicarPrefsIniciales(Sesion.uid).then(() => {
       // Navegar a vista por defecto de prefs si existe
       const defView = Sesion.prefs?.defaultView;
@@ -272,6 +294,7 @@ Auth.observarSesion(
     detenerInactivityTimer();
     detenerNotificaciones();
     detenerChatBg();
+    detenerAutBg();
     _destroyAll();
     document.getElementById("app-shell").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");

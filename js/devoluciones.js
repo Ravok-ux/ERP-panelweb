@@ -8,8 +8,8 @@ import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
-  collection, doc, addDoc, updateDoc, onSnapshot,
-  query, orderBy, where, getDocs, serverTimestamp, limit
+  collection, doc, addDoc, getDoc, updateDoc, onSnapshot,
+  query, orderBy, where, getDocs, serverTimestamp, limit, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { crearNotificacion } from "./notificaciones.js";
 import { getClientes } from "./erp-cache.js";
@@ -17,7 +17,11 @@ import { getClientes } from "./erp-cache.js";
 let _unsub = null;
 
 const fmtMXN   = v => Number(v || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
-const fmtFecha = ts => ts ? new Date(ts).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const fmtFecha = ts => {
+  if (!ts) return "—";
+  const d = ts?.toDate?.() ? ts.toDate() : new Date(ts);
+  return isNaN(d) ? "—" : d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+};
 
 const STATUS = {
   PENDIENTE:  { label: "Pendiente",  cls: "badge-yellow" },
@@ -301,13 +305,15 @@ async function _guardarSolicitud() {
   btn.textContent = "Guardando…";
 
   try {
-    // Generar folio DEV-XXXXX
-    const snap = await getDocs(query(
-      collection(db, "devoluciones"), orderBy("_ts", "desc"), limit(1)
-    ));
-    const ultimo = snap.empty ? 0 : (snap.docs[0].data()._folioNum || 0);
-    const num    = ultimo + 1;
-    const folio  = "DEV-" + String(num).padStart(5, "0");
+    // Generar folio DEV-XXXXX usando transacción atómica para evitar duplicados
+    const contadorRef = doc(db, "contadores", "devoluciones");
+    let folio, num;
+    await runTransaction(db, async tx => {
+      const counterDoc = await tx.get(contadorRef);
+      num = (counterDoc.data()?.ultimo || 0) + 1;
+      tx.set(contadorRef, { ultimo: num }, { merge: true });
+      folio = "DEV-" + String(num).padStart(5, "0");
+    });
 
     await addDoc(collection(db, "devoluciones"), {
       folio,
@@ -346,16 +352,46 @@ async function _guardarSolicitud() {
 
 // ── Aprobar ──────────────────────────────────────────────────
 async function _aprobarDev(id, dev) {
-  if (!await window.modal({ title: "Aprobar devolución", message: `¿Aprobar devolución ${dev?.folio}? Se ajustará el inventario y la cartera del cliente.`, confirmLabel: "Aprobar" })) return;
+  if (!await window.modal({ title: "Aprobar devolución", message: `¿Aprobar devolución ${dev?.folio}? Se registrará el ajuste de inventario y se actualizará la cartera del cliente.`, confirmLabel: "Aprobar" })) return;
   try {
+    const ahora = Date.now();
+
+    // 1. Marcar devolución como APROBADA
     await updateDoc(doc(db, "devoluciones", id), {
-      status:          "APROBADA",
-      aprobadaPor:     Sesion.alias,
-      aprobadaEn:      serverTimestamp(),
-      aprobadaEn_ts:   Date.now(),
+      status:        "APROBADA",
+      aprobadaPor:   Sesion.alias,
+      aprobadaEn:    serverTimestamp(),
+      aprobadaEn_ts: ahora,
     });
+
+    // 2. Registrar movimiento de stock tipo DEVOLUCION
+    await addDoc(collection(db, "movimientos_stock"), {
+      tipo:            "DEVOLUCION",
+      motivo:          `Devolución aprobada ${dev?.folio} · ${dev?.motivo || ""}`,
+      monto:           dev?.monto || 0,
+      folioDev:        dev?.folio,
+      clienteNombre:   dev?.clienteNombre,
+      quienRegistro:   Sesion.alias,
+      _ts:             serverTimestamp(),
+      timestamp:       ahora,
+    });
+
+    // 3. Ajustar cartera del cliente si se tiene clienteId
+    if (dev?.clienteId) {
+      const clienteRef  = doc(db, "clientes", dev.clienteId);
+      const clienteSnap = await getDoc(clienteRef);
+      if (clienteSnap.exists()) {
+        const c = clienteSnap.data();
+        const saldoActual = Number(c.saldoCapitalTotal ?? c.totalAPagarTotal ?? c.saldo ?? 0);
+        await updateDoc(clienteRef, {
+          saldoCapitalTotal: Math.max(0, saldoActual - (dev.monto || 0)),
+          ultimaDevolucion:  ahora,
+        });
+      }
+    }
+
     logAudit("DEVOLUCION_APROBADA", { folio: dev?.folio, monto: dev?.monto, clienteNombre: dev?.clienteNombre, ingeniero: dev?.ingenieroAlias });
-    window.toast?.("Devolución aprobada. Ajustando inventario…", "success");
+    window.toast?.("Devolución aprobada y ajuste registrado.", "success");
 
     await crearNotificacion({
       tipo:          "DEVOLUCION_APROBADA",

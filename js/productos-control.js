@@ -99,26 +99,37 @@ window.Prod_stockImportar = async function() {
   try {
     const registros = await importarPlantillaStock();
     if (!registros.length) return;
-    const { getDocs, collection: col, doc: d, updateDoc, writeBatch } =
+    const { getDocs, collection: col, doc: d, writeBatch } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const { db: fdb } = await import("./firebase-config.js");
 
-    // Construir mapa codigo → docId
+    // Construir mapa codigo → { docId, invId }
     const snap = await getDocs(col(fdb, "productos"));
     const codigoMap = new Map();
-    snap.docs.forEach(doc => { if(doc.data().codigo) codigoMap.set(doc.data().codigo, doc.id); });
+    snap.docs.forEach(pd => {
+      const data = pd.data();
+      if (data.codigo) codigoMap.set(data.codigo, {
+        docId: pd.id,
+        invId: data.codigoN10 || data.codigo   // ID en colección inventario
+      });
+    });
 
     let ok = 0, noMatch = 0;
-    const batch = writeBatch(fdb);
-    let cnt = 0;
-    for (const r of registros) {
-      const docId = codigoMap.get(r.codigo);
-      if (!docId) { noMatch++; continue; }
-      batch.update(d(fdb, "productos", docId), { stock: r.stock, actualizadoEn: new Date() });
-      ok++; cnt++;
-      if (cnt === 499) break; // máx 499 por batch
+    const ts = Date.now();
+    // Procesar en chunks de 249 (2 ops por registro: productos + inventario)
+    const validos = registros.filter(r => codigoMap.has(r.codigo));
+    noMatch = registros.length - validos.length;
+    for (let i = 0; i < validos.length; i += 249) {
+      const chunk = validos.slice(i, i + 249);
+      const batch = writeBatch(fdb);
+      for (const r of chunk) {
+        const { docId, invId } = codigoMap.get(r.codigo);
+        batch.update(d(fdb, "productos", docId), { stock: r.stock, stockActual: r.stock, actualizadoEn: new Date() });
+        batch.set(d(fdb, "inventario", invId), { stockActual: r.stock, _ts: ts }, { merge: true });
+        ok++;
+      }
+      await batch.commit();
     }
-    await batch.commit();
     window.toast?.(`Stock actualizado: ${ok} productos${noMatch ? `, ${noMatch} sin coincidencia` : ""}.`,
       ok > 0 ? "success" : "warning");
   } catch(e) { window.toast?.("Error al importar stock: " + e.message, "error"); console.error(e); }
@@ -275,7 +286,7 @@ function _html() {
       </div>
 
       <!-- Tabla -->
-      <div id="pc-tablewrap" style="flex:1;overflow:auto;min-height:0">
+      <div id="pc-tablewrap" style="flex:1;overflow:auto;min-height:0" data-dual-done="1">
         <table style="border-collapse:collapse;font-size:12px;min-width:1500px;width:100%" id="pc-table">
           <thead id="pc-thead">
             <tr style="background:var(--surface-2);border-bottom:2px solid var(--border);
@@ -725,8 +736,7 @@ function _renderDetalle(docId) {
   const activo   = p.activo !== false;
   const num      = p.numero ?? "–";
   const codigo   = p.codigo || ("N10-" + String(Math.round(p.numero ?? 0)).padStart(4,"0"));
-  const impuesto = !p.impuesto || p.impuesto === "Exento" ? "Exento de Impuesto"
-                 : p.impuesto === "IVA" ? "Con IVA 16%" : p.impuesto;
+  const tieneIVA = p.impuesto === "IVA";
   const granel   = p.granel === true;
 
   const dv = document.getElementById("pc-detail-view");
@@ -812,7 +822,29 @@ function _renderDetalle(docId) {
           ${_dfield("Peso",               p.peso > 0 ? p.peso + " kg" : "–")}
           ${_dfield("Familia",            p.familia === "N10" ? "💧 N10 — Litros" : "Estándar")}
           ${p.familia === "N10" ? _dfield("Litros por unidad", p.litros_por_unidad > 0 ? p.litros_por_unidad + " L" : "–") : ""}
-          ${_dfield("Impuesto",           esc(impuesto))}
+          <div>
+            <div style="font-size:10px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Impuesto IVA</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${PUEDE_EDITAR() ? `
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <div style="position:relative;width:40px;height:22px">
+                    <input type="checkbox" id="pd-iva-toggle" ${tieneIVA?"checked":""}
+                      style="opacity:0;position:absolute;inset:0;cursor:pointer;z-index:1"
+                      onchange="ProdCtrlUI.toggleIVA('${esc(docId)}', this.checked)">
+                    <div id="pd-iva-track" style="position:absolute;inset:0;border-radius:11px;
+                      background:${tieneIVA?"#4ADE80":"#374151"};transition:background .2s"></div>
+                    <div id="pd-iva-thumb" style="position:absolute;top:3px;left:${tieneIVA?"21px":"3px"};
+                      width:16px;height:16px;border-radius:50%;background:var(--surface);transition:left .2s"></div>
+                  </div>
+                  <span id="pd-iva-label" style="font-size:13px;font-weight:700;color:${tieneIVA?"#4ADE80":"var(--text-primary)"}">
+                    ${tieneIVA?"Con IVA 16%":"Sin IVA"}
+                  </span>
+                </label>` : `
+                <span style="font-size:13px;font-weight:700;color:${tieneIVA?"#4ADE80":"var(--text-sec)"}">
+                  ${tieneIVA?"Con IVA 16%":"Sin IVA"}
+                </span>`}
+            </div>
+          </div>
           ${_dfield("Materia Prima",      p.materia_prima === true ? "Sí" : "No")}
           ${_dfield("Creado por",         esc(p.creadoPor || "–"))}
           ${_dfield("Modificado por",     esc(p.modificadoPor || "–") + (p.modificadoEn?.toDate ? ` <span style="font-size:10px;color:#9CA3AF;font-weight:400">· ${p.modificadoEn.toDate().toLocaleString("es-MX",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</span>` : ""))}
@@ -1217,6 +1249,26 @@ function _bindUI() {
         num.textContent = "–"; num.style.color = "#9CA3AF";
         if (lab) { lab.textContent = "Captura dosis para calcular las partes"; lab.style.color = "#9CA3AF"; }
         if (box) { box.style.background = "var(--surface)"; box.style.borderColor = "var(--border)"; }
+      }
+    },
+
+    async toggleIVA(docId, enabled) {
+      const track = document.getElementById("pd-iva-track");
+      const thumb = document.getElementById("pd-iva-thumb");
+      const label = document.getElementById("pd-iva-label");
+      if (track) track.style.background = enabled ? "#4ADE80" : "#374151";
+      if (thumb) thumb.style.left = enabled ? "21px" : "3px";
+      if (label) { label.textContent = enabled ? "Con IVA 16%" : "Sin IVA"; label.style.color = enabled ? "#4ADE80" : "var(--text-primary)"; }
+      try {
+        await updateDoc(doc(db, "productos", docId), {
+          impuesto: enabled ? "IVA" : "Exento",
+          modificadoPor: Sesion.alias, modificadoEn: serverTimestamp()
+        });
+        const p = _todos.find(x => x._docId === docId);
+        if (p) p.impuesto = enabled ? "IVA" : "Exento";
+        window.toast?.(enabled ? "IVA 16% activado para este producto." : "IVA desactivado — producto exento.", "success");
+      } catch(e) {
+        window.toast?.("Error: " + e.message, "error");
       }
     },
 

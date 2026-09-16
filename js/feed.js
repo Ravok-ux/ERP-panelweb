@@ -40,26 +40,30 @@ export const FeedModule = {
   }
 };
 
-const TIPOS = ["TODOS","PEDIDO_CONFIRMADO","PEDIDO_ENTREGADO","PEDIDO_CANCELADO",
+const TIPOS = ["TODOS","PEDIDO_PENDIENTE_AUTH","PEDIDO_CONFIRMADO","PEDIDO_ENTREGADO","PEDIDO_CANCELADO",
                "ABONO_REGISTRADO","REMISION_CREADA","JORNADA_INICIO","JORNADA_FIN","VISITA_REGISTRADA"];
 
 const TIPO_LABEL = {
-  TODOS:"Todos", PEDIDO_CONFIRMADO:"Pedidos", PEDIDO_ENTREGADO:"Entregados",
-  PEDIDO_CANCELADO:"Cancelados", ABONO_REGISTRADO:"Abonos", REMISION_CREADA:"Remisiones",
-  JORNADA_INICIO:"Inicio jornada", JORNADA_FIN:"Fin jornada", VISITA_REGISTRADA:"Visitas"
+  TODOS:"Todos", PEDIDO_PENDIENTE_AUTH:"⚠️ Autorización", PEDIDO_CONFIRMADO:"Pedidos",
+  PEDIDO_ENTREGADO:"Entregados", PEDIDO_CANCELADO:"Cancelados", ABONO_REGISTRADO:"Abonos",
+  REMISION_CREADA:"Remisiones", JORNADA_INICIO:"Inicio jornada",
+  JORNADA_FIN:"Fin jornada", VISITA_REGISTRADA:"Visitas"
 };
 
 const EV_COLOR = {
+  PEDIDO_PENDIENTE_AUTH:"#EF4444",
   PEDIDO_CONFIRMADO:"#16A34A", PEDIDO_ENTREGADO:"#16A34A", PEDIDO_CANCELADO:"#DC2626",
   ABONO_REGISTRADO:"#2563EB",  REMISION_CREADA:"#7C3AED",  JORNADA_INICIO:"#D97706",
   JORNADA_FIN:"#6B7280",       VISITA_REGISTRADA:"#2563EB"
 };
 const EV_ICON = {
+  PEDIDO_PENDIENTE_AUTH:"🚨",
   PEDIDO_CONFIRMADO:"🛒", PEDIDO_ENTREGADO:"✅", PEDIDO_CANCELADO:"❌",
   ABONO_REGISTRADO:"💳",  REMISION_CREADA:"📄",  JORNADA_INICIO:"🚀",
   JORNADA_FIN:"🏁",       VISITA_REGISTRADA:"📍"
 };
 const EV_PILL_CLASS = {
+  PEDIDO_PENDIENTE_AUTH:"pill-venc",
   PEDIDO_CONFIRMADO:"pill-entg", PEDIDO_ENTREGADO:"pill-entg", PEDIDO_CANCELADO:"pill-venc",
   ABONO_REGISTRADO:"pill-conf",  REMISION_CREADA:"pill-ruta",  JORNADA_INICIO:"pill-ruta",
   JORNADA_FIN:"pill-off",        VISITA_REGISTRADA:"pill-conf"
@@ -318,6 +322,7 @@ function _updateAliasSelect() {
 
 // ── Card HTML reutilizable ────────────────────────────────────
 function _cardHTML(a) {
+  if (a.tipo === "PEDIDO_PENDIENTE_AUTH") return _cardAlarm(a);
   const c   = EV_COLOR[a.tipo]      || "#6B7280";
   const ico = EV_ICON[a.tipo]       || "•";
   const pc  = EV_PILL_CLASS[a.tipo] || "pill-off";
@@ -342,11 +347,42 @@ function _cardHTML(a) {
     </div>`;
 }
 
+function _cardAlarm(a) {
+  const ts = typeof a.timestamp === "number"
+    ? _fmtTs(new Date(a.timestamp))
+    : _fmtTs(a.timestamp?.toDate?.() || new Date());
+  return `
+    <div class="feed-card feed-alarm" style="border-radius:10px;padding:12px 16px;
+      border:2px solid #EF4444;display:flex;gap:12px;align-items:center;margin-bottom:7px;
+      cursor:pointer;background:#EF444412;animation:alarm-glow 1.4s ease-in-out infinite">
+      <div style="width:40px;height:40px;border-radius:8px;background:#EF44441A;
+        display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🚨</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:800;color:#EF4444;letter-spacing:.02em">
+          REQUIERE AUTORIZACIÓN
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-top:2px">
+          ${esc(a.cliente) || "–"}
+        </div>
+        <div style="font-size:11px;color:var(--text-sec);margin-top:1px">
+          Registrado por: ${esc(a.alias) || "–"} · Motivo: ${esc(a.motivo) || "–"}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:10px;color:var(--text-sec)">${ts.hora}</div>
+        <div style="font-size:10px;color:var(--text-sec);margin-top:1px">${ts.fecha}</div>
+        <span class="pill pill-venc" style="margin-top:4px;display:inline-block;
+          background:#EF4444;color:#fff;font-size:9px">⚠️ Pendiente</span>
+      </div>
+    </div>`;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 function _tipoLabel(tipo) { return TIPO_LABEL[tipo] || tipo; }
 
 function _detalle(a) {
   switch(a.tipo) {
+    case "PEDIDO_PENDIENTE_AUTH": return `${a.cliente || "–"} · ${a.motivo || "–"} · requiere autorización`;
     case "PEDIDO_CONFIRMADO": return `${a.folio || "–"} · ${a.cliente || "–"} · ${_fmt(a.total)}`;
     case "PEDIDO_ENTREGADO":  return `Entregó ${a.folio || "–"} a ${a.cliente || "–"}`;
     case "PEDIDO_CANCELADO":  return `Canceló ${a.folio || "–"} — ${a.motivo || "sin motivo"}`;
@@ -375,6 +411,12 @@ const style = document.createElement("style");
 style.textContent = `
   .feed-card { background: var(--surface); transition: background .12s; }
   .feed-card:hover { background: var(--surface-2); }
+  .feed-alarm { background: #EF444412 !important; }
+  .feed-alarm:hover { background: #EF44441E !important; }
+  @keyframes alarm-glow {
+    0%,100% { box-shadow: 0 0 0 0 #EF444400, 0 0 6px 0 #EF444430; }
+    50%      { box-shadow: 0 0 0 3px #EF444430, 0 0 12px 0 #EF444460; }
+  }
 `;
 if (!document.getElementById("feed-styles")) {
   style.id = "feed-styles";

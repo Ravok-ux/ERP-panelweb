@@ -161,35 +161,42 @@ function _escuchar() {
     orderBy("fechaCreacion", "desc"),
     limit(500)
   );
-  _unsub = onSnapshot(q, async snap => {
+  _unsub = onSnapshot(q, snap => {
     _remisiones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    await cargarNombres();
-
-    // Poblar selector — deduplicar por nombre resuelto (varios aliases pueden ser el mismo usuario)
-    const _seenNombre = new Set();
-    const nombresUnicos = [];
-    _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
-      .filter(Boolean)
-      .forEach(a => {
-        const n = resolverNombre(a);
-        if (!_seenNombre.has(n)) { _seenNombre.add(n); nombresUnicos.push(n); }
-      });
-    nombresUnicos.sort();
-
-    const sel = document.getElementById("cob-sel-alias");
-    if (sel) {
-      const prev = sel.value;
-      sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
-        nombresUnicos.map(n => `<option value="${esc(n)}"${n === prev?" selected":""}>${esc(n)}</option>`).join("");
-    }
-
-    _renderTabla();
+    // Proceso async separado para no silenciar errores en callback de Firestore
+    _procesarRemisiones().catch(e => {
+      console.error("[Cobranza] procesarRemisiones:", e);
+      window.toast?.("Error al procesar cobranza.", "error");
+    });
   }, err => {
     console.error("[Cobranza]", err);
     window.toast?.("Error al cargar cobranza.", "error");
   });
 }
 
+async function _procesarRemisiones() {
+  await cargarNombres();
+
+  // Poblar selector — deduplicar por nombre resuelto
+  const _seenNombre = new Set();
+  const nombresUnicos = [];
+  _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
+    .filter(Boolean)
+    .forEach(a => {
+      const n = resolverNombre(a);
+      if (!_seenNombre.has(n)) { _seenNombre.add(n); nombresUnicos.push(n); }
+    });
+  nombresUnicos.sort();
+
+  const sel = document.getElementById("cob-sel-alias");
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
+      nombresUnicos.map(n => `<option value="${esc(n)}"${n === prev?" selected":""}>${esc(n)}</option>`).join("");
+  }
+
+  _renderTabla();
+}
 // ── Aplanar abonos de todas las remisiones ────────────────────
 function _aplanarAbonos() {
   const rows = [];

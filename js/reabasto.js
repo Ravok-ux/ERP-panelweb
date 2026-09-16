@@ -403,8 +403,15 @@ async function _surtirSolicitud(s) {
       const prodRef = doc(db, "productos", item.productoId);
       const prodSnap = await getDoc(prodRef);
       if (!prodSnap.exists()) continue;
-      const stockActual = prodSnap.data().stock ?? 0;
-      batch.update(prodRef, { stock: Math.max(0, stockActual - item.cantidadSurtida) });
+      const pData = prodSnap.data();
+      const stockActual = pData.stock ?? 0;
+      const stockDespues = Math.max(0, stockActual - item.cantidadSurtida);
+      batch.update(prodRef, { stock: stockDespues, stockActual: stockDespues });
+      // Sincronizar inventario
+      const invId = pData.codigoN10 || pData.codigo;
+      if (invId) {
+        batch.set(doc(db, "inventario", invId), { stockActual: stockDespues, _ts: Date.now() }, { merge: true });
+      }
       // Movimiento en kardex
       const movRef = doc(collection(db, "movimientos_stock"));
       batch.set(movRef, {
@@ -413,7 +420,7 @@ async function _surtirSolicitud(s) {
         nombreProducto: item.nombre,
         cantidad: item.cantidadSurtida,
         stockAntes: stockActual,
-        stockDespues: Math.max(0, stockActual - item.cantidadSurtida),
+        stockDespues,
         solicitudId: s.id,
         ingenieroAlias: s.ingenieroAlias,
         quienRegistro: Sesion.alias,

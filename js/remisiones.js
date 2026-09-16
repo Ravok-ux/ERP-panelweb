@@ -399,7 +399,7 @@ function _renderTabla() {
 
   tbody.innerHTML = lista.map(r => {
     const col     = STATUS_COLOR[r.status] ?? STATUS_COLOR.FUTURA;
-    const mora    = r.diasAtraso < 0 ? Math.abs(r.diasAtraso) : 0;
+    const mora    = (r.diasAtraso || 0) > 0 ? r.diasAtraso : 0;
     const pagado  = r.status === "PAGADO";
 
     return `<tr style="border-bottom:1px solid var(--border);${pagado ? "opacity:.6" : ""}">
@@ -421,7 +421,7 @@ function _renderTabla() {
       <td style="padding:9px 14px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-muted)">
         ${fmt.format(r.totalAbonado ?? 0)}</td>
       <td style="padding:9px 14px;text-align:right;font-variant-numeric:tabular-nums">
-        ${pagado ? "–" : fmt.format(r.deudaRestante)}</td>
+        ${pagado ? "–" : fmt.format((r.montoOriginal || 0) + (r.interesGenerado || 0))}</td>
       <td style="padding:9px 14px;text-align:center;font-weight:700;
         color:${mora > 0 ? col.badge : "#9CA3AF"}">
         ${mora > 0 ? mora + " días" : "–"}</td>

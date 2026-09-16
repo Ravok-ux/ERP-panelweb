@@ -612,6 +612,19 @@ function _renderStock(rows) {
       document.getElementById("inv-chip-codigo").textContent = `ID: ${id}`;
       document.getElementById("inv-prod-chip").style.display   = "flex";
       document.getElementById("inv-prod-search").style.display = "none";
+      // Poblar docid buscando en productos por codigoN10 o codigo
+      try {
+        const { getDocs: gdD, query: qD, collection: colD, where: wD } =
+          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        let docIdProd = "";
+        const snap1 = await gdD(qD(colD(db, "productos"), wD("codigoN10", "==", id))).catch(() => null);
+        if (snap1 && !snap1.empty) { docIdProd = snap1.docs[0].id; }
+        if (!docIdProd) {
+          const snap2 = await gdD(qD(colD(db, "productos"), wD("codigo", "==", id))).catch(() => null);
+          if (snap2 && !snap2.empty) docIdProd = snap2.docs[0].id;
+        }
+        document.getElementById("inv-prod-docid").value = docIdProd;
+      } catch { document.getElementById("inv-prod-docid").value = ""; }
 
       // Pre-poblar campos N10 desde Firestore
       try {
@@ -678,6 +691,13 @@ async function _guardarAjuste() {
           await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
         const snap2 = await getDocs(q2(col2(db, "productos"), w2("codigoN10", "==", prodId))).catch(() => null);
         if (snap2 && !snap2.empty) docIdParaProductos = snap2.docs[0].id;
+      }
+      if (!docIdParaProductos) {
+        // Fallback: buscar por campo 'codigo' (campo estándar en productos) si codigoN10 no encontró
+        const { getDocs: gd3, query: q3, collection: col3, where: w3 } =
+          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const snap3 = await gd3(q3(col3(db, "productos"), w3("codigo", "==", prodId))).catch(() => null);
+        if (snap3 && !snap3.empty) docIdParaProductos = snap3.docs[0].id;
       }
       if (docIdParaProductos) {
         await updateDoc(doc(db, "productos", docIdParaProductos), { stock: stockDespues, stockActual: stockDespues, _ts: Date.now() })
