@@ -423,27 +423,31 @@ function _escucharFeedMapa() {
     }
 
     const colors = {
+      PEDIDO_PENDIENTE_AUTH:"#EF4444",
       PEDIDO_CONFIRMADO:"#4ADE80", ABONO_REGISTRADO:"#60A5FA",
       REMISION_CREADA:"#C084FC",   JORNADA_INICIO:"#FBBF24",
       PEDIDO_ENTREGADO:"#4ADE80",  VISITA_REGISTRADA:"#60A5FA",
       PEDIDO_CANCELADO:"#F87171"
     };
     const icons = {
+      PEDIDO_PENDIENTE_AUTH:"🚨",
       PEDIDO_CONFIRMADO:"🛒", ABONO_REGISTRADO:"💳", REMISION_CREADA:"📄",
       JORNADA_INICIO:"🚀",    PEDIDO_ENTREGADO:"✅", VISITA_REGISTRADA:"📍",
       PEDIDO_CANCELADO:"❌",   JORNADA_FIN:"🏁"
     };
 
     el.innerHTML = snap.docs.map(d => {
-      const a   = d.data();
-      const c   = colors[a.tipo] || "#6B7280";
-      const ico = icons[a.tipo]  || "•";
-      const ts  = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
+      const a      = d.data();
+      const c      = colors[a.tipo] || "#6B7280";
+      const ico    = icons[a.tipo]  || "•";
+      const ts     = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
+      const isAuth = a.tipo === "PEDIDO_PENDIENTE_AUTH";
+      const extraStyle = isAuth ? `background:#EF444412;animation:dash-alarm 1.4s ease-in-out infinite;border-width:2px` : "";
       return `
-        <div class="mev" style="border-color:${c}">
+        <div class="mev" style="border-color:${c};${extraStyle}">
           <div style="font-size:13px;flex-shrink:0">${ico}</div>
           <div>
-            <div class="mev-who">${a.alias || "–"}</div>
+            <div class="mev-who" style="${isAuth ? "color:#EF4444;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.04em" : ""}">${isAuth ? "Autorización" : (a.alias || "–")}</div>
             <div class="mev-what">${_resumen(a)}</div>
             <div class="mev-ts">${ts}</div>
           </div>
@@ -478,13 +482,14 @@ function _tiempoRelativo(date) {
 }
 function _resumen(a) {
   switch(a.tipo) {
+    case "PEDIDO_PENDIENTE_AUTH": return `⚠️ ${a.cliente || "–"} requiere autorización`;
     case "PEDIDO_CONFIRMADO": return `${a.folio || "–"} · ${_fmt(a.total || 0)}`;
     case "ABONO_REGISTRADO":  return `Abono ${_fmt(a.monto || 0)}`;
     case "REMISION_CREADA":   return `Remisión ${_fmt(a.total || 0)}`;
     case "JORNADA_INICIO":    return `Inició — ${a.zona || "–"}`;
     case "PEDIDO_ENTREGADO":  return `Entregó ${a.folio || "–"}`;
     case "VISITA_REGISTRADA": return `Visita: ${a.cliente || "–"}`;
-    default: return a.descripcion || a.tipo || "–";
+    default: return a.descripcion || "–";
   }
 }
 
