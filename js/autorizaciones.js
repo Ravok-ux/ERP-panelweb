@@ -245,7 +245,7 @@ function _renderPendientes() {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           <div class="aut-total">${_fmtMXN(p.total)}</div>
-          <span class="aut-timer${urgente ? " urgente" : ""}" id="aut-timer-${esc(p.id)}" data-ts="${p.fechaPedido || 0}">
+          <span class="aut-timer${urgente ? " urgente" : ""}" id="aut-timer-${esc(p.id)}" data-ts="${_tsMillis(p.fechaPedido) || 0}">
             ⏱ ${espera}
           </span>
         </div>
@@ -512,9 +512,19 @@ function _promptAsync(label) {
   });
 }
 
-function _minutosEspera(ts) {
+function _tsMillis(ts) {
   if (!ts) return 0;
-  return Math.floor((Date.now() - ts) / 60_000);
+  // Firestore Timestamp object
+  if (typeof ts === "object" && typeof ts.toMillis === "function") return ts.toMillis();
+  // Seconds (10-digit number), convert to ms
+  if (typeof ts === "number" && ts < 1e12) return ts * 1000;
+  return ts; // already milliseconds
+}
+
+function _minutosEspera(ts) {
+  const ms = _tsMillis(ts);
+  if (!ms) return 0;
+  return Math.floor((Date.now() - ms) / 60_000);
 }
 
 function _tiempoEspera(ts) {
