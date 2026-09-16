@@ -56,6 +56,7 @@ import { mount as rcMount, destroy as rcDestroy } from "./reportes-custom.js";
 import { mount as cajaMount, destroy as cajaDestroy } from "./caja.js";
 import { mount as gastosMount, destroy as gastosDestroy } from "./gastos.js";
 import { mount as reabastoMount, destroy as reabastoDestroy } from "./reabasto.js";
+import { mount as entradasMount, destroy as entradasDestroy } from "./entradas.js";
 import { BlacklistModule } from "./blacklist.js";
 import { iniciarNotificaciones, detenerNotificaciones } from "./notificaciones.js";
 import { iniciarFCM } from "./fcm.js";
@@ -249,6 +250,7 @@ const MODULES = {
   caja:             { mount: cajaMount, destroy: cajaDestroy },
   gastos:           { mount: gastosMount, destroy: gastosDestroy },
   reabasto:         { mount: reabastoMount, destroy: reabastoDestroy },
+  entradas:         { mount: entradasMount, destroy: entradasDestroy },
   blacklist:        BlacklistModule,
 };
 
@@ -615,6 +617,7 @@ function _navigate(viewId) {
     cotizaciones:"Cotizaciones", reportes_custom:"Reportes Configurables",
     asignaciones:"Asignaciones",
     reabasto:"Reabasto",
+    entradas:"Entradas sin OC",
     caja:"Arqueo de Caja", gastos:"Gastos de Empleados",
     historial_ventas:"Historial de Ventas",
     asistencia:"Control de Asistencia",
@@ -650,6 +653,7 @@ function _navigate(viewId) {
     cotizaciones:"Cotizaciones activas y vencidas",
     reportes_custom:"Reportes con campos configurables por fuente de datos",
     reabasto:"Solicitudes de reabasto por ingeniero",
+    entradas:"Entradas de inventario al almacén sin orden de compra",
     caja:"Cortes y arqueos de caja por turno",
     gastos:"Solicitudes de gastos y reembolsos",
     blacklist:"Clientes morosos, fraudulentos y de alto riesgo" };
@@ -1152,6 +1156,7 @@ function _aplicarVisibilidadSidebar() {
     historial_ventas: pvF("PUEDE_VER_HISTORIAL","GERENTE","ADMINISTRADOR","MESA_CONTROL"),
     bi_analytics:     pvF("PUEDE_ACCESO_BI","GERENTE","ADMINISTRADOR","MESA_CONTROL"),
     reabasto:         pv("GERENTE","ALMACENISTA","ADMINISTRADOR","MESA_CONTROL"),
+    entradas:         pv("SUPER_ADMIN","ADMINISTRADOR","ALMACENISTA"),
     blacklist:        pv("GERENTE","ADMINISTRADOR","MESA_CONTROL","INGENIERO","RECUPERADOR","JURIDICO","VENDEDOR"),
   };
 
@@ -1171,7 +1176,7 @@ function _aplicarVisibilidadSidebar() {
     { grp: "sb-grupo-ventas",        sbi: "sbi-ventas",       views: ["crm","cotizaciones","metas","formularios","promociones","sms","historial_ventas"] },
     { grp: "sb-grupo-juridico-sec",  sbi: "sbi-juridico-sec", views: ["juridico"] },
     { grp: "sb-grupo-catalogo",      sbi: "sbi-catalogo",     views: ["productos","precios","precios_segmento"] },
-    { grp: "sb-grupo-inventario",    sbi: "sbi-inventario",   views: ["inventario","reabasto","compras","proveedores","kardex","devoluciones"] },
+    { grp: "sb-grupo-inventario",    sbi: "sbi-inventario",   views: ["inventario","reabasto","entradas","compras","proveedores","kardex","devoluciones"] },
     { grp: "sb-grupo-finanzas",      sbi: "sbi-finanzas",     views: ["caja","gastos","finanzas","comisiones","cartera","config_intereses","cobranza"] },
     { grp: "sb-grupo-rrhh",          sbi: "sbi-rrhh",         views: ["rh","mi_rh","asistencia"] },
     { grp: "sb-grupo-analisis",      sbi: "sbi-analisis",     views: ["bi_analytics","reportes","reportes_custom"] },
