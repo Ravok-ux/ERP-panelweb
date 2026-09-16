@@ -11,8 +11,8 @@ import {
 } from "./intereses-engine.js";
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
-  collection, query, orderBy, limit, onSnapshot,
-  doc, getDoc, setDoc, updateDoc, serverTimestamp, runTransaction
+  collection, query, where, orderBy, limit, onSnapshot,
+  doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const fmt    = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
@@ -346,6 +346,8 @@ function _bindUI() {
           const { update: upd } = calcularAbono(fresco, { monto, recibo, fecha });
           tx.update(ref, { ...upd, modificadoPor: Sesion.alias, modificadoEn: serverTimestamp() });
         });
+        // Recalcular saldoCapitalTotal del cliente en Firestore
+        await _actualizarSaldoCliente(_abonoTarget.clienteId).catch(() => {});
         window.toast?.(
           liquidada
             ? `✅ Nota liquidada. Total pagado: ${fmt.format((_abonoTarget.totalAbonado ?? 0) + monto)}`
@@ -360,6 +362,34 @@ function _bindUI() {
       }
     },
   };
+}
+
+// Recalcula saldoCapitalTotal sumando deudaRestante de todas las remisiones
+// activas del cliente y actualiza el doc en clientes/
+async function _actualizarSaldoCliente(clienteId) {
+  if (!clienteId) return;
+  const snapRem = await getDocs(
+    query(collection(db, "remisiones_credito"),
+      where("clienteId", "==", clienteId),
+      where("status", "in", ["ACTIVA", "PARCIAL", "VENCIDA"]))
+  );
+  const hoy = new Date();
+  let saldoCapitalTotal = 0;
+  snapRem.docs.forEach(d => {
+    const r = { id: d.id, ...d.data() };
+    const calc = calcularRemision(r, hoy);
+    saldoCapitalTotal += calc.deudaRestante ?? 0;
+  });
+  // Buscar el doc ID del cliente por el campo clienteId (CLI-XXXXX)
+  const snapCli = await getDocs(
+    query(collection(db, "clientes"), where("clienteId", "==", clienteId), limit(1))
+  );
+  if (!snapCli.empty) {
+    await updateDoc(doc(db, "clientes", snapCli.docs[0].id), {
+      saldoCapitalTotal,
+      saldoActualizadoEn: serverTimestamp(),
+    });
+  }
 }
 
 function _previewAbono() {
