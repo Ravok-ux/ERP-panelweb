@@ -26,10 +26,16 @@ function _iniciarListener() {
   }, err => console.error("[NombresCache] onSnapshot:", err));
 }
 
-// Compatibilidad retroactiva — sigue funcionando igual que antes
+// Espera al primer snapshot si el cache aún está vacío
 export function cargarNombres() {
   _iniciarListener();
-  return Promise.resolve(_cache);
+  if (Object.keys(_cache).length > 0) return Promise.resolve(_cache);
+  return new Promise(resolve => {
+    const unsub = onSnapshot(collection(db, "usuarios"), snap => {
+      unsub();
+      resolve(_cache);
+    }, () => resolve(_cache));
+  });
 }
 
 export function resolverNombre(alias) {

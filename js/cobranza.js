@@ -174,27 +174,26 @@ function _escuchar() {
   });
 }
 
-async function _procesarRemisiones() {
-  await cargarNombres();
-
-  // Poblar selector — deduplicar por nombre resuelto
-  const _seenNombre = new Set();
-  const nombresUnicos = [];
+function _poblarSelectorAlias() {
+  const seen = new Set();
+  const nombres = [];
   _remisiones.flatMap(r => (r.abonos ?? []).map(a => a.quienRegistro || r.ingenieroAlias || "–"))
     .filter(Boolean)
     .forEach(a => {
-      const n = resolverNombre(a);
-      if (!_seenNombre.has(n)) { _seenNombre.add(n); nombresUnicos.push(n); }
+      const n = resolverNombre(a) || a;
+      if (!seen.has(n)) { seen.add(n); nombres.push(n); }
     });
-  nombresUnicos.sort();
-
+  nombres.sort();
   const sel = document.getElementById("cob-sel-alias");
-  if (sel) {
-    const prev = sel.value;
-    sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
-      nombresUnicos.map(n => `<option value="${esc(n)}"${n === prev?" selected":""}>${esc(n)}</option>`).join("");
-  }
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = `<option value="TODOS">Todos los recuperadores</option>` +
+    nombres.map(n => `<option value="${esc(n)}"${n === prev ? " selected" : ""}>${esc(n)}</option>`).join("");
+}
 
+async function _procesarRemisiones() {
+  await cargarNombres();
+  _poblarSelectorAlias();
   _renderTabla();
 }
 // ── Aplanar abonos de todas las remisiones ────────────────────
