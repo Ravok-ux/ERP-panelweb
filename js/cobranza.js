@@ -271,9 +271,12 @@ function _renderTabla() {
   _set("cob-k-interes",   fmt.format(totalInteres));
   _set("cob-k-liquidadas",String(liquidaciones));
 
-  // Ranking
+  // Ranking — agrupar por nombre resuelto para unificar alias distintos del mismo usuario
   const por = {};
-  lista.forEach(a => { por[a.ingenieroAlias] = (por[a.ingenieroAlias] || 0) + a.monto; });
+  lista.forEach(a => {
+    const nombre = resolverNombre(a.ingenieroAlias) || a.ingenieroAlias;
+    por[nombre] = (por[nombre] || 0) + a.monto;
+  });
   const ranked = Object.entries(por).sort((a, b) => b[1] - a[1]);
   const maxVal = ranked[0]?.[1] || 1;
   const rankEl = document.getElementById("cob-ranking");
@@ -283,7 +286,7 @@ function _renderTabla() {
           const pct = Math.round((monto / maxVal) * 100);
           return `<div style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-              <span style="font-weight:600">${i+1}. ${esc(resolverNombre(alias))}</span>
+              <span style="font-weight:600">${i+1}. ${esc(alias)}</span>
               <span style="font-weight:700;font-variant-numeric:tabular-nums">${fmt.format(monto)}</span>
             </div>
             <div style="height:5px;background:var(--border);border-radius:3px">
