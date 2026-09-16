@@ -270,7 +270,7 @@ function _autPersist(id) {
   } catch {}
 }
 
-function _autLogPedido(addDoc, colRef, id, p) {
+function _autLogPedido(addDoc, Timestamp, colRef, id, p) {
   if (_autLogueados.has(id)) return;
   if (_autGetPersisted().has(id)) { _autLogueados.add(id); return; }
   _autLogueados.add(id);
@@ -282,14 +282,14 @@ function _autLogPedido(addDoc, colRef, id, p) {
     alias:     p.vendedor || p.ingeniero || p.alias || "–",
     uid:       p.uid || null,
     motivo:    p.motivoBloqueo || "CREDITO",
-    timestamp: Date.now(),
+    timestamp: Timestamp.fromMillis(Date.now()),
   }).catch(e => console.warn("[AutBg] log error", e));
 }
 
 function iniciarAutBg() {
   if (_autUnsub) return;
   import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(
-    ({ collection, query, where, onSnapshot, addDoc }) => {
+    ({ collection, query, where, onSnapshot, addDoc, Timestamp }) => {
       const logCol = collection(db, "log_actividades");
       const q = query(collection(db, "pedidos"), where("status", "==", "PENDIENTE_AUTORIZACION"));
       let primerDisparo = true;
@@ -307,14 +307,14 @@ function iniciarAutBg() {
         if (primerDisparo) {
           // Primera carga: escribir evento para los que ya están pendientes y no se han logueado antes
           primerDisparo = false;
-          snap.docs.forEach(d => _autLogPedido(addDoc, logCol, d.id, d.data()));
+          snap.docs.forEach(d => _autLogPedido(addDoc, Timestamp, logCol, d.id, d.data()));
           return;
         }
 
         // Cambios posteriores: solo los "added" nuevos
         snap.docChanges().forEach(change => {
           if (change.type !== "added") return;
-          _autLogPedido(addDoc, logCol, change.doc.id, change.doc.data());
+          _autLogPedido(addDoc, Timestamp, logCol, change.doc.id, change.doc.data());
         });
       }, err => console.warn("[AutBg]", err));
     }
