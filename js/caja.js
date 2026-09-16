@@ -20,6 +20,7 @@ export function mount(container) {
 
 export function destroy() {
   if (_unsub) { _unsub(); _unsub = null; }
+  document.removeEventListener("keydown", _onKeyDown);
   _filtroStatus = "";
   _filtroAlias  = "";
   _lastDocs     = [];
@@ -95,19 +96,19 @@ function _html() {
       <div id="caja-f-sistema-detalle" style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem"></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem">
-      <div class="caja-form-row">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem">
+      <div class="caja-form-row" style="margin-bottom:0">
         <label>Efectivo declarado</label>
         <input id="caja-f-ef" type="number" min="0" step="0.01" placeholder="0.00">
       </div>
-      <div class="caja-form-row">
+      <div class="caja-form-row" style="margin-bottom:0">
         <label>Tarjeta declarada</label>
         <input id="caja-f-tj" type="number" min="0" step="0.01" placeholder="0.00">
       </div>
-      <div class="caja-form-row">
-        <label>Transferencia declarada</label>
-        <input id="caja-f-tr" type="number" min="0" step="0.01" placeholder="0.00">
-      </div>
+    </div>
+    <div class="caja-form-row">
+      <label>Transferencia declarada</label>
+      <input id="caja-f-tr" type="number" min="0" step="0.01" placeholder="0.00">
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:1px solid var(--border)">
@@ -118,7 +119,10 @@ function _html() {
         <span style="font-size:.85rem;color:var(--text-muted)">Diferencia: </span>
         <span id="caja-f-diferencia" style="font-weight:700">$0.00</span>
       </div>
-      <button id="caja-btn-guardar" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:.5rem 1.2rem;font-weight:700;cursor:pointer">Guardar corte</button>
+      <div style="display:flex;gap:.5rem">
+        <button id="caja-btn-cancelar" style="background:none;border:1px solid var(--border);border-radius:6px;padding:.5rem 1.2rem;font-weight:600;cursor:pointer;color:var(--text-primary)">Cancelar</button>
+        <button id="caja-btn-guardar" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:.5rem 1.2rem;font-weight:700;cursor:pointer">Guardar corte</button>
+      </div>
     </div>
   </div>
 </div>
@@ -138,10 +142,11 @@ function _html() {
 .badge-dif  { background:#FEE2E2;color:#991B1B;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;font-weight:700; }
 .badge-auto { background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:.2rem .4rem;font-size:.72rem;font-weight:700; }
 .badge-man  { background:#E0F2FE;color:#0369A1;border-radius:4px;padding:.2rem .4rem;font-size:.72rem;font-weight:700; }
+.badge-liq  { background:#FEF3C7;color:#92400E;border-radius:4px;padding:.2rem .4rem;font-size:.72rem;font-weight:700; }
 .btn-validar  { background:#16A34A;color:#fff;border:none;border-radius:5px;padding:.3rem .6rem;cursor:pointer;font-size:.8rem; }
 .btn-rechazar { background:#DC2626;color:#fff;border:none;border-radius:5px;padding:.3rem .6rem;cursor:pointer;font-size:.8rem;margin-left:.3rem; }
 .caja-modal-bg { position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center; }
-.caja-modal { background:var(--surface);border-radius:12px;padding:1.25rem;width:min(520px,95vw);box-shadow:0 8px 32px rgba(0,0,0,.3); }
+.caja-modal { background:var(--surface);border-radius:12px;padding:1.25rem 1.5rem;width:min(560px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3); }
 .caja-form-row { display:flex;flex-direction:column;gap:.25rem;margin-bottom:.6rem; }
 .caja-form-row label { font-size:.78rem;font-weight:600;color:var(--text-muted); }
 .caja-form-row input,.caja-form-row select { padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:.9rem; }
@@ -168,9 +173,11 @@ function _bindEvents() {
   });
   _container.querySelector("#caja-btn-nuevo").addEventListener("click", _abrirModal);
   _container.querySelector("#caja-modal-close").addEventListener("click", _cerrarModal);
+  _container.querySelector("#caja-btn-cancelar").addEventListener("click", _cerrarModal);
   _container.querySelector("#caja-modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) _cerrarModal();
   });
+  document.addEventListener("keydown", _onKeyDown);
 
   // Recalcular total declarado y diferencia al cambiar montos
   ["caja-f-ef","caja-f-tj","caja-f-tr"].forEach(id => {
@@ -187,7 +194,7 @@ function _bindEvents() {
 
 async function _abrirModal() {
   await cargarNombres();
-  const ingenieros = getIngenieros();
+  const ingenieros = getIngenieros(["INGENIERO", "RECUPERADOR", "ADMINISTRADOR"]);
   const sel = _container.querySelector("#caja-f-alias");
   sel.innerHTML = `<option value="">Selecciona…</option>` +
     ingenieros.map(u => `<option value="${u.alias || u.uid}">${u.nombre || u.alias}</option>`).join("");
@@ -198,6 +205,10 @@ async function _abrirModal() {
 
 function _cerrarModal() {
   _container.querySelector("#caja-modal").style.display = "none";
+}
+
+function _onKeyDown(e) {
+  if (e.key === "Escape") _cerrarModal();
 }
 
 async function _calcularSistema(alias) {
@@ -276,7 +287,7 @@ async function _guardarCorte() {
       efectivo:      ef,
       tarjeta:       tj,
       transferencia: tr,
-      status:        Math.abs(dif) < 0.5 ? "PENDIENTE" : "PENDIENTE",
+      status:        "PENDIENTE",
       turno,
       fechaStr:      hoyStr,
       origen:        "MANUAL",
@@ -358,7 +369,9 @@ function _render(docs) {
       <button class="btn-rechazar" data-id="${c.id}">Diferencia</button>` : `<span style="font-size:.8rem;color:var(--muted)">${c.validadoPor || "—"}</span>`;
     const origenBadge = c.origen === "AUTO"
       ? `<span class="badge-auto">AUTO</span>`
-      : `<span class="badge-man">MANUAL</span>`;
+      : c.origen === "LIQUIDACION"
+        ? `<span class="badge-liq">LIQUIDACIÓN</span>`
+        : `<span class="badge-man">MANUAL</span>`;
     return `<tr>
       <td>${resolverNombre(c.alias) || c.alias || c.uid}</td>
       <td style="white-space:nowrap;font-size:.8rem">${fecha}<br><span style="color:var(--muted)">${c.turno || "—"}</span></td>

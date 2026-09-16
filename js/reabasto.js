@@ -21,13 +21,56 @@ const PUEDE_GESTIONAR = () =>
   ["SUPER_ADMIN","GERENTE","ADMINISTRADOR","ALMACENISTA"].includes(Sesion.rol);
 
 // ── Estado local ───────────────────────────────────────────────
-let _unsub       = null;
-let _unsubStock  = null;
+let _unsub        = null;
+let _unsubStock   = null;
 let _solicitudes  = [];
 let _stockIng     = [];
 let _filtroStock  = "";
 let _filtroTab    = "PENDIENTE";
 let _container    = null;
+let _prevPendCount = -1;   // para detectar nuevas requisiciones
+
+// ── Badge sidebar ─────────────────────────────────────────────
+function _actualizarBadgeSidebar(n) {
+  let badge = document.getElementById("reb-sidebar-badge");
+  const link = document.querySelector('a[data-view="reabasto"]');
+  if (!link) return;
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.id = "reb-sidebar-badge";
+    badge.className = "sb-badge aut-alarm";
+    badge.style.cssText = "margin-left:auto;animation:reb-badge-pulse 0.8s ease-in-out infinite";
+    link.appendChild(badge);
+  }
+  if (n > 0) {
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+// ── Alarma sonora ─────────────────────────────────────────────
+let _audioCtx = null;
+function _sonarAlarma() {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    // Secuencia: 3 pitidos urgentes
+    [[0, 880, 0.18], [0.22, 1100, 0.15], [0.42, 880, 0.18]].forEach(([t, freq, dur]) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + dur + 0.05);
+    });
+  } catch (_) {}
+}
 
 // ── Estados y colores ─────────────────────────────────────────
 const ESTADOS = {
@@ -64,6 +107,7 @@ export function destroy() {
   _solicitudes = [];
   _stockIng    = [];
   _container = null;
+  // Badge persiste en sidebar — se actualiza al montar de nuevo
 }
 
 // ── HTML base ─────────────────────────────────────────────────
@@ -123,6 +167,11 @@ function _escuchar() {
   );
   _unsub = onSnapshot(q, snap => {
     _solicitudes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pendN = _solicitudes.filter(s => s.estado === "PENDIENTE").length;
+    _actualizarBadgeSidebar(pendN);
+    // Alarma solo cuando llega una nueva (no en la carga inicial)
+    if (_prevPendCount >= 0 && pendN > _prevPendCount) _sonarAlarma();
+    _prevPendCount = pendN;
     _renderKPIs();
     _renderConteoTabs();
     _renderLista();
@@ -246,28 +295,32 @@ function _cerrarModal() {
 
 function _htmlDetalle(s) {
   const est   = ESTADOS[s.estado] || ESTADOS.PENDIENTE;
-  const fecha = s._ts ? new Date(s._ts).toLocaleDateString("es-MX",{dateStyle:"medium",timeStyle:"short"}) : "–";
+  const fecha = s._ts ? new Date(s._ts).toLocaleString("es-MX",{dateStyle:"medium",timeStyle:"short"}) : "–";
   const puede = PUEDE_GESTIONAR();
 
   const filasItems = (s.items || []).map((item, i) => {
     const sinStock = !item.hayStock;
     const puedeEditar = puede && s.estado === "EN_PROCESO";
+    const rowBg = sinStock ? "background:rgba(220,38,38,.10);border-left:3px solid #DC2626" : "border-left:3px solid transparent";
     return `
-    <tr style="border-bottom:1px solid var(--border);${sinStock?"background:#FFF7F7":""}">
-      <td style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--text-primary)">${esc(item.nombre||"–")}</td>
-      <td style="padding:8px 12px;font-size:11px;font-family:monospace;color:#6B7280">${esc(item.codigo||"–")}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">${item.cantidadSolicitada||0}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:11px;color:${item.stockAlmacen>0?"#16A34A":"#DC2626"}">
-        ${item.stockAlmacen||0} ${sinStock?`<span style="font-size:9px;background:#FEE2E2;color:#DC2626;padding:1px 5px;border-radius:6px">SIN STOCK</span>`:""}
+    <tr style="border-bottom:1px solid var(--border);${rowBg}">
+      <td style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text-primary)">${esc(item.nombre||"–")}</td>
+      <td style="padding:8px 12px;font-size:11px;font-family:monospace;color:var(--text-muted)">${esc(item.codigoN10||"–")}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:800;color:var(--text-primary)">${item.cantidadSolicitada||0}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:${(item.stockAlmacen||0)>0?"#22C55E":"#F87171"}">
+        ${item.stockAlmacen||0}
+        ${sinStock?`<span style="display:inline-block;font-size:9px;font-weight:800;background:#DC2626;color:#fff;
+          padding:2px 6px;border-radius:4px;margin-left:4px;letter-spacing:.03em">SIN STOCK</span>`:""}
       </td>
-      <td style="padding:8px 12px;text-align:center">
+      <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:var(--text-primary)">
         ${puedeEditar
           ? `<input type="number" class="reb-qty-surtida" data-idx="${i}" min="0" max="${item.cantidadSolicitada}"
               value="${item.cantidadSurtida ?? item.cantidadSolicitada}"
-              style="width:60px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;font-size:12px;background:var(--surface)">`
-          : `<span style="font-size:12px">${item.cantidadSurtida ?? "–"}</span>`}
+              style="width:64px;text-align:center;border:1px solid var(--border);border-radius:6px;
+                padding:5px;font-size:13px;font-weight:700;background:var(--surface);color:var(--text-primary)">`
+          : `<span>${item.cantidadSurtida ?? "–"}</span>`}
       </td>
-      <td style="padding:8px 12px;text-align:center;font-size:12px">
+      <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:var(--text-primary)">
         ${item.cantidadRecibida ?? "–"}
       </td>
     </tr>`;
@@ -285,32 +338,34 @@ function _htmlDetalle(s) {
   };
 
   return `
-  <div style="padding:20px">
+  <div style="padding:0">
     <!-- Header -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <button onclick="window._rebCerrar()" style="padding:6px 12px;border:1px solid var(--border);
-        border-radius:6px;background:transparent;color:var(--text-primary);font-size:12px;cursor:pointer">✕ Cerrar</button>
-      <div style="flex:1">
-        <div style="font-size:15px;font-weight:800;color:var(--text-primary)">
-          Solicitud — ${esc(resolverNombre(s.ingenieroAlias))}
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;
+      border-bottom:1px solid var(--border);background:var(--surface-2);border-radius:12px 12px 0 0">
+      <button onclick="window._rebCerrar()" style="flex-shrink:0;padding:7px 14px;border:1px solid var(--border);
+        border-radius:7px;background:var(--surface);color:var(--text-primary);font-size:12px;font-weight:600;cursor:pointer">✕ Cerrar</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:800;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          📦 ${esc(resolverNombre(s.ingenieroAlias))}
         </div>
-        <div style="font-size:11px;color:#9CA3AF">${fecha} · Zona: ${esc(s.zona||"–")}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fecha}</div>
       </div>
-      <span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;
+      <span style="flex-shrink:0;font-size:11px;font-weight:800;padding:5px 14px;border-radius:20px;letter-spacing:.04em;
         background:${est.bg};color:${est.color}">${est.label}</span>
     </div>
 
     <!-- Tabla productos -->
-    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:16px">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <div style="padding:16px 20px">
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:var(--surface-2)">
-            <th style="padding:8px 12px;text-align:left;font-weight:700;color:#9CA3AF;font-size:10px">PRODUCTO</th>
-            <th style="padding:8px 12px;text-align:left;font-weight:700;color:#9CA3AF;font-size:10px">CÓDIGO</th>
-            <th style="padding:8px 12px;text-align:center;font-weight:700;color:#9CA3AF;font-size:10px">SOLICITADO</th>
-            <th style="padding:8px 12px;text-align:center;font-weight:700;color:#9CA3AF;font-size:10px">STOCK ALMACÉN</th>
-            <th style="padding:8px 12px;text-align:center;font-weight:700;color:#9CA3AF;font-size:10px">SURTIDO</th>
-            <th style="padding:8px 12px;text-align:center;font-weight:700;color:#9CA3AF;font-size:10px">RECIBIDO</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">PRODUCTO</th>
+            <th style="padding:9px 12px;text-align:left;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">CÓDIGO</th>
+            <th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">SOLICITADO</th>
+            <th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">STOCK ALMACÉN</th>
+            <th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">SURTIDO</th>
+            <th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--text-muted);font-size:10px;letter-spacing:.06em">RECIBIDO</th>
           </tr>
         </thead>
         <tbody>${filasItems}</tbody>
@@ -318,29 +373,33 @@ function _htmlDetalle(s) {
     </div>
 
     <!-- Notas -->
-    ${s.notasIngeniero ? `<div style="margin-bottom:12px;padding:10px 14px;background:var(--surface-2);border-radius:8px;font-size:12px">
-      <span style="font-size:10px;color:#9CA3AF;font-weight:600">NOTA DEL INGENIERO:</span><br>
-      ${esc(s.notasIngeniero)}
+    ${s.notasIngeniero ? `<div style="margin-bottom:10px;padding:10px 14px;background:var(--surface-2);border-radius:8px;
+      border-left:3px solid #F59E0B;font-size:12px;color:var(--text-primary)">
+      <span style="font-size:10px;color:#F59E0B;font-weight:700;letter-spacing:.05em">NOTA DEL INGENIERO</span><br>
+      <span style="margin-top:3px;display:block">${esc(s.notasIngeniero)}</span>
     </div>` : ""}
-    ${s.notasAlmacenista ? `<div style="margin-bottom:12px;padding:10px 14px;background:var(--surface-2);border-radius:8px;font-size:12px">
-      <span style="font-size:10px;color:#9CA3AF;font-weight:600">NOTA DEL ALMACENISTA:</span><br>
-      ${esc(s.notasAlmacenista)}
+    ${s.notasAlmacenista ? `<div style="margin-bottom:10px;padding:10px 14px;background:var(--surface-2);border-radius:8px;
+      border-left:3px solid #7C3AED;font-size:12px;color:var(--text-primary)">
+      <span style="font-size:10px;color:#7C3AED;font-weight:700;letter-spacing:.05em">NOTA DEL ALMACENISTA</span><br>
+      <span style="margin-top:3px;display:block">${esc(s.notasAlmacenista)}</span>
     </div>` : ""}
 
     <!-- Notas almacenista al surtir -->
     ${puede && s.estado === "EN_PROCESO" ? `
-    <div style="margin-bottom:16px">
-      <label style="font-size:11px;color:#6B7280;font-weight:600;display:block;margin-bottom:4px">Notas del almacenista (opcional)</label>
-      <textarea id="reb-notas-alm" rows="2" placeholder="Observaciones al surtir…"
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:5px;letter-spacing:.05em">OBSERVACIONES AL SURTIR (opcional)</label>
+      <textarea id="reb-notas-alm" rows="2" placeholder="Ej: faltó 1 unidad de FURADAN, se reintegra al almacén"
         style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
-          padding:8px 12px;font-size:12px;background:var(--surface);color:var(--text-primary);resize:vertical">${s.notasAlmacenista||""}</textarea>
+          padding:9px 12px;font-size:12px;background:var(--surface);color:var(--text-primary);resize:vertical">${s.notasAlmacenista||""}</textarea>
     </div>` : ""}
 
     <!-- Acciones -->
-    <div style="display:flex;gap:8px;justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">
       ${botonesAccion()}
     </div>
-    <div id="reb-detalle-error" style="display:none;margin-top:8px;font-size:12px;color:#DC2626;text-align:right"></div>
+    <div id="reb-detalle-error" style="display:none;margin-top:10px;font-size:12px;font-weight:600;color:#F87171;
+      background:rgba(220,38,38,.12);padding:8px 12px;border-radius:6px;text-align:right"></div>
+    </div><!-- /padding wrapper -->
   </div>`;
 }
 
@@ -543,8 +602,7 @@ function _renderStockIngenieros(el) {
       e.stopPropagation();
       const uid   = btn.dataset.uid;
       const alias = btn.dataset.alias;
-      const ing   = _stockIng.find(i => i.id === uid);
-      _abrirAsignar(uid, alias, ing?.items || []);
+      _abrirAsignar(uid, alias);
     });
   });
 
@@ -625,212 +683,265 @@ function _cardStockIngeniero(ing, ahora, DIAS_40) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Asignación directa de stock a ingeniero
+// MODAL CARRITO — Asignación directa multi-SKU a ingeniero
+// Crea solicitudes_reabasto con origen:"DIRECTA" para que el
+// ingeniero coteje y acepte desde el APK.
 // ══════════════════════════════════════════════════════════════
 
-let _asignarProductos = [];    // caché de productos para búsqueda
-let _asignarSelProd   = null;  // producto seleccionado en modal
+let _cart        = [];   // [{ prod, cantidad }]
+let _cartUid     = "";
+let _cartAlias   = "";
+let _catalogoProd = [];  // caché de productos
+let _catalogoIng  = [];  // caché de ingenieros
+let _cartSelProd  = null;
 
+// ── Inyectar modal (solo una vez en el DOM) ───────────────────
 function _inyectarModalAsignar() {
   if (document.getElementById("reb-asignar-modal")) return;
   const m = document.createElement("div");
   m.id = "reb-asignar-modal";
   m.style.cssText = `display:none;position:fixed;inset:0;z-index:9000;
-    background:#0007;align-items:center;justify-content:center`;
+    background:rgba(0,0,0,.55);align-items:flex-start;justify-content:center;
+    padding:24px 12px;overflow-y:auto`;
   m.innerHTML = `
-    <div style="background:var(--surface);border-radius:14px;padding:24px;width:min(440px,94vw);
-      box-shadow:0 8px 40px #0005;position:relative">
-      <button id="reb-asignar-cerrar" style="position:absolute;top:12px;right:14px;
-        background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-secondary)">✕</button>
-      <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">
-        Asignar stock directo</div>
-      <div id="reb-asignar-ing-nombre"
-        style="font-size:12px;color:#7C3AED;margin-bottom:16px"></div>
+  <div style="background:var(--surface);border-radius:14px;width:min(620px,100%);
+    box-shadow:0 12px 48px rgba(0,0,0,.4);position:relative;margin:auto">
 
-      <label style="font-size:11px;font-weight:600;color:#9CA3AF;display:block;margin-bottom:4px">PRODUCTO</label>
-      <div style="position:relative;margin-bottom:14px">
-        <input id="reb-asignar-buscar" type="text" autocomplete="off"
-          placeholder="Buscar por nombre o código N10…"
-          style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
-            padding:9px 12px;font-size:13px;background:var(--surface);color:var(--text-primary)">
-        <div id="reb-asignar-dd" style="display:none;position:absolute;top:100%;left:0;right:0;
-          background:var(--surface);border:1px solid var(--border);border-radius:8px;
-          max-height:200px;overflow-y:auto;z-index:200;box-shadow:0 4px 16px #0003;margin-top:2px"></div>
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:18px 20px 14px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:800;font-size:15px;color:var(--text-primary)">📦 Nueva asignación de stock</div>
+        <div id="reb-cart-ing-label" style="font-size:12px;color:#7C3AED;margin-top:2px"></div>
       </div>
-      <div id="reb-asignar-prod-info" style="display:none;margin-bottom:14px;padding:8px 12px;
-        background:var(--surface-2);border-radius:8px;font-size:12px;color:var(--text-primary)"></div>
+      <button id="reb-asignar-cerrar" style="background:none;border:none;font-size:20px;
+        cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
+    </div>
 
-      <label style="font-size:11px;font-weight:600;color:#9CA3AF;display:block;margin-bottom:4px">CANTIDAD</label>
-      <input id="reb-asignar-cantidad" type="number" min="0" step="1" value=""
-        style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
-          padding:9px 12px;font-size:15px;font-weight:700;background:var(--surface);
-          color:var(--text-primary);margin-bottom:18px">
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
 
-      <div id="reb-asignar-error" style="display:none;color:#DC2626;font-size:12px;margin-bottom:10px"></div>
+      <!-- Selector ingeniero -->
+      <div id="reb-cart-ing-wrap">
+        <label style="font-size:11px;font-weight:700;color:#9CA3AF;display:block;margin-bottom:5px;letter-spacing:.05em">DESTINATARIO</label>
+        <select id="reb-cart-ing-select"
+          style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
+            padding:9px 12px;font-size:13px;background:var(--surface);color:var(--text-primary);cursor:pointer">
+          <option value="" disabled selected>— Selecciona un ingeniero —</option>
+        </select>
+      </div>
 
-      <button id="reb-asignar-guardar" style="width:100%;padding:11px;border:none;border-radius:8px;
-        background:#7C3AED;color:#fff;font-size:14px;font-weight:700;cursor:pointer">
-        Guardar asignación
-      </button>
-    </div>`;
+      <!-- Buscador producto + cantidad -->
+      <div style="background:var(--surface-2);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:11px;font-weight:700;color:#9CA3AF;letter-spacing:.05em">AGREGAR PRODUCTO</label>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div style="flex:1;position:relative">
+            <input id="reb-cart-prod-buscar" type="text" autocomplete="off" placeholder="Nombre o código N10…"
+              style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
+                padding:8px 12px;font-size:13px;background:var(--surface);color:var(--text-primary)">
+            <div id="reb-cart-prod-dd" style="display:none;position:absolute;top:100%;left:0;right:0;
+              background:var(--surface);border:1px solid var(--border);border-radius:8px;
+              max-height:220px;overflow-y:auto;z-index:300;box-shadow:0 6px 20px rgba(0,0,0,.15);margin-top:3px"></div>
+          </div>
+          <input id="reb-cart-cant" type="number" min="0.01" step="1" placeholder="Cant."
+            style="width:76px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;
+              padding:8px 10px;font-size:14px;font-weight:700;text-align:center;
+              background:var(--surface);color:var(--text-primary)">
+          <button id="reb-cart-agregar" style="flex-shrink:0;padding:8px 14px;border:none;border-radius:8px;
+            background:#7C3AED;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+            + Agregar
+          </button>
+        </div>
+        <div id="reb-cart-prod-info" style="display:none;font-size:11px;color:#6B7280;padding:2px 4px"></div>
+      </div>
+
+      <!-- Carrito -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#9CA3AF;letter-spacing:.05em;margin-bottom:8px">
+          PRODUCTOS EN LA ASIGNACIÓN <span id="reb-cart-count" style="color:#7C3AED"></span>
+        </div>
+        <div id="reb-cart-lista" style="display:flex;flex-direction:column;gap:6px;min-height:40px">
+          <div id="reb-cart-vacio" style="padding:16px;text-align:center;color:#9CA3AF;font-size:12px;
+            border:1px dashed var(--border);border-radius:8px">
+            Agrega productos usando el buscador de arriba
+          </div>
+        </div>
+      </div>
+
+      <!-- Error + botón enviar -->
+      <div id="reb-cart-error" style="display:none;color:#DC2626;font-size:12px;padding:8px 12px;
+        background:#FEF2F2;border-radius:6px"></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="reb-cart-cancelar" style="padding:10px 18px;border:1px solid var(--border);
+          border-radius:8px;background:none;color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer">
+          Cancelar
+        </button>
+        <button id="reb-cart-enviar" style="padding:10px 22px;border:none;border-radius:8px;
+          background:#7C3AED;color:#fff;font-size:13px;font-weight:700;cursor:pointer">
+          Enviar asignación →
+        </button>
+      </div>
+    </div>
+  </div>`;
   document.body.appendChild(m);
 
+  // Cerrar
   document.getElementById("reb-asignar-cerrar").addEventListener("click", _cerrarAsignar);
-  m.addEventListener("click", e => { if (e.target === m) _cerrarAsignar(); });
+  document.getElementById("reb-cart-cancelar").addEventListener("click", _cerrarAsignar);
+  m.addEventListener("mousedown", e => { if (e.target === m) _cerrarAsignar(); });
 
-  const buscar = document.getElementById("reb-asignar-buscar");
-  const dd     = document.getElementById("reb-asignar-dd");
+  // Selector ingeniero (dropdown)
+  const ingSelect = document.getElementById("reb-cart-ing-select");
+  ingSelect.addEventListener("change", () => {
+    const uid = ingSelect.value;
+    const ing = _catalogoIng.find(i => i.uid === uid);
+    _cartUid   = uid;
+    _cartAlias = ing ? (ing.alias || "") : "";
+    const nombre = ing ? (ing.nombre || ing.alias || uid) : uid;
+    document.getElementById("reb-cart-ing-label").textContent = uid ? `→ ${nombre}` : "";
+  });
 
-  buscar.addEventListener("input", () => {
-    _asignarSelProd = null;
-    document.getElementById("reb-asignar-prod-info").style.display = "none";
-    const q = norm(buscar.value);
-    if (q.length < 2) { dd.style.display = "none"; return; }
-    const matches = _asignarProductos
+  // Buscador producto
+  const prodInput = document.getElementById("reb-cart-prod-buscar");
+  const prodDd    = document.getElementById("reb-cart-prod-dd");
+  const prodInfo  = document.getElementById("reb-cart-prod-info");
+  prodInput.addEventListener("input", () => {
+    _cartSelProd = null;
+    prodInfo.style.display = "none";
+    const q = norm(prodInput.value);
+    if (q.length < 2) { prodDd.style.display = "none"; return; }
+    const matches = _catalogoProd
       .filter(p => norm(p.nombre||"").includes(q) || norm(p.codigoN10||"").includes(q))
-      .slice(0, 12);
-    if (!matches.length) { dd.style.display = "none"; return; }
-    dd.innerHTML = matches.map(p =>
-      `<div class="reb-ad-item" data-id="${p.id}"
-        style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);color:var(--text-primary)">
+      .slice(0, 14);
+    if (!matches.length) { prodDd.style.display = "none"; return; }
+    prodDd.innerHTML = matches.map(p =>
+      `<div class="reb-cp-item" data-id="${p.id}"
+        style="padding:9px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);color:var(--text-primary)">
         <span style="font-weight:600">${esc(p.nombre||"")}</span>
         <span style="color:#9CA3AF;font-size:11px;margin-left:6px">${esc(p.codigoN10||"")}</span>
+        <span style="color:${(p.stock||0)>0?"#16A34A":"#DC2626"};font-size:11px;margin-left:6px">
+          Stock: ${p.stock||0} ${esc(p.unidad||"")}
+        </span>
       </div>`).join("");
-    dd.style.display = "block";
-    dd.querySelectorAll(".reb-ad-item").forEach(el2 =>
+    prodDd.style.display = "block";
+    prodDd.querySelectorAll(".reb-cp-item").forEach(el2 =>
       el2.addEventListener("mousedown", ev => {
         ev.preventDefault();
-        const prod = _asignarProductos.find(p => p.id === el2.dataset.id);
+        const prod = _catalogoProd.find(p => p.id === el2.dataset.id);
         if (!prod) return;
-        _asignarSelProd = prod;
-        buscar.value = prod.nombre;
-        dd.style.display = "none";
-        const info = document.getElementById("reb-asignar-prod-info");
-        info.textContent = `${prod.codigoN10 || "–"}  ·  ${prod.unidad || "–"}`;
-        info.style.display = "block";
+        _cartSelProd   = prod;
+        prodInput.value = prod.nombre;
+        prodDd.style.display = "none";
+        prodInfo.textContent = `${prod.codigoN10||"–"} · ${prod.unidad||"–"} · Stock almacén: ${prod.stock||0}`;
+        prodInfo.style.display = "block";
+        document.getElementById("reb-cart-cant").focus();
       }));
   });
-  buscar.addEventListener("blur", () => setTimeout(() => { dd.style.display = "none"; }, 150));
+  prodInput.addEventListener("blur", () => setTimeout(() => { prodDd.style.display = "none"; }, 150));
 
-  document.getElementById("reb-asignar-guardar").addEventListener("click", _guardarAsignacion);
+  // Agregar al carrito
+  document.getElementById("reb-cart-agregar").addEventListener("click", () => {
+    const errEl = document.getElementById("reb-cart-error");
+    errEl.style.display = "none";
+    if (!_cartSelProd) { errEl.textContent = "Selecciona un producto del buscador."; errEl.style.display = "block"; return; }
+    const cant = parseFloat(document.getElementById("reb-cart-cant").value);
+    if (isNaN(cant) || cant <= 0) { errEl.textContent = "Ingresa una cantidad mayor a 0."; errEl.style.display = "block"; return; }
+    const existe = _cart.findIndex(c => c.prod.id === _cartSelProd.id);
+    if (existe >= 0) {
+      _cart[existe].cantidad += cant;
+    } else {
+      _cart.push({ prod: _cartSelProd, cantidad: cant });
+    }
+    prodInput.value = "";
+    document.getElementById("reb-cart-cant").value = "";
+    prodInfo.style.display = "none";
+    _cartSelProd = null;
+    _renderCarrito();
+    prodInput.focus();
+  });
+
+  // Enviar
+  document.getElementById("reb-cart-enviar").addEventListener("click", _enviarAsignacion);
+}
+
+function _renderCarrito() {
+  const lista  = document.getElementById("reb-cart-lista");
+  const vacio  = document.getElementById("reb-cart-vacio");
+  const count  = document.getElementById("reb-cart-count");
+  if (!lista) return;
+  count.textContent = _cart.length > 0 ? `(${_cart.length})` : "";
+  if (_cart.length === 0) {
+    lista.innerHTML = "";
+    lista.appendChild(vacio || document.createElement("div"));
+    if (vacio) vacio.style.display = "block";
+    return;
+  }
+  if (vacio) vacio.style.display = "none";
+  lista.innerHTML = _cart.map((c, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+      background:var(--surface-2);border-radius:8px;border:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${esc(c.prod.nombre||"")}</div>
+        <div style="font-size:11px;color:#6B7280">${esc(c.prod.codigoN10||"–")} · ${esc(c.prod.unidad||"")}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="reb-cart-menos" data-i="${i}"
+          style="width:26px;height:26px;border:1px solid var(--border);border-radius:6px;
+            background:none;cursor:pointer;font-size:14px;font-weight:700;color:var(--text-primary)">−</button>
+        <span style="font-size:14px;font-weight:800;color:#7C3AED;min-width:36px;text-align:center">${c.cantidad}</span>
+        <button class="reb-cart-mas" data-i="${i}"
+          style="width:26px;height:26px;border:1px solid var(--border);border-radius:6px;
+            background:none;cursor:pointer;font-size:14px;font-weight:700;color:var(--text-primary)">+</button>
+      </div>
+      <button class="reb-cart-quitar" data-i="${i}"
+        style="background:none;border:none;cursor:pointer;font-size:16px;color:#9CA3AF;padding:4px">✕</button>
+    </div>`).join("");
+
+  lista.querySelectorAll(".reb-cart-quitar").forEach(btn =>
+    btn.addEventListener("click", () => { _cart.splice(parseInt(btn.dataset.i), 1); _renderCarrito(); }));
+  lista.querySelectorAll(".reb-cart-menos").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const i = parseInt(btn.dataset.i);
+      if (_cart[i].cantidad > 1) { _cart[i].cantidad--; _renderCarrito(); }
+    }));
+  lista.querySelectorAll(".reb-cart-mas").forEach(btn =>
+    btn.addEventListener("click", () => { _cart[parseInt(btn.dataset.i)].cantidad++; _renderCarrito(); }));
 }
 
 async function _abrirAsignarConSelector() {
   _inyectarModalAsignar();
-
-  // Mostrar campo de selección de ingeniero
-  let ingRow = document.getElementById("reb-asignar-ing-row");
-  if (!ingRow) {
-    const modal = document.getElementById("reb-asignar-modal");
-    const inner = modal?.querySelector("div");
-    if (!inner) return;
-    ingRow = document.createElement("div");
-    ingRow.id = "reb-asignar-ing-row";
-    ingRow.style.cssText = "margin-bottom:14px";
-    ingRow.innerHTML = `
-      <label style="font-size:11px;font-weight:600;color:#9CA3AF;display:block;margin-bottom:4px">INGENIERO</label>
-      <div style="position:relative">
-        <input id="reb-asignar-ing-buscar" type="text" autocomplete="off"
-          placeholder="Buscar ingeniero…"
-          style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;
-            padding:9px 12px;font-size:13px;background:var(--surface);color:var(--text-primary)">
-        <div id="reb-asignar-ing-dd" style="display:none;position:absolute;top:100%;left:0;right:0;
-          background:var(--surface);border:1px solid var(--border);border-radius:8px;
-          max-height:180px;overflow-y:auto;z-index:210;box-shadow:0 4px 16px #0003;margin-top:2px"></div>
-      </div>`;
-    const ingNomEl = document.getElementById("reb-asignar-ing-nombre");
-    inner.insertBefore(ingRow, ingNomEl);
-
-    // Cargar ingenieros desde Firestore
-    let _ingenieros = [];
-    try {
-      const snap = await getDocs(collection(db, "usuarios"));
-      _ingenieros = snap.docs
-        .map(d => ({ uid: d.id, ...d.data() }))
-        .filter(u => ["INGENIERO","RECUPERADOR","ALMACENISTA"].includes(u.rol) && u.activo !== false)
-        .sort((a, b) => (a.alias||"").localeCompare(b.alias||"", "es"));
-    } catch (_) {}
-
-    const ingBuscar = document.getElementById("reb-asignar-ing-buscar");
-    const ingDd     = document.getElementById("reb-asignar-ing-dd");
-    ingBuscar.addEventListener("input", () => {
-      const q = norm(ingBuscar.value);
-      const matches = q.length < 1 ? _ingenieros : _ingenieros.filter(i => norm(i.alias||"").includes(q));
-      if (!matches.length) { ingDd.style.display = "none"; return; }
-      ingDd.innerHTML = matches.slice(0,12).map(i =>
-        `<div class="reb-ing-item" data-uid="${esc(i.uid)}" data-alias="${esc(i.alias||"")}"
-          style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary)">
-          ${esc(i.alias||"")} <span style="font-size:10px;color:#9CA3AF">${esc(i.rol||"")}</span>
-        </div>`).join("");
-      ingDd.style.display = "block";
-      ingDd.querySelectorAll(".reb-ing-item").forEach(el2 =>
-        el2.addEventListener("mousedown", ev => {
-          ev.preventDefault();
-          ingBuscar.value = el2.dataset.alias;
-          ingDd.style.display = "none";
-          const modal = document.getElementById("reb-asignar-modal");
-          modal.dataset.uid   = el2.dataset.uid;
-          modal.dataset.alias = el2.dataset.alias;
-          document.getElementById("reb-asignar-ing-nombre").textContent = el2.dataset.alias;
-        }));
-    });
-    ingBuscar.addEventListener("focus", () => ingBuscar.dispatchEvent(new Event("input")));
-    ingBuscar.addEventListener("blur",  () => setTimeout(() => { ingDd.style.display = "none"; }, 150));
-  }
-
-  // Resetear estado
-  document.getElementById("reb-asignar-ing-row").style.display = "block";
-  const ingBuscar = document.getElementById("reb-asignar-ing-buscar");
-  if (ingBuscar) { ingBuscar.value = ""; }
-  document.getElementById("reb-asignar-ing-nombre").textContent = "";
-  _asignarSelProd = null;
-  document.getElementById("reb-asignar-buscar").value = "";
-  document.getElementById("reb-asignar-dd").style.display = "none";
-  document.getElementById("reb-asignar-prod-info").style.display = "none";
-  document.getElementById("reb-asignar-cantidad").value = "";
-  document.getElementById("reb-asignar-error").style.display = "none";
-
+  _cart = []; _cartUid = ""; _cartAlias = "";
+  _cartSelProd = null;
+  const ingSelectReset = document.getElementById("reb-cart-ing-select");
+  if (ingSelectReset) ingSelectReset.selectedIndex = 0;
+  document.getElementById("reb-cart-ing-label").textContent = "";
+  document.getElementById("reb-cart-prod-buscar").value = "";
+  document.getElementById("reb-cart-cant").value = "";
+  document.getElementById("reb-cart-prod-info").style.display = "none";
+  document.getElementById("reb-cart-error").style.display = "none";
+  document.getElementById("reb-cart-ing-wrap").style.display = "block";
+  _renderCarrito();
   const modal = document.getElementById("reb-asignar-modal");
-  modal.dataset.uid   = "";
-  modal.dataset.alias = "";
   modal.style.display = "flex";
   _regEsc(_cerrarAsignar);
-
-  if (!_asignarProductos.length) {
-    getDocs(collection(db, "productos")).then(snap => {
-      _asignarProductos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(p => p.activo !== false)
-        .sort((a, b) => (a.nombre||"").localeCompare(b.nombre||"", "es"));
-    }).catch(() => {});
-  }
+  _cargarCatalogos();
 }
 
-function _abrirAsignar(uid, alias, currentItems) {
+function _abrirAsignar(uid, alias) {
   _inyectarModalAsignar();
-  _asignarSelProd = null;
-  document.getElementById("reb-asignar-buscar").value = "";
-  document.getElementById("reb-asignar-dd").style.display = "none";
-  document.getElementById("reb-asignar-prod-info").style.display = "none";
-  document.getElementById("reb-asignar-cantidad").value = "";
-  document.getElementById("reb-asignar-error").style.display = "none";
-  document.getElementById("reb-asignar-ing-nombre").textContent = alias;
-  // Ocultar selector de ingeniero (ya está definido por la card)
-  const ingRow = document.getElementById("reb-asignar-ing-row");
-  if (ingRow) ingRow.style.display = "none";
-
+  _cart = []; _cartUid = uid; _cartAlias = alias;
+  _cartSelProd = null;
+  document.getElementById("reb-cart-ing-label").textContent = `→ ${resolverNombre(alias) || alias}`;
+  document.getElementById("reb-cart-ing-wrap").style.display = "none";
+  document.getElementById("reb-cart-prod-buscar").value = "";
+  document.getElementById("reb-cart-cant").value = "";
+  document.getElementById("reb-cart-prod-info").style.display = "none";
+  document.getElementById("reb-cart-error").style.display = "none";
+  _renderCarrito();
   const modal = document.getElementById("reb-asignar-modal");
-  modal.dataset.uid   = uid;
-  modal.dataset.alias = alias;
   modal.style.display = "flex";
   _regEsc(_cerrarAsignar);
-
-  if (!_asignarProductos.length) {
-    getDocs(collection(db, "productos")).then(snap => {
-      _asignarProductos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(p => p.activo !== false)
-        .sort((a, b) => (a.nombre||"").localeCompare(b.nombre||"", "es"));
-    }).catch(() => {});
-  }
+  _cargarCatalogos();
 }
 
 function _cerrarAsignar() {
@@ -839,65 +950,88 @@ function _cerrarAsignar() {
   _unregEsc();
 }
 
-async function _guardarAsignacion() {
-  const modal    = document.getElementById("reb-asignar-modal");
-  const uid      = modal?.dataset.uid;
-  const alias    = modal?.dataset.alias;
-  const errEl    = document.getElementById("reb-asignar-error");
-  const btn      = document.getElementById("reb-asignar-guardar");
-  const cantStr  = document.getElementById("reb-asignar-cantidad").value.trim();
+function _poblarSelectIng() {
+  const sel = document.getElementById("reb-cart-ing-select");
+  if (!sel) return;
+  sel.innerHTML = `<option value="" disabled selected>— Selecciona un ingeniero —</option>` +
+    _catalogoIng.map(i =>
+      `<option value="${esc(i.uid)}" data-uid="${esc(i.uid)}" data-alias="${esc(i.alias||"")}">
+        ${esc(i.nombre || i.alias || i.uid)}
+      </option>`
+    ).join("");
+}
 
+function _cargarCatalogos() {
+  if (!_catalogoProd.length) {
+    getDocs(collection(db, "productos")).then(snap => {
+      _catalogoProd = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(p => p.activo !== false)
+        .sort((a, b) => (a.nombre||"").localeCompare(b.nombre||"", "es"));
+    }).catch(() => {});
+  }
+  if (!_catalogoIng.length) {
+    getDocs(collection(db, "usuarios")).then(snap => {
+      _catalogoIng = snap.docs.map(d => ({ uid: d.id, ...d.data() }))
+        .filter(u => u.rol === "INGENIERO" && u.activo !== false)
+        .sort((a, b) => (a.alias||"").localeCompare(b.alias||"", "es"));
+      _poblarSelectIng();
+    }).catch(() => {});
+  } else {
+    _poblarSelectIng();
+  }
+}
+
+async function _enviarAsignacion() {
+  const errEl = document.getElementById("reb-cart-error");
+  const btn   = document.getElementById("reb-cart-enviar");
   errEl.style.display = "none";
-  if (!uid)             { errEl.textContent = "Error: sin ingeniero."; errEl.style.display = "block"; return; }
-  if (!_asignarSelProd) { errEl.textContent = "Selecciona un producto."; errEl.style.display = "block"; return; }
-  const cantidad = parseFloat(cantStr);
-  if (isNaN(cantidad) || cantidad < 0) { errEl.textContent = "Cantidad inválida."; errEl.style.display = "block"; return; }
-
-  btn.disabled = true;
-  btn.textContent = "Guardando…";
-
+  if (!_cartUid)      { errEl.textContent = "Selecciona un ingeniero destinatario."; errEl.style.display = "block"; return; }
+  if (!_cart.length)  { errEl.textContent = "Agrega al menos un producto al carrito."; errEl.style.display = "block"; return; }
+  btn.disabled = true; btn.textContent = "Enviando…";
   try {
-    const docRef  = doc(db, "stock_ingenieros", uid);
-    const snap    = await getDoc(docRef);
-    const actual  = snap.exists() ? (snap.data().items || []) : [];
-    const prod    = _asignarSelProd;
+    const { addDoc: _add } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const ahora   = Date.now();
-
-    const idx = actual.findIndex(i => i.productoId === prod.id || i.codigoN10 === prod.codigoN10);
-    if (idx >= 0) {
-      actual[idx] = { ...actual[idx], cantidad, ultimoMovimiento: ahora };
-    } else {
-      actual.push({
-        productoId:       prod.id,
-        nombre:           prod.nombre || "",
-        codigoN10:        prod.codigoN10 || "",
-        unidad:           prod.unidad || "",
-        cantidad,
-        ultimoMovimiento: ahora
-      });
-    }
-
-    const baseData = snap.exists() ? {} : {
-      ingenieroUid:   uid,
-      ingenieroAlias: alias,
-      almacenId:      0
-    };
-
-    await setDoc(docRef, { ...baseData, items: actual, _ts: ahora }, { merge: true });
-
-    await logAudit("asignar_stock_ingeniero", {
-      uid, alias,
-      producto: prod.nombre, codigoN10: prod.codigoN10, cantidad
+    const hoyStr  = new Date().toISOString().slice(0,10);
+    const items   = await Promise.all(_cart.map(async c => {
+      // Leer stock actual del almacén para registrarlo
+      const prodSnap = await getDoc(doc(db, "productos", c.prod.id));
+      const stockAlmacen = prodSnap.exists() ? (prodSnap.data().stock ?? 0) : 0;
+      return {
+        productoId:         c.prod.id,
+        nombre:             c.prod.nombre || "",
+        codigoN10:          c.prod.codigoN10 || "",
+        unidad:             c.prod.unidad || "",
+        cantidadSolicitada: c.cantidad,
+        cantidadSurtida:    c.cantidad,
+        cantidadRecibida:   null,
+        stockAlmacen,
+        hayStock:           stockAlmacen >= c.cantidad,
+      };
+    }));
+    await _add(collection(db, "solicitudes_reabasto"), {
+      ingenieroUid:        _cartUid,
+      ingenieroAlias:      _cartAlias,
+      origen:              "DIRECTA",
+      estado:              "PENDIENTE",
+      items,
+      fechaStr:            hoyStr,
+      almacenistaAlias:    Sesion.alias,
+      almacenistaUid:      Sesion.uid,
+      notasAlmacenista:    "",
+      tieneProductosSinStock: items.some(i => !i.hayStock),
+      _ts:                 ahora,
+      timestamp:           serverTimestamp(),
     });
-
-    window.toast?.(`Stock asignado: ${prod.nombre} × ${cantidad}`, "success");
+    await logAudit("REABASTO_ASIGNACION_DIRECTA", {
+      ingeniero: _cartAlias, items: items.length, por: Sesion.alias
+    });
+    window.toast?.(`Asignación enviada a ${resolverNombre(_cartAlias)||_cartAlias} — ${items.length} producto(s)`, "success");
     _cerrarAsignar();
-  } catch (e) {
-    errEl.textContent = "Error: " + e.message;
+  } catch(e) {
+    errEl.textContent = "Error al enviar: " + e.message;
     errEl.style.display = "block";
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Guardar asignación";
+    btn.disabled = false; btn.textContent = "Enviar asignación →";
   }
 }
 

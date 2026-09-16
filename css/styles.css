@@ -298,6 +298,10 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   0%,100% { box-shadow: 0 0 0 2px #EF444466; }
   50%      { box-shadow: 0 0 0 5px #EF444400; }
 }
+@keyframes reb-badge-pulse {
+  0%,100% { opacity: 1; box-shadow: 0 0 0 2px #EF444488, 0 0 8px 2px #EF444444; transform: scale(1); }
+  50%      { opacity: .65; box-shadow: 0 0 0 5px #EF444400; transform: scale(1.18); }
+}
 @keyframes dash-alarm {
   0%,100% { box-shadow: 0 0 0 0 #EF444400; }
   50%      { box-shadow: 0 0 4px 0 #EF444470; }

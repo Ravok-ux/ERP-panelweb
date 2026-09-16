@@ -259,6 +259,51 @@ let _unsubscribers = [];
 let _autUnsub = null;
 const _autLogueados = new Set();
 
+// ── Badge + alarma persistente de Reabasto ────────────────────
+let _rebBgUnsub   = null;
+let _rebBgPrevN   = -1;
+let _rebAudioCtx  = null;
+
+function _rebSonar() {
+  try {
+    if (!_rebAudioCtx) _rebAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _rebAudioCtx;
+    [[0, 880, 0.18], [0.22, 1100, 0.15], [0.42, 880, 0.18]].forEach(([t, freq, dur]) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "square"; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + dur + 0.05);
+    });
+  } catch (_) {}
+}
+
+function iniciarReabastoBg() {
+  if (_rebBgUnsub) return;
+  import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(
+    ({ collection, query, where, onSnapshot }) => {
+      const q = query(collection(db, "solicitudes_reabasto"), where("estado", "==", "PENDIENTE"));
+      _rebBgUnsub = onSnapshot(q, snap => {
+        const n = snap.size;
+        // Badge en sidebar
+        const badge = document.getElementById("reb-sidebar-badge");
+        if (badge) {
+          badge.textContent = n > 99 ? "99+" : String(n);
+          badge.classList.toggle("hidden", n === 0);
+        }
+        // Alarma solo en incrementos posteriores a la carga inicial
+        if (_rebBgPrevN >= 0 && n > _rebBgPrevN) _rebSonar();
+        _rebBgPrevN = n;
+      }, err => console.warn("[ReabastoBg]", err));
+    }
+  );
+}
+function detenerReabastoBg() {
+  if (_rebBgUnsub) { _rebBgUnsub(); _rebBgUnsub = null; }
+  _rebBgPrevN = -1;
+}
+
 // IDs ya logueados en sesiones anteriores (persiste entre recargas)
 function _autGetPersisted() {
   try { return new Set(JSON.parse(localStorage.getItem("aut_logged") || "[]")); } catch { return new Set(); }
@@ -334,6 +379,8 @@ Auth.observarSesion(
     setTimeout(() => iniciarChatBg(), 1200);
     // Badge persistente de Autorizaciones pendientes
     setTimeout(() => iniciarAutBg(), 1500);
+    // Badge + alarma persistente de Reabasto pendiente
+    setTimeout(() => iniciarReabastoBg(), 1800);
     aplicarPrefsIniciales(Sesion.uid).then(() => {
       // Navegar a vista por defecto de prefs si existe
       const defView = Sesion.prefs?.defaultView;
@@ -345,6 +392,7 @@ Auth.observarSesion(
     detenerNotificaciones();
     detenerChatBg();
     detenerAutBg();
+    detenerReabastoBg();
     _destroyAll();
     document.getElementById("app-shell").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
