@@ -1208,15 +1208,11 @@ function _inicioMes() {
 }
 
 function _fmt(n) {
-  if (n >= 1000000) return "$" + (n/1000000).toFixed(1) + "M";
-  if (n >= 1000)    return "$" + (n/1000).toFixed(1) + "k";
   return "$" + Math.round(n).toLocaleString("es-MX");
 }
 
 function _fmtK(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1) + "M";
-  if (n >= 1000)    return (n/1000).toFixed(0) + "k";
-  return String(Math.round(n));
+  return Math.round(n).toLocaleString("es-MX");
 }
 
 function _norm(v, min, max) {
