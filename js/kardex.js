@@ -217,8 +217,10 @@ function _escuchar() {
       _movimientos = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => {
-          const ta = a._ts?.toDate?.() || new Date(a.timestamp || a.creadoEn || 0);
-          const tb = b._ts?.toDate?.() || new Date(b.timestamp || b.creadoEn || 0);
+          // _ts puede ser Firestore Timestamp (toDate) o número (Date.now())
+          const tsA = a._ts; const tsB = b._ts;
+          const ta = tsA?.toDate?.() ?? (typeof tsA === "number" ? new Date(tsA) : null) ?? new Date(a.timestamp || a.creadoEn || 0);
+          const tb = tsB?.toDate?.() ?? (typeof tsB === "number" ? new Date(tsB) : null) ?? new Date(b.timestamp || b.creadoEn || 0);
           return tb - ta;
         });
       _renderKPIs();

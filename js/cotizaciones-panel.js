@@ -6,7 +6,7 @@ import { cargarNombres, resolverNombre } from './nombres-cache.js';
 import {
   collection, doc, addDoc, updateDoc, setDoc, getDoc,
   onSnapshot, query, orderBy, where, getDocs,
-  serverTimestamp, limit
+  serverTimestamp, limit, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const fmtMXN   = v => Number(v || 0).toLocaleString('es-MX', { style:'currency', currency:'MXN' });
@@ -494,24 +494,32 @@ export const CotizacionesPanelModule = (() => {
     if (!await window.modal?.({ title:'Convertir en pedido',
       message:'¿Convertir esta cotización en un pedido borrador?',
       confirmLabel:'Convertir' })) return;
+
+    // Feedback visual mientras se ejecuta la conversión
+    const convBtns = document.querySelectorAll(`.cot-convertir[data-id="${cotId}"]`);
+    convBtns.forEach(b => { b.disabled = true; b.textContent = '⏳ Creando pedido…'; });
+
     try {
       const cotSnap = await getDoc(doc(db,'cotizaciones',cotId));
       if (!cotSnap.exists()) { window.toast?.('No se encontró la cotización.','error'); return; }
       const c = cotSnap.data();
 
-      // Folio secuencial
+      // Folio secuencial — transacción atómica para evitar duplicados bajo concurrencia
       const cfgRef = doc(db,'configuracion_erp','ULTIMO_FOLIO_PEDIDO_WEB');
-      const cfgSnap = await getDoc(cfgRef);
-      const ultimo = parseInt(cfgSnap.exists() ? cfgSnap.data().valor : '0') || 0;
-      const siguiente = ultimo + 1;
-      const folioPed = 'N10-PED-' + String(siguiente).padStart(5,'0');
-      await setDoc(cfgRef, { valor: String(siguiente) }, { merge:true });
+      let folioPed = '';
+      await runTransaction(db, async tx => {
+        const cfgSnap = await tx.get(cfgRef);
+        const siguiente = (parseInt(cfgSnap.exists() ? cfgSnap.data().valor : '0') || 0) + 1;
+        tx.set(cfgRef, { valor: String(siguiente) }, { merge: true });
+        folioPed = 'N10-PED-' + String(siguiente).padStart(5, '0');
+      });
 
       const pedRef = await addDoc(collection(db,'pedidos'), {
         folio:          folioPed,
         clienteId:      c.clienteId || '',
         clienteNombre:  c.clienteNombre || '',
         ingenieroAlias: c.ingenieroAlias || '',
+        ingenieroUid:   c.ingenieroUid  || '',
         tipoPedido:     'VENTA_RUTA',
         tipoVenta:      'CONTADO',
         status:         'BORRADOR',
@@ -541,7 +549,10 @@ export const CotizacionesPanelModule = (() => {
         confirmLabel:'Ir a Pedidos', cancelLabel:'Quedarme' })) {
         window.navigate?.('pedidos');
       }
-    } catch(e) { window.toast?.('Error al convertir: ' + e.message, 'error'); }
+    } catch(e) {
+      window.toast?.('Error al convertir: ' + e.message, 'error');
+      convBtns.forEach(b => { b.disabled = false; b.textContent = '📋 Convertir en pedido'; });
+    }
   }
 
   // ── UI ────────────────────────────────────────────────────────────────

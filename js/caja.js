@@ -91,7 +91,10 @@ function _html() {
     </div>
 
     <div style="background:var(--surface-2);border-radius:8px;padding:.75rem;margin:.75rem 0">
-      <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem">TOTAL SISTEMA (calculado)</div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem">
+        TOTAL SISTEMA (calculado)
+        <span id="caja-sistema-loading" style="display:none;margin-left:8px;font-size:.72rem;font-weight:400;color:#2563EB">⏳ calculando…</span>
+      </div>
       <div id="caja-f-sistema" style="font-size:1.4rem;font-weight:800;color:#16A34A">$0.00</div>
       <div id="caja-f-sistema-detalle" style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem"></div>
     </div>
@@ -185,7 +188,10 @@ function _bindEvents() {
   });
 
   _container.querySelector("#caja-f-alias").addEventListener("change", async e => {
+    const sistemaEl = _container.querySelector("#caja-sistema-loading");
+    if (sistemaEl) { sistemaEl.style.display = "inline"; }
     await _calcularSistema(e.target.value);
+    if (sistemaEl) { sistemaEl.style.display = "none"; }
     _actualizarTotalesModal();
   });
 

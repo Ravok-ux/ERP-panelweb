@@ -6,7 +6,7 @@ import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import {
   collection, query, orderBy, limit, where, onSnapshot, doc, updateDoc, getDoc,
-  addDoc, getDocs, Timestamp, serverTimestamp, runTransaction
+  addDoc, getDocs, Timestamp, serverTimestamp, runTransaction, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { registrarVentaN10, revertirVentaN10 } from "./comisiones-n10-engine.js";
 import { getIngenieros } from "./erp-cache.js";
@@ -481,6 +481,8 @@ async function _marcarEntregado(pedidoId) {
     window.toast?.("Entrega confirmada", "success");
     document.querySelector(`tr.tr-detalle[data-for="${pedidoId}"]`)?.remove();
     const ped = _pedidos.find(p => p.id === pedidoId);
+    // Descontar stock del almacén por la venta
+    if (ped) _descontarStockVenta({ ...ped, entregadoEn }).catch(e => console.warn("[Stock venta]", e));
     // Registrar comisión N10 en background
     if (ped) _comisionN10Entrega({ ...ped, entregadoEn }).catch(e => console.warn("[N10 comision]", e));
     // Crear remisión de crédito si el pedido es a crédito
@@ -489,6 +491,63 @@ async function _marcarEntregado(pedidoId) {
     console.error("[Pedidos] entregado:", e);
     window.toast?.("Error: " + e.message, "error");
   }
+}
+
+/**
+ * Descuenta el stock del almacén al confirmar entrega de un pedido.
+ * Actualiza productos, inventario y escribe en movimientos_stock (tipo SALIDA·VENTA).
+ */
+async function _descontarStockVenta(ped) {
+  const items = ped.items || ped.productos || [];
+  if (!items.length) return;
+  const ahora = Date.now();
+  const batch = writeBatch(db);
+
+  for (const it of items) {
+    const pid = it.productoId || it.id;
+    if (!pid) continue;
+    const cant = Number(it.cantidad ?? 1);
+    if (cant <= 0) continue;
+
+    const prodRef  = doc(db, "productos", pid);
+    let prodSnap;
+    try { prodSnap = await getDoc(prodRef); } catch(_) { continue; }
+    if (!prodSnap.exists()) continue;
+
+    const pData     = prodSnap.data();
+    const stockAntes = Number(pData.stock ?? pData.stockActual ?? 0);
+    const stockDespues = Math.max(0, stockAntes - cant);
+
+    batch.update(prodRef, { stock: stockDespues, stockActual: stockDespues, _ts: ahora });
+
+    const codigoN10 = pData.codigoN10 || pData.codigo;
+    if (codigoN10) {
+      batch.set(doc(db, "inventario", codigoN10), { stockActual: stockDespues, _ts: ahora }, { merge: true });
+    }
+
+    const movRef = doc(collection(db, "movimientos_stock"));
+    batch.set(movRef, {
+      tipo:           "SALIDA",
+      motivo:         "VENTA",
+      productoId:     pid,
+      nombreProducto: it.nombre || it.descripcion || pData.nombre || "",
+      codigoN10:      codigoN10 || "",
+      cantidad:       cant,
+      costoUnitario:  it.precioUnitario || it.precio || 0,
+      costoTotal:     cant * (it.precioUnitario || it.precio || 0),
+      stockAntes,
+      stockDespues,
+      folioPedido:    ped.folio || "",
+      pedidoId:       ped.id    || "",
+      clienteNombre:  ped.clienteNombre || "",
+      quienRegistro:  Sesion.alias || Sesion.uid,
+      ingenieroAlias: ped.ingenieroAlias || "",
+      ingenieroUid:   ped.ingenieroUid   || "",
+      _ts: ahora,
+    });
+  }
+
+  await batch.commit();
 }
 
 /**

@@ -9,7 +9,7 @@ import { esc, logAudit, norm } from "./app.js";
 import { cargarNombres, resolverNombre } from "./nombres-cache.js";
 import {
   collection, doc, addDoc, getDoc, updateDoc, onSnapshot,
-  query, orderBy, where, getDocs, serverTimestamp, limit, runTransaction
+  query, orderBy, where, getDocs, serverTimestamp, limit, runTransaction, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { crearNotificacion } from "./notificaciones.js";
 import { getClientes } from "./erp-cache.js";
@@ -201,7 +201,7 @@ function _renderTabla(devs) {
   tbody.innerHTML = devs.map(d => {
     const st  = STATUS[d.status] || STATUS.PENDIENTE;
     const acc = puedeAprobar && d.status === "PENDIENTE"
-      ? `<button class="btn-sm btn-green" data-id="${d.id}" data-action="aprobar">✓ Aprobar</button>
+      ? `<button class="btn-sm btn-green" data-id="${d.id}" data-action="aprobar" id="dev-apro-${d.id}">✓ Aprobar</button>
          <button class="btn-sm btn-red" data-id="${d.id}" data-action="rechazar" style="margin-left:4px">✗ Rechazar</button>`
       : `<button class="btn-sm btn-outline" data-id="${d.id}" data-action="ver">Ver</button>`;
 
@@ -353,30 +353,41 @@ async function _guardarSolicitud() {
 // ── Aprobar ──────────────────────────────────────────────────
 async function _aprobarDev(id, dev) {
   if (!await window.modal({ title: "Aprobar devolución", message: `¿Aprobar devolución ${dev?.folio}? Se registrará el ajuste de inventario y se actualizará la cartera del cliente.`, confirmLabel: "Aprobar" })) return;
+
+  const btn = document.getElementById(`dev-apro-${id}`);
+  if (btn) { btn.disabled = true; btn.textContent = "Procesando…"; }
+
   try {
-    const ahora = Date.now();
+    const ahora  = Date.now();
+    const batch  = writeBatch(db);
 
     // 1. Marcar devolución como APROBADA
-    await updateDoc(doc(db, "devoluciones", id), {
+    batch.update(doc(db, "devoluciones", id), {
       status:        "APROBADA",
       aprobadaPor:   Sesion.alias,
       aprobadaEn:    serverTimestamp(),
       aprobadaEn_ts: ahora,
     });
 
-    // 2. Registrar movimiento de stock tipo DEVOLUCION
-    await addDoc(collection(db, "movimientos_stock"), {
-      tipo:            "DEVOLUCION",
-      motivo:          `Devolución aprobada ${dev?.folio} · ${dev?.motivo || ""}`,
-      monto:           dev?.monto || 0,
-      folioDev:        dev?.folio,
-      clienteNombre:   dev?.clienteNombre,
-      quienRegistro:   Sesion.alias,
-      _ts:             serverTimestamp(),
-      timestamp:       ahora,
+    // 2. Registrar movimiento en kardex (tipo DEVOLUCION)
+    const movRef = doc(collection(db, "movimientos_stock"));
+    batch.set(movRef, {
+      tipo:           "DEVOLUCION",
+      motivo:         `${dev?.motivo || "Devolución"} · ${dev?.folio}`,
+      folioDev:       dev?.folio || "",
+      folioRef:       dev?.folioRef || "",
+      clienteNombre:  dev?.clienteNombre || "",
+      ingenieroAlias: dev?.ingenieroAlias || "",
+      ingenieroUid:   dev?.ingenieroUid  || "",
+      productosTexto: dev?.productos     || "",  // texto libre capturado en la solicitud
+      monto:          dev?.monto || 0,
+      quienRegistro:  Sesion.alias,
+      _ts:            ahora,
     });
 
-    // 3. Ajustar cartera del cliente si se tiene clienteId
+    await batch.commit();
+
+    // 3. Ajustar cartera del cliente
     if (dev?.clienteId) {
       const clienteRef  = doc(db, "clientes", dev.clienteId);
       const clienteSnap = await getDoc(clienteRef);
@@ -401,6 +412,7 @@ async function _aprobarDev(id, dev) {
     });
   } catch (e) {
     window.toast?.("Error: " + e.message, "error");
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Aprobar"; }
   }
 }
 

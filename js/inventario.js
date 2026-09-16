@@ -458,7 +458,7 @@ async function _montarStock() {
             <div style="font-size:10px;color:#64748B;margin-top:1px">
               ${(p.codigoN10||p.codigo) ? `<span style="font-family:monospace">${esc(p.codigoN10||p.codigo)}</span>` : ""}
               ${p.categoria ? ` · ${esc(p.categoria)}` : ""}
-              ${p.precioBase ? ` · $${Number(p.precioBase).toLocaleString("es-MX")}` : ""}
+              ${(p.precioBase || p.precio_base) ? ` · $${Number(p.precioBase ?? p.precio_base).toLocaleString("es-MX")}` : ""}
             </div>
           </div>
         </div>`;
