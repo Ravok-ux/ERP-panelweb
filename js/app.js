@@ -257,12 +257,40 @@ let _unsubscribers = [];
 
 // ── Badge persistente de Autorizaciones ───────────────────────
 let _autUnsub = null;
-const _autLogueados = new Set(); // IDs ya escritos en log_actividades esta sesión
+const _autLogueados = new Set();
+
+// IDs ya logueados en sesiones anteriores (persiste entre recargas)
+function _autGetPersisted() {
+  try { return new Set(JSON.parse(localStorage.getItem("aut_logged") || "[]")); } catch { return new Set(); }
+}
+function _autPersist(id) {
+  try {
+    const s = _autGetPersisted(); s.add(id);
+    localStorage.setItem("aut_logged", JSON.stringify([...s].slice(-200)));
+  } catch {}
+}
+
+function _autLogPedido(addDoc, colRef, id, p) {
+  if (_autLogueados.has(id)) return;
+  if (_autGetPersisted().has(id)) { _autLogueados.add(id); return; }
+  _autLogueados.add(id);
+  _autPersist(id);
+  addDoc(colRef, {
+    tipo:      "PEDIDO_PENDIENTE_AUTH",
+    folio:     p.folio || id,
+    cliente:   p.clienteNombre || p.cliente?.nombre || (typeof p.cliente === "string" ? p.cliente : "–"),
+    alias:     p.vendedor || p.ingeniero || p.alias || "–",
+    uid:       p.uid || null,
+    motivo:    p.motivoBloqueo || "CREDITO",
+    timestamp: Date.now(),
+  }).catch(e => console.warn("[AutBg] log error", e));
+}
 
 function iniciarAutBg() {
   if (_autUnsub) return;
   import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(
     ({ collection, query, where, onSnapshot, addDoc }) => {
+      const logCol = collection(db, "log_actividades");
       const q = query(collection(db, "pedidos"), where("status", "==", "PENDIENTE_AUTORIZACION"));
       let primerDisparo = true;
 
@@ -276,30 +304,17 @@ function iniciarAutBg() {
           badge.classList.toggle("aut-alarm", n > 0);
         }
 
-        // ── Log feed (solo cambios reales, no carga inicial) ──
         if (primerDisparo) {
-          // En la carga inicial solo marcamos los IDs existentes, no los logueamos
-          snap.docs.forEach(d => _autLogueados.add(d.id));
+          // Primera carga: escribir evento para los que ya están pendientes y no se han logueado antes
           primerDisparo = false;
+          snap.docs.forEach(d => _autLogPedido(addDoc, logCol, d.id, d.data()));
           return;
         }
 
-        // Pedidos que acaban de aparecer en el snapshot (docChanges tipo "added")
+        // Cambios posteriores: solo los "added" nuevos
         snap.docChanges().forEach(change => {
           if (change.type !== "added") return;
-          const id = change.doc.id;
-          if (_autLogueados.has(id)) return;
-          _autLogueados.add(id);
-          const p = change.doc.data();
-          addDoc(collection(db, "log_actividades"), {
-            tipo:      "PEDIDO_PENDIENTE_AUTH",
-            folio:     p.folio || id,
-            cliente:   p.clienteNombre || p.cliente?.nombre || p.cliente || "–",
-            alias:     p.vendedor || p.ingeniero || p.alias || "–",
-            uid:       p.uid || null,
-            motivo:    p.motivoBloqueo || "CREDITO",
-            timestamp: Date.now(),
-          }).catch(e => console.warn("[AutBg] log error", e));
+          _autLogPedido(addDoc, logCol, change.doc.id, change.doc.data());
         });
       }, err => console.warn("[AutBg]", err));
     }
