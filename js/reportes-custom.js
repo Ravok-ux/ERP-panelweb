@@ -3,6 +3,7 @@ import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
 import { norm } from "./app.js";
 import { enriquecerRemisiones } from "./intereses-engine.js";
+import { resolverNombre, cargarNombres } from "./nombres-cache.js";
 import { exportarExcel } from "./excel-utils.js";
 import {
   collection, query, where, orderBy, getDocs,
@@ -19,7 +20,7 @@ const FUENTES = {
     campos: {
       folio:          { label: "Folio",       tipo: "texto"  },
       clienteNombre:  { label: "Cliente",     tipo: "texto"  },
-      ingenieroAlias: { label: "Ingeniero",   tipo: "texto"  },
+      ingenieroAlias: { label: "Ingeniero",   tipo: "ingeniero" },
       status:         { label: "Status",      tipo: "status" },
       total:          { label: "Total",       tipo: "moneda" },
       tipoPedido:     { label: "Tipo pedido", tipo: "texto"  },
@@ -112,7 +113,7 @@ const FUENTES = {
       deudaRestante:   { label: "Deuda restante",   tipo: "moneda" },
       status:          { label: "Status",           tipo: "status" },
       diasAtraso:      { label: "Días atraso",      tipo: "numero" },
-      ingenieroAlias:  { label: "Ingeniero",        tipo: "texto"  },
+      ingenieroAlias:  { label: "Ingeniero",        tipo: "ingeniero" },
       fechaVencimiento:{ label: "Vencimiento",      tipo: "fecha"  },
     },
     filtros: ["status", "ingenieroAlias", "clienteNombre"],
@@ -130,6 +131,7 @@ let _resultados   = [];
 export function mount(container) {
   _container = container;
   _container.innerHTML = _html();
+  cargarNombres();
   _bindEvents();
 }
 export function destroy() {}
@@ -557,6 +559,8 @@ function _renderCelda(val, tipo) {
       return `<td style="font-variant-numeric:tabular-nums;text-align:right">${val != null ? Number(val).toLocaleString("es-MX") : "—"}</td>`;
     case "status":
       return `<td>${_badgeStatus(String(val ?? ""))}</td>`;
+    case "ingeniero":
+      return `<td>${val != null && val !== "" ? resolverNombre(String(val)) || String(val) : "—"}</td>`;
     default:
       return `<td>${val != null && val !== "" ? String(val) : "—"}</td>`;
   }
