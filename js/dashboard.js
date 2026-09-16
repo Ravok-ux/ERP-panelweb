@@ -442,7 +442,17 @@ function _html() {
         <div class="rp-feed-title">
           <span class="live-dot"></span> Feed en vivo
         </div>
-        <span class="rp-filter">Filtrar ▾</span>
+        <div class="rp-filter-wrap" id="rp-filter-wrap">
+          <span class="rp-filter" id="rp-filter-btn">Todos ▾</span>
+          <div class="rp-filter-menu hidden" id="rp-filter-menu">
+            <div class="rp-filter-opt" data-f="">Todos</div>
+            <div class="rp-filter-opt" data-f="PEDIDO_PENDIENTE_AUTH">🚨 Autorizaciones</div>
+            <div class="rp-filter-opt" data-f="PEDIDO_CONFIRMADO,PEDIDO_EN_RUTA,PEDIDO_ENTREGADO,PEDIDO_CANCELADO">🛒 Pedidos</div>
+            <div class="rp-filter-opt" data-f="ABONO_REGISTRADO,REMISION_CREADA">💳 Cobranza</div>
+            <div class="rp-filter-opt" data-f="VISITA_REGISTRADA">📍 Visitas</div>
+            <div class="rp-filter-opt" data-f="JORNADA_INICIO,JORNADA_FIN">🚀 Jornadas</div>
+          </div>
+        </div>
       </div>
       <div class="rp-feed" id="dash-feed">
         <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:11px">Cargando…</div>
@@ -1039,10 +1049,12 @@ function _escucharUbicaciones() {
 
     pinsEl.innerHTML = "";
     const bounds = { minLat: 28, maxLat: 32, minLng: -112, maxLng: -107 };
+    let activos = 0;
 
     snap.forEach(d => {
       const u = d.data();
       if (!u.lat || !u.lng || !estaEnJornadaHoy(u)) return;
+      activos++;
 
       const x = _norm(u.lng, bounds.minLng, bounds.maxLng) * 100;
       const y = (1 - _norm(u.lat, bounds.minLat, bounds.maxLat)) * 100;
@@ -1053,6 +1065,20 @@ function _escucharUbicaciones() {
       pin.title = u.alias || "Ingeniero";
       pinsEl.appendChild(pin);
     });
+
+    // Mensaje cuando no hay ingenieros activos
+    let empty = document.getElementById("rp-map-empty");
+    if (activos === 0) {
+      if (!empty) {
+        empty = document.createElement("div");
+        empty.id = "rp-map-empty";
+        empty.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;pointer-events:none";
+        empty.innerHTML = `<span style="font-size:22px">📍</span><span style="font-size:10px;color:var(--text-muted);font-weight:600">Sin ingenieros en campo</span>`;
+        pinsEl.parentElement.appendChild(empty);
+      }
+    } else if (empty) {
+      empty.remove();
+    }
   }, _logErr("ubicaciones-map"));
 }
 
@@ -1106,6 +1132,67 @@ function _escucharCharts() {
   }, _logErr("charts-s4"));
 }
 
+let _dashFeedDocs = [];
+let _dashFeedFiltro = "";
+
+function _renderDashFeed() {
+  const el = document.getElementById("dash-feed");
+  if (!el) return;
+
+  const tipos = _dashFeedFiltro ? _dashFeedFiltro.split(",") : null;
+  const docs  = tipos ? _dashFeedDocs.filter(d => tipos.includes(d.data().tipo)) : _dashFeedDocs;
+
+  if (docs.length === 0) {
+    el.innerHTML = `<div class="empty-state" style="padding:20px">
+      <div class="empty-state-icon">⚡</div>
+      <div class="empty-state-title">Sin actividad reciente</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = docs.map(d => {
+    const a   = d.data();
+    const cfg = _eventConfig(a.tipo);
+    const ts  = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
+    const isAlarm = a.tipo === "PEDIDO_PENDIENTE_AUTH";
+    const extraStyle = isAlarm
+      ? `background:#EF444412;border-width:2px;animation:dash-alarm 1.4s ease-in-out infinite`
+      : "";
+    return `
+      <div class="feed-event" style="border-color:${cfg.color};${extraStyle}">
+        <div class="ev-icon">${cfg.icon}</div>
+        <div class="ev-body">
+          <div class="ev-who" style="${isAlarm ? "color:#EF4444;font-weight:800" : ""}">${isAlarm ? "AUTORIZACIÓN" : (esc(a.alias) || "–")}</div>
+          <div class="ev-what">${esc(_resumenActividad(a))}</div>
+          <div class="ev-time">${ts}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function _bindFiltroFeed() {
+  const btn  = document.getElementById("rp-filter-btn");
+  const menu = document.getElementById("rp-filter-menu");
+  if (!btn || !menu) return;
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
+
+  menu.querySelectorAll(".rp-filter-opt").forEach(opt => {
+    opt.addEventListener("click", () => {
+      _dashFeedFiltro = opt.dataset.f || "";
+      btn.textContent = (opt.textContent.trim() || "Todos") + " ▾";
+      menu.classList.add("hidden");
+      menu.querySelectorAll(".rp-filter-opt").forEach(o => o.classList.toggle("active", o === opt));
+      _renderDashFeed();
+    });
+  });
+
+  document.addEventListener("click", () => menu.classList.add("hidden"));
+}
+
 function _escucharFeedDash() {
   // Solo eventos de hoy para el mini-feed y el badge
   const medianoches = (() => { const m = new Date(); m.setHours(0,0,0,0); return m.getTime(); })();
@@ -1114,39 +1201,14 @@ function _escucharFeedDash() {
     collection(db, "log_actividades"),
     where("timestamp", ">=", tsHoy),
     orderBy("timestamp", "desc"),
-    limit(20)
+    limit(50)
   );
 
+  _bindFiltroFeed();
+
   return onSnapshot(feedQ, snap => {
-    const el = document.getElementById("dash-feed");
-    if (!el) return;
-
-    if (snap.empty) {
-      el.innerHTML = `<div class="empty-state" style="padding:20px">
-        <div class="empty-state-icon">⚡</div>
-        <div class="empty-state-title">Sin actividad reciente</div>
-      </div>`;
-      return;
-    }
-
-    el.innerHTML = snap.docs.map(d => {
-      const a   = d.data();
-      const cfg = _eventConfig(a.tipo);
-      const ts  = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
-      const isAlarm = a.tipo === "PEDIDO_PENDIENTE_AUTH";
-      const extraStyle = isAlarm
-        ? `background:#EF444412;border-width:2px;animation:dash-alarm 1.4s ease-in-out infinite`
-        : "";
-      return `
-        <div class="feed-event" style="border-color:${cfg.color};${extraStyle}">
-          <div class="ev-icon">${cfg.icon}</div>
-          <div class="ev-body">
-            <div class="ev-who" style="${isAlarm ? "color:#EF4444;font-weight:800" : ""}">${isAlarm ? "AUTORIZACIÓN" : (esc(a.alias) || "–")}</div>
-            <div class="ev-what">${esc(_resumenActividad(a))}</div>
-            <div class="ev-time">${ts}</div>
-          </div>
-        </div>`;
-    }).join("");
+    _dashFeedDocs = snap.docs;
+    _renderDashFeed();
 
     // Badge: sólo eventos más nuevos que la última vez que el usuario abrió el Feed
     const badge = document.getElementById("feed-badge");
