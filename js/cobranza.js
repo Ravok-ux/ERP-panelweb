@@ -206,22 +206,26 @@ function _aplanarAbonos() {
       (r.abonosConciliados ?? []).map(c => c.idx)
     );
     abonos.forEach((ab, idx) => {
-      // Reconstruir estado de la nota justo DESPUÉS de este abono
-      const totalAbonado = abonos.slice(0, idx + 1).reduce((s, a) => s + a.monto, 0);
-      const notaConAbono = { ...r, totalAbonado };
-      const fechaAbono   = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
-      const calc         = calcularRemision(notaConAbono, fechaAbono);
+      const fechaAbono = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
 
-      // Cuánto del abono fue a capital vs interés.
-      // interesGenerado es el total acumulado desde el origen hasta la fecha del abono.
-      // Restamos el interés ya cobrado en abonos anteriores para obtener solo el incremental.
-      const interesEnFecha = calc.interesGenerado;
+      // Calcular interés ANTES de este abono (usando solo abonos previos)
+      // para que saldoCapital refleje el estado real en esa fecha
+      const totalAbonadoAntes = abonos.slice(0, idx).reduce((s, a) => s + a.monto, 0);
+      const notaAntes = { ...r, totalAbonado: totalAbonadoAntes };
+      const calcAntes = calcularRemision(notaAntes, fechaAbono);
+
+      // interesGenerado acumulado hasta esta fecha menos lo ya cobrado en abonos previos
       const interesYaCobrado = rows
         .filter(row => row.remisionId === r.id)
         .reduce((s, row) => s + row.interesAbono, 0);
-      const interesDisponible = Math.max(0, interesEnFecha - interesYaCobrado);
-      const interesAbono   = Math.min(ab.monto, interesDisponible);
-      const capitalAbono   = Math.max(0, ab.monto - interesAbono);
+      const interesDisponible = Math.max(0, calcAntes.interesGenerado - interesYaCobrado);
+      const interesAbono  = Math.min(ab.monto, interesDisponible);
+      const capitalAbono  = Math.max(0, ab.monto - interesAbono);
+
+      // Estado DESPUÉS del abono para deudaRestante
+      const totalAbonado = totalAbonadoAntes + ab.monto;
+      const notaConAbono = { ...r, totalAbonado };
+      const calc         = calcularRemision(notaConAbono, fechaAbono);
 
       rows.push({
         remisionId:    r.id,
