@@ -1,8 +1,8 @@
 import { db } from './firebase-config.js';
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, getDocs, query, where, orderBy, limit,
-  serverTimestamp, Timestamp
+  onSnapshot, getDocs, getDoc, query, where, orderBy, limit,
+  serverTimestamp, Timestamp, increment, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { Sesion } from './auth.js';
 
@@ -253,6 +253,22 @@ const FIN_CSS = `
 .fin-diff-ok  { color: #16a34a; font-weight: 700; }
 .fin-diff-err { color: #dc2626; font-weight: 700; }
 `;
+
+// ─── Actualiza saldos en cuentas_contables tras guardar/borrar pólizas ───────
+async function _glAplicarSaldos(movimientosAdd = [], movimientosRevert = []) {
+  const batch = writeBatch(db);
+  movimientosAdd.forEach(m => {
+    if (!m.cuentaId) return;
+    const delta = (m.cargo || 0) - (m.abono || 0);
+    if (delta !== 0) batch.update(doc(db, 'cuentas_contables', m.cuentaId), { saldo: increment(delta) });
+  });
+  movimientosRevert.forEach(m => {
+    if (!m.cuentaId) return;
+    const delta = (m.cargo || 0) - (m.abono || 0);
+    if (delta !== 0) batch.update(doc(db, 'cuentas_contables', m.cuentaId), { saldo: increment(-delta) });
+  });
+  await batch.commit();
+}
 
 // ─── mount / destroy ─────────────────────────────────────────────────────────
 export const FinanzasModule = {
@@ -542,7 +558,10 @@ function _glCargarPolizas() {
     window._glVerPoliza  = (id) => _glModalPoliza(polizas.find(p=>p.id===id), true);
     window._glDelPoliza  = (id) => {
       window.modal('¿Eliminar póliza?', async () => {
+        const snap = await getDoc(doc(db,'polizas',id));
+        const movs = snap.exists() ? (snap.data().movimientos || []) : [];
         await deleteDoc(doc(db,'polizas',id));
+        await _glAplicarSaldos([], movs);
       });
     };
   }, e => { console.error('[finanzas] polizas:', e); _showError('gl-polizas-lista', e.message); });
@@ -720,8 +739,16 @@ function _glModalPoliza(poliza, soloVer=false) {
       concepto:   el('mp-concepto').value.trim(),
       movimientos, total: totalCargos, usuario: Sesion.alias||Sesion.uid||'',
     };
-    if (id) await updateDoc(doc(db,'polizas',id), data);
-    else await addDoc(collection(db,'polizas'), {...data, creadoEn:serverTimestamp()});
+    if (id) {
+      // Revertir movimientos viejos antes de aplicar los nuevos
+      const viejaSnap = await getDoc(doc(db,'polizas',id));
+      const viejosMovs = viejaSnap.exists() ? (viejaSnap.data().movimientos || []) : [];
+      await updateDoc(doc(db,'polizas',id), data);
+      await _glAplicarSaldos(movimientos, viejosMovs);
+    } else {
+      await addDoc(collection(db,'polizas'), {...data, creadoEn:serverTimestamp()});
+      await _glAplicarSaldos(movimientos);
+    }
     el('modal-poliza').remove();
   };
 }
@@ -1359,9 +1386,9 @@ function _montarPresupuesto() {
 function _presCargar() {
   if (_unsubPresupuesto) { _unsubPresupuesto(); _unsubPresupuesto = null; }
   const mes = el('pres-mes')?.value||hoy().slice(0,7);
-  const q   = query(collection(db,'presupuestos'), where('mes','==',mes), orderBy('categoria'));
+  const q   = query(collection(db,'presupuestos'), where('mes','==',mes));
   const unsub = onSnapshot(q,
-    snap => _presRenderizar(snap.docs.map(d=>({id:d.id,...d.data()})), mes),
+    snap => _presRenderizar(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')), mes),
     e => { console.error('[finanzas] presupuestos:', e); _showError('pres-tabla-wrap', e.message); });
   _unsubPresupuesto = unsub;
   _unsubs.push(unsub);
