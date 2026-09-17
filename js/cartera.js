@@ -247,17 +247,26 @@ function _htmlConfig() {
   return `
   <div style="max-width:640px;display:flex;flex-direction:column;gap:16px">
     <div class="cfg-card">
-      <div style="font-weight:700;margin-bottom:14px;font-size:14px">🚦 Umbrales del semáforo (días vencidos)</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
-        <label style="font-size:12px;color:#9CA3AF;display:flex;flex-direction:column;gap:4px">
-          🟢 Verde hasta <input id="cfg-verde" type="number" class="cfg-input" value="${s.verde??15}" min="1">
-        </label>
-        <label style="font-size:12px;color:#9CA3AF;display:flex;flex-direction:column;gap:4px">
-          🟡 Amarillo hasta <input id="cfg-amarillo" type="number" class="cfg-input" value="${s.amarillo??30}" min="1">
-        </label>
-        <label style="font-size:12px;color:#9CA3AF;display:flex;flex-direction:column;gap:4px">
-          🟠 Naranja hasta <input id="cfg-naranja" type="number" class="cfg-input" value="${s.naranja??60}" min="1">
-        </label>
+      <div style="font-weight:700;margin-bottom:14px;font-size:14px">🚦 Niveles del semáforo (días vencidos)</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        ${[
+          { dot:"#22C55E", label:"Al corriente",     rango:"0 días vencidos"   },
+          { dot:"#86EFAC", label:"Por vencer",        rango:"1 – 14 días"        },
+          { dot:"#EAB308", label:"Leve",              rango:"15 – 28 días"       },
+          { dot:"#3B82F6", label:"Moderado",          rango:"29 – 42 días"       },
+          { dot:"#F97316", label:"Grave",             rango:"43 – 60 días"       },
+          { dot:"#EF4444", label:"Crítico",           rango:"más de 60 días"     },
+        ].map(n => `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
+            border-radius:7px;background:var(--surface-2);border:1px solid var(--border)">
+            <span style="width:11px;height:11px;border-radius:50%;background:${n.dot};flex-shrink:0;display:inline-block"></span>
+            <span style="font-weight:700;font-size:13px;min-width:110px">${n.label}</span>
+            <span style="font-size:12px;color:#9CA3AF">${n.rango}</span>
+          </div>`).join("")}
+      </div>
+      <div style="font-size:11px;color:#6B7280;margin-bottom:12px;padding:8px 10px;
+        background:var(--surface-2);border-radius:6px;border:1px solid var(--border)">
+        ℹ Los umbrales están definidos en el motor de intereses y se aplican uniformemente a todo el sistema.
       </div>
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
         <input type="checkbox" id="cfg-bloqueo" ${_config.bloqueoAutoActivo!==false?"checked":""}>
@@ -542,9 +551,6 @@ async function _rebloqueaCliente(clienteId) {
 
 // ── Config: guardar ───────────────────────────────────────────
 async function _guardarConfig(scope) {
-  const verde    = parseInt(scope.querySelector("#cfg-verde")?.value) || 15;
-  const amarillo = parseInt(scope.querySelector("#cfg-amarillo")?.value) || 30;
-  const naranja  = parseInt(scope.querySelector("#cfg-naranja")?.value) || 60;
   const bloqueo  = scope.querySelector("#cfg-bloqueo")?.checked !== false;
   const horasRaw = (scope.querySelector("#cfg-horas")?.value || "4,8,24")
     .split(",").map(h => parseInt(h.trim())).filter(h => h > 0);
@@ -554,7 +560,7 @@ async function _guardarConfig(scope) {
     dias:  parseInt(tr.querySelector("[data-fk='dias']")?.value) || 7
   })).filter(f => f.label);
 
-  const nuevo = { semaforo:{ verde, amarillo, naranja }, bloqueoAutoActivo:bloqueo,
+  const nuevo = { bloqueoAutoActivo:bloqueo,
     horasDesbloqueo:horasRaw, frecuencias,
     actualizadoPor:Sesion.alias, actualizadoEn:serverTimestamp() };
   try {

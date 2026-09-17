@@ -6,7 +6,7 @@ import { Sesion } from "./auth.js";
 import { esc, logAudit, norm } from "./app.js";
 import {
   collection, query, orderBy, onSnapshot, where,
-  doc, updateDoc, addDoc, serverTimestamp, limit
+  doc, getDoc, updateDoc, addDoc, serverTimestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const toDate = ts => {
@@ -34,10 +34,11 @@ const diasHasta = ts => {
 let _unsubSol  = null;
 let _unsubCli  = null;
 let _unsubHist = null;
-let _solicitudes = [];
-let _clientes    = [];
-let _historial   = [];
-let _tabActiva   = "calendario";
+let _solicitudes  = [];
+let _clientes     = [];
+let _historial    = [];
+let _frecuencias  = []; // cargado desde configuracion/cartera
+let _tabActiva    = "calendario";
 let _busqueda    = "";
 let _filtroFreq  = "TODOS";
 let _histBusq    = "";
@@ -51,11 +52,16 @@ const _puedeAutorizar = () =>
 export const VisitasModule = {
   mount(container) {
     _busqueda = ""; _filtroFreq = "TODOS"; _tabActiva = "calendario"; _histBusq = "";
-    container.innerHTML = _html();
-    _bindUI(container);
-    _escucharSolicitudes();
-    _escucharClientes();
-    _escucharHistorial();
+    // Cargar frecuencias configuradas antes de renderizar
+    getDoc(doc(db, "configuracion", "cartera")).then(snap => {
+      _frecuencias = snap.exists() ? (snap.data().frecuencias || []) : [];
+    }).catch(() => { _frecuencias = []; }).finally(() => {
+      container.innerHTML = _html();
+      _bindUI(container);
+      _escucharSolicitudes();
+      _escucharClientes();
+      _escucharHistorial();
+    });
   },
   destroy() {
     _unsubSol?.();  _unsubSol  = null;
@@ -168,6 +174,13 @@ function _html() {
                 font-size:11.5px;font-weight:${v==="TODOS"?"700":"600"};
                 color:${c};cursor:pointer;transition:all .15s">
               ${l}
+            </button>`).join("")}
+          ${_frecuencias.map(f => `
+            <button class="vis-filtro-btn" data-freq="FREQ:${esc(f.label)}"
+              style="padding:5px 12px;border-radius:20px;border:1.5px solid #7C3AED30;
+                background:transparent;font-size:11.5px;font-weight:600;
+                color:#7C3AED;cursor:pointer;transition:all .15s">
+              📅 ${esc(f.label)}
             </button>`).join("")}
         </div>
       </div>
@@ -311,6 +324,10 @@ function _renderCalendario() {
   let lista = _clientes.filter(c => {
     if (q && !norm(c.nombre).includes(q) && !norm(c.ingeniero || c.ingenieroAlias || c.vendedor || "").includes(q)) return false;
     const pv = toDate(c.proximaVisita);
+    if (_filtroFreq.startsWith("FREQ:")) {
+      const label = _filtroFreq.slice(5);
+      return (c.frecuenciaVisitaLabel || c.frecuenciaVisita || "") === label;
+    }
     switch (_filtroFreq) {
       case "VENCIDAS":    return pv && pv < hoy;
       case "HOY":         return pv && pv >= hoy && pv < new Date(hoy.getTime()+86400000);

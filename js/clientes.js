@@ -1316,14 +1316,18 @@ async function _abrirFormCliente(clienteId = null) {
   const body  = document.getElementById("cli-form-body");
   if (!modal || !body) return;
 
-  // Cargar solo ingenieros (rol estrictamente INGENIERO)
+  // Cargar ingenieros y frecuencias de visita en paralelo
+  let _frecuencias = [];
   try {
-    const snap = await getDocs(query(collection(db, "usuarios"),
-      where("rol", "==", "INGENIERO")));
-    _ingenierosList = snap.docs
+    const [snapU, snapCfg] = await Promise.all([
+      getDocs(query(collection(db, "usuarios"), where("rol", "==", "INGENIERO"))),
+      getDoc(doc(db, "configuracion", "cartera")),
+    ]);
+    _ingenierosList = snapU.docs
       .filter(d => d.data().activo !== false)
       .map(d => d.data().alias || d.id)
       .filter(Boolean).sort();
+    _frecuencias = snapCfg.exists() ? (snapCfg.data().frecuencias || []) : [];
   } catch { _ingenierosList = []; }
 
   let c = clienteId ? _clientes.find(x => x.id === clienteId) ?? {} : {};
@@ -1460,6 +1464,15 @@ async function _abrirFormCliente(clienteId = null) {
         <div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px;background:var(--surface-2);
           border:1px solid var(--border);border-radius:6px">${diasChecks}</div>
       </div>
+      ${_frecuencias.length ? _field("Frecuencia de visita", `
+        <select id="clf-frecuencia" style="${_inputStyle()}">
+          <option value="">— Sin categoría —</option>
+          ${_frecuencias.map((f, i) =>
+            `<option value="${i}" data-label="${esc(f.label)}" data-dias="${f.dias}"
+              ${(c.frecuenciaVisitaId === String(i) || c.frecuenciaVisitaLabel === f.label) ? "selected" : ""}>
+              ${esc(f.label)} (cada ${f.dias} días)
+            </option>`).join("")}
+        </select>`) : ""}
 
       <!-- Cliente compartido -->
       ${_seccion("🔗 Cliente compartido entre ingenieros")}
@@ -1644,6 +1657,21 @@ async function _guardarFormCliente(clienteId) {
       notas:         document.getElementById("clf-notas")?.value?.trim() || null,
       activo: true,
     };
+
+    // Frecuencia de visita (si existe el selector)
+    const freqSel = document.getElementById("clf-frecuencia");
+    if (freqSel) {
+      const opt = freqSel.options[freqSel.selectedIndex];
+      if (opt && opt.value !== "") {
+        payload.frecuenciaVisitaId    = opt.value;
+        payload.frecuenciaVisitaLabel = opt.dataset.label || opt.text.split(" (")[0].trim();
+        payload.frecuenciaVisitaDias  = parseInt(opt.dataset.dias) || null;
+      } else {
+        payload.frecuenciaVisitaId    = null;
+        payload.frecuenciaVisitaLabel = null;
+        payload.frecuenciaVisitaDias  = null;
+      }
+    }
     // Limpiar nulos para no sobreescribir con null en update
     Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k]; });
 
