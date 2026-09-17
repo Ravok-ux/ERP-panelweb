@@ -124,6 +124,10 @@ export const SegmentoPrecioModule = (() => {
               background:var(--surface);color:var(--text-primary);font-size:12px;min-width:180px">
             <option value="">— Seleccionar segmento —</option>
           </select>
+          <input id="buscarMatriz" type="text" placeholder="Buscar producto…" autocomplete="off"
+            style="flex:1;min-width:180px;max-width:280px;padding:8px 12px;border-radius:8px;
+              border:1px solid var(--border);background:var(--surface);color:var(--text-primary);
+              font-size:12px">
           <button id="btnGuardarMatriz"
             style="padding:8px 18px;border-radius:8px;border:none;background:#1565C0;
               color:#fff;font-size:12px;font-weight:700;cursor:pointer">
@@ -134,8 +138,11 @@ export const SegmentoPrecioModule = (() => {
           border:1px solid var(--border)">
           <table class="matriz-table" id="tablaMatriz">
             <thead><tr>
-              <th>ID</th><th>Producto</th><th>Precio base</th>
-              <th>Precio segmento</th><th>Variación</th><th>Activo</th>
+              <th>ID</th><th>Producto</th>
+              <th style="text-align:center">Precio base</th>
+              <th style="text-align:center">Precio segmento</th>
+              <th style="text-align:center">Variación</th>
+              <th style="text-align:center">Activo</th>
             </tr></thead>
             <tbody id="tbodyMatriz">
               <tr><td colspan="6" style="padding:30px;text-align:center;color:#9CA3AF">
@@ -151,10 +158,16 @@ export const SegmentoPrecioModule = (() => {
           <select id="selectSegmentoCliente"
             style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);
               background:var(--surface);color:var(--text-primary);font-size:12px;min-width:180px">
-            <option value="">— Seleccionar segmento —</option>
+            <option value="">— Ver segmento —</option>
           </select>
-          <input id="seg-cli-buscar" type="text" placeholder="Buscar cliente…" class="cli-seg-search"
-            style="flex:1;margin-bottom:0">
+          <div style="position:relative;flex:1;min-width:220px">
+            <input id="seg-cli-buscar" type="text" placeholder="Buscar cliente para asignar…" autocomplete="off"
+              style="width:100%;padding:8px 32px 8px 12px;border-radius:8px;border:1px solid var(--border);
+                background:var(--surface);color:var(--text-primary);font-size:12px;box-sizing:border-box">
+            <div id="seg-cli-dd" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;
+              background:var(--surface);border:1px solid var(--border);border-radius:8px;
+              box-shadow:0 6px 20px rgba(0,0,0,.25);max-height:240px;overflow-y:auto;margin-top:3px"></div>
+          </div>
         </div>
         <div style="overflow:auto;max-height:calc(100vh - 280px);border-radius:10px;
           border:1px solid var(--border)">
@@ -273,7 +286,7 @@ export const SegmentoPrecioModule = (() => {
           </div>
           <div class="seg-card-actions">
             <button class="btn-edit" data-id="${esc(d.id)}">✏️ Editar</button>
-            <button class="btn-precios seg-card-actions" data-id="${esc(d.id)}">💲 Precios</button>
+            <button class="btn-precios" data-id="${esc(d.id)}">💲 Precios</button>
             <button class="btn-del" data-id="${esc(d.id)}">🗑️</button>
           </div>
         </div>
@@ -403,6 +416,15 @@ export const SegmentoPrecioModule = (() => {
       else container.querySelector('#tbodyMatriz').innerHTML = '';
     });
 
+    container.querySelector('#buscarMatriz').addEventListener('input', e => {
+      const q = e.target.value.trim().toLowerCase();
+      container.querySelectorAll('#tbodyMatriz tr[data-idpretoriano]').forEach(tr => {
+        const nombre = (tr.dataset.nombre || '').toLowerCase();
+        const id     = (tr.dataset.idpretoriano || '').toLowerCase();
+        tr.style.display = (!q || nombre.includes(q) || id.includes(q)) ? '' : 'none';
+      });
+    });
+
     container.querySelector('#btnGuardarMatriz').addEventListener('click', async () => {
       if (!_segmentoActivo) { window.toast?.('Selecciona un segmento.', 'warn'); return; }
       await _guardarMatriz(container, _segmentoActivo);
@@ -411,14 +433,12 @@ export const SegmentoPrecioModule = (() => {
 
   async function _cargarMatriz(container, segmentoId) {
     const tbody = container.querySelector('#tbodyMatriz');
-    tbody.innerHTML = '<tr><td colspan="5">Cargando productos…</td></tr>';
-
+    tbody.innerHTML = '<tr><td colspan="6">Cargando productos…</td></tr>';
     try {
       const [productosSnap, preciosSnap] = await Promise.all([
         getDocs(query(collection(db, 'productos'), orderBy('nombre'))),
         getDocs(query(collection(db, 'precios_segmento'), where('segmentoId', '==', segmentoId)))
       ]);
-
       const preciosMap = {};
       preciosSnap.forEach(d => {
         const p = d.data();
@@ -426,16 +446,17 @@ export const SegmentoPrecioModule = (() => {
       });
 
       if (!productosSnap.docs.length) {
-        tbody.innerHTML = '<tr><td colspan="5">Sin productos en catálogo.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6">Sin productos en catálogo.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = productosSnap.docs.map(d => {
+      const _productosDocs = productosSnap.docs;
+      tbody.innerHTML = _productosDocs.map(d => {
         const p    = d.data();
         const prev = preciosMap[p.idPretoriano] || {};
+        const base    = p.precioBase ?? p.precio_base ?? null;
         const precio  = prev.precio ?? '';
         const activo  = prev.activo !== false;
-        const base    = p.precioBase ?? p.precio_base ?? null;
         const varHtml = (precio !== '' && base != null && base > 0)
           ? (() => {
               const pct = ((parseFloat(precio) - base) / base * 100);
@@ -450,30 +471,39 @@ export const SegmentoPrecioModule = (() => {
           <td style="font-family:monospace;color:#9CA3AF;font-size:11px">${esc(String(p.idPretoriano))}</td>
           <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
             font-weight:600;color:var(--text-primary)">${esc(p.nombre)}</td>
-          <td style="text-align:right;font-variant-numeric:tabular-nums;color:#9CA3AF">
+          <td style="text-align:center;font-variant-numeric:tabular-nums;color:#9CA3AF">
             ${base != null ? '$' + base.toFixed(2) : '—'}</td>
-          <td style="text-align:right"><input type="number" class="input-precio" min="0" step="0.01"
-               value="${esc(String(precio))}" placeholder="Sin precio"
+          <td style="text-align:center"><input type="number" class="input-precio" min="0" step="0.01"
+               value="${esc(String(precio))}" placeholder=""
                style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);
                  background:var(--surface-2);color:var(--text-primary);font-size:12px;
-                 text-align:right;font-variant-numeric:tabular-nums"
-               oninput="(function(inp){
-                 const base=${base != null ? base : 0};
-                 const tr=inp.closest('tr');
-                 const v=parseFloat(inp.value);
-                 const el=tr.querySelector('.var-cell');
-                 if(el&&base>0&&!isNaN(v)){
-                   const pct=((v-base)/base*100);
-                   el.innerHTML='<span class=\\''+( pct>=0?'var-pos':'var-neg')+'\\'>'+(pct>=0?'+':'')+pct.toFixed(1)+'%</span>';
-                 } else if(el){el.innerHTML='<span style=\\"color:#9CA3AF;font-size:10px\\">—</span>';}
-               })(this)">
+                 text-align:right;font-variant-numeric:tabular-nums">
           </td>
           <td class="var-cell" style="text-align:center">${varHtml}</td>
           <td style="text-align:center"><input type="checkbox" class="chk-activo" ${activo ? 'checked' : ''}></td>
         </tr>`;
       }).join('');
+
+      // Attach input listeners for variation calculation (avoids inline oninput escaping issues)
+      tbody.querySelectorAll('tr[data-idpretoriano]').forEach(tr => {
+        const base = parseFloat(tr.dataset.base) || 0;
+        const inp  = tr.querySelector('.input-precio');
+        if (!inp) return;
+        inp.addEventListener('input', () => {
+          const v  = parseFloat(inp.value);
+          const el = tr.querySelector('.var-cell');
+          if (!el) return;
+          if (base > 0 && !isNaN(v)) {
+            const pct = ((v - base) / base * 100);
+            const cls = pct >= 0 ? 'var-pos' : 'var-neg';
+            el.innerHTML = `<span class="${cls}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+          } else {
+            el.innerHTML = '<span style="color:#9CA3AF;font-size:10px">—</span>';
+          }
+        });
+      });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5">Error: ${esc(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6">Error: ${esc(err.message)}</td></tr>`;
     }
   }
 
@@ -485,7 +515,7 @@ export const SegmentoPrecioModule = (() => {
     let cambios = 0;
 
     filas.forEach(fila => {
-      const idPretoriano = parseInt(fila.dataset.idpretoriano, 10);
+      const idPretoriano = parseInt(fila.dataset.idpretoriano, 10) || 0;
       const nombreProducto = fila.dataset.nombre;
       const precioInput = fila.querySelector('.input-precio').value.trim();
       const activo = fila.querySelector('.chk-activo').checked;
@@ -524,10 +554,82 @@ export const SegmentoPrecioModule = (() => {
 
   // ── Clientes por segmento ─────────────────────────────────────────────
 
+  let _clientesCache = [];  // [{id, nombre, aliasVendedor, segmentoId}]
+  let _cliCacheLoaded = false;
+
+  async function _cargarCacheClientes() {
+    if (_cliCacheLoaded) return;
+    const snap = await getDocs(query(collection(db, 'clientes'), orderBy('nombre')));
+    _clientesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _cliCacheLoaded = true;
+  }
+
   function _bindClientesSegmento(container) {
     container.querySelector('#selectSegmentoCliente').addEventListener('change', e => {
       _cargarClientesDeSegmento(container, e.target.value || null);
     });
+
+    // Autocomplete: buscar cualquier cliente para asignarlo a un segmento
+    const input = container.querySelector('#seg-cli-buscar');
+    const dd    = container.querySelector('#seg-cli-dd');
+    if (!input || !dd) return;
+
+    input.addEventListener('input', async () => {
+      const q = (input.value || '').trim().toLowerCase();
+      if (q.length < 2) { dd.style.display = 'none'; return; }
+
+      await _cargarCacheClientes();
+      const matches = _clientesCache
+        .filter(c => (c.nombre || '').toLowerCase().includes(q))
+        .slice(0, 15);
+
+      if (!matches.length) { dd.style.display = 'none'; return; }
+
+      dd.innerHTML = matches.map(c => {
+        const segNombre = _segmentosCache.find(s => s.id === c.segmentoId)?.nombre || '';
+        return `<div data-cid="${esc(c.id)}"
+          style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);
+            display:flex;align-items:center;justify-content:space-between;gap:8px"
+          onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+          <div>
+            <div style="font-weight:600;font-size:12px;color:var(--text-primary)">${esc(c.nombre || c.id)}</div>
+            <div style="font-size:10px;color:#9CA3AF">${esc(c.aliasVendedor || '')}</div>
+          </div>
+          ${segNombre ? `<span style="font-size:10px;padding:2px 7px;border-radius:4px;
+            background:var(--surface-2);border:1px solid var(--border);white-space:nowrap">${esc(segNombre)}</span>` : ''}
+        </div>`;
+      }).join('');
+      dd.style.display = 'block';
+
+      dd.querySelectorAll('div[data-cid]').forEach(el => {
+        el.addEventListener('mousedown', e => e.preventDefault());
+        el.addEventListener('click', async () => {
+          const segId = container.querySelector('#selectSegmentoCliente').value;
+          if (!segId) {
+            window.toast?.('Selecciona primero un segmento.', 'warn');
+            return;
+          }
+          const cid = el.dataset.cid;
+          const cliente = _clientesCache.find(c => c.id === cid);
+          if (!cliente) return;
+          try {
+            await updateDoc(doc(db, 'clientes', cid),
+              { segmentoId: segId, actualizadoEn: serverTimestamp() });
+            // Update local cache
+            cliente.segmentoId = segId;
+            input.value = '';
+            dd.style.display = 'none';
+            // Reload table to show the newly added client
+            _cargarClientesDeSegmento(container, segId);
+            window.toast?.(`${cliente.nombre} asignado al segmento.`, 'success');
+          } catch (err) {
+            window.toast?.('Error al asignar: ' + err.message, 'error');
+          }
+        });
+      });
+    });
+
+    input.addEventListener('blur', () => setTimeout(() => { dd.style.display = 'none'; }, 150));
   }
 
   async function _cargarClientesDeSegmento(container, segmentoId) {
@@ -538,19 +640,21 @@ export const SegmentoPrecioModule = (() => {
     try {
       const snap = await getDocs(query(collection(db, 'clientes'),
         where('segmentoId', '==', segmentoId)));
+      snap.docs.sort((a, b) => (a.data().nombre || '').localeCompare(b.data().nombre || ''));
 
       if (snap.empty) {
-        tbody.innerHTML = '<tr><td colspan="4">Sin clientes en este segmento.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:30px;text-align:center;color:#9CA3AF">Sin clientes en este segmento.<br><span style="font-size:10px">Usa el buscador de arriba para asignar clientes.</span></td></tr>';
         return;
       }
 
       tbody.innerHTML = snap.docs.map(d => {
         const c = d.data();
-        return `<tr data-nombre="${esc(c.nombre || d.id)}">
+        const segNombre = _segmentosCache.find(s => s.id === c.segmentoId)?.nombre || '—';
+        return `<tr data-clienteid="${esc(d.id)}" data-nombre="${esc(c.nombre || d.id)}">
           <td style="font-weight:600;color:var(--text-primary)">${esc(c.nombre || d.id)}</td>
           <td style="color:#9CA3AF">${esc(c.aliasVendedor || '—')}</td>
           <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;
-            background:var(--surface-2);border:1px solid var(--border)">${esc(c.segmentoId || '—')}</span></td>
+            background:var(--surface-2);border:1px solid var(--border)">${esc(segNombre)}</span></td>
           <td>
             <select class="sel-segmento input-select-sm" data-cid="${esc(d.id)}">
               <option value="">Sin segmento</option>
@@ -563,18 +667,27 @@ export const SegmentoPrecioModule = (() => {
       }).join('');
 
       tbody.querySelectorAll('.sel-segmento').forEach(sel => {
+        sel.dataset.prevVal = sel.value;
         sel.addEventListener('change', async e => {
           const nuevoSegmento = e.target.value;
+          const tr = e.target.closest('tr');
+          const cid = e.target.dataset.cid;
           try {
-            await updateDoc(doc(db, 'clientes', e.target.dataset.cid),
+            await updateDoc(doc(db, 'clientes', cid),
               { segmentoId: nuevoSegmento, actualizadoEn: serverTimestamp() });
+            // Update local cache
+            const cached = _clientesCache.find(c => c.id === cid);
+            if (cached) cached.segmentoId = nuevoSegmento;
+            tr?.remove();
+            if (!tbody.querySelectorAll('tr[data-clienteid]').length) {
+              tbody.innerHTML = '<tr><td colspan="4" style="padding:30px;text-align:center;color:#9CA3AF">Sin clientes en este segmento.<br><span style="font-size:10px">Usa el buscador de arriba para asignar clientes.</span></td></tr>';
+            }
           } catch (err) {
             window.toast?.('Error al actualizar cliente: ' + err.message, 'error');
             e.target.value = e.target.dataset.prevVal || '';
           }
           e.target.dataset.prevVal = nuevoSegmento;
         });
-        sel.dataset.prevVal = sel.value;
       });
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="4">Error: ${esc(err.message)}</td></tr>`;

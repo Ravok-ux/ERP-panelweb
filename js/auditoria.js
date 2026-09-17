@@ -118,7 +118,7 @@ function _html() {
   const hoy   = new Date().toISOString().slice(0, 10);
   const hace7 = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
   return `
-  <div class="mod-wrap">
+  <div class="mod-wrap" style="min-height:0;overflow:hidden;gap:10px">
     <div class="mod-topbar">
       <h2 class="mod-title">🔍 Panel de Auditoría</h2>
       <div class="mod-actions">
@@ -128,7 +128,7 @@ function _html() {
     </div>
 
     <!-- Filtros -->
-    <div class="aud-filters" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;
+    <div class="aud-filters" style="display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;
       padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
       <select class="sel-sm" id="aud-fuente">
         ${FUENTES.map(f => `<option value="${f.id}">${f.label}</option>`).join("")}
@@ -152,7 +152,7 @@ function _html() {
     </div>
 
     <!-- KPIs -->
-    <div class="kpi-row" style="margin-bottom:14px">
+    <div class="kpi-row" style="flex-shrink:0">
       <div class="kpi-card" style="border-left-color:#DC2626">
         <div class="kpi-icon">🔴</div>
         <div class="kpi-val" id="aud-kpi-alta">–</div>
@@ -180,19 +180,23 @@ function _html() {
       </div>
     </div>
 
-    <!-- Gráfica de barras por día -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
-      padding:14px 18px;margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--text-sec);
-        text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">
-        Eventos por día
+    <!-- Gráfica de barras por día (colapsable) -->
+    <details id="aud-chart-details" style="background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;margin-bottom:14px;flex-shrink:0">
+      <summary style="padding:10px 18px;font-size:11px;font-weight:700;color:var(--text-sec);
+        text-transform:uppercase;letter-spacing:.06em;cursor:pointer;list-style:none;
+        display:flex;align-items:center;gap:6px">
+        <span>▶</span> Eventos por día
+      </summary>
+      <div style="padding:0 18px 14px">
+        <div id="aud-chart" style="overflow-x:auto"></div>
       </div>
-      <div id="aud-chart" style="overflow-x:auto"></div>
-    </div>
+    </details>
 
-    <!-- Tabla -->
-    <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
-      <table class="data-table" id="aud-table">
+    <!-- Tabla — flex:1 para ocupar el resto del alto disponible -->
+    <div style="flex:1;min-height:0;overflow-x:auto;overflow-y:auto;
+      border:1px solid var(--border);border-radius:8px;background:var(--surface)">
+      <table class="data-table" id="aud-table" style="background:var(--surface)">
         <thead>
           <tr>
             <th>FECHA / HORA</th><th>TIPO</th><th>SEV.</th>
@@ -214,6 +218,32 @@ function _bindUI() {
   document.getElementById("aud-ingeniero")?.addEventListener("change", _aplicarFiltrosCliente);
   document.getElementById("aud-sev")?.addEventListener("change", _aplicarFiltrosCliente);
   document.getElementById("aud-usuario")?.addEventListener("input", _aplicarFiltrosCliente);
+
+  // Rotar icono del chart colapsable
+  const det = document.getElementById("aud-chart-details");
+  if (det) {
+    const arrow = det.querySelector("summary span");
+    det.addEventListener("toggle", () => {
+      if (arrow) arrow.textContent = det.open ? "▼" : "▶";
+      _ajustarAlturaTabla();
+    });
+  }
+
+  _ajustarAlturaTabla();
+  window.addEventListener("resize", _ajustarAlturaTabla);
+}
+
+function _ajustarAlturaTabla() {
+  const wrap = document.querySelector(".mod-wrap");
+  const tableContainer = document.querySelector("#aud-table")?.parentElement;
+  if (!wrap || !tableContainer) return;
+  const wrapH = wrap.offsetHeight;
+  const siblings = [...wrap.children].filter(c => c !== tableContainer);
+  const usedH = siblings.reduce((s, c) => s + c.offsetHeight, 0);
+  const gap = 10 * wrap.children.length;
+  const h = Math.max(200, wrapH - usedH - gap);
+  tableContainer.style.height = h + "px";
+  tableContainer.style.flexShrink = "0";
 }
 
 // ── Consulta Firestore ────────────────────────────────────────

@@ -1526,7 +1526,9 @@ function _bindUI() {
           subcategoria:    document.getElementById("pc-e-subcategoria")?.value.trim() || "",
           descripcion:     document.getElementById("pc-e-descripcion")?.value.trim()  || "",
           precio_base:     parseFloat(document.getElementById("pc-e-precio")?.value) || 0,
+          precioBase:      parseFloat(document.getElementById("pc-e-precio")?.value) || 0,
           costo_base:      parseFloat(document.getElementById("pc-e-costo")?.value)  || 0,
+          costoBase:       parseFloat(document.getElementById("pc-e-costo")?.value)  || 0,
           peso:            parseFloat(document.getElementById("pc-e-peso")?.value)   || 0,
           impuesto:        document.getElementById("pc-e-impuesto")?.value || "Exento",
           materia_prima:   document.getElementById("pc-e-materia_prima")?.checked === true,
@@ -1552,9 +1554,33 @@ function _bindUI() {
           docIdFinal = newRef.id;
           window.toast?.(`Producto "${nombre}" creado con código ${codigo}.`, "success");
         } else {
+          // Detectar cambio de precio/costo antes de guardar
+          const precioBefore = p?.precio_base ?? p?.precioBase ?? 0;
+          const costoBefore  = p?.costo_base  ?? p?.costoBase  ?? 0;
+          const precioNuevo  = data.precio_base;
+          const costoNuevo   = data.costo_base;
+          const cambioPrecio = Math.abs(precioNuevo - precioBefore) > 0.001;
+          const cambioCosto  = Math.abs(costoNuevo  - costoBefore)  > 0.001;
+
           await updateDoc(doc(db, "productos", _editandoId), {
             ...data, modificadoPor: Sesion.alias, modificadoEn: serverTimestamp()
           });
+
+          if (cambioPrecio || cambioCosto) {
+            await addDoc(collection(db, "historial_precios"), {
+              productoId:     _editandoId,
+              nombreProducto: nombre,
+              precioBase:     precioNuevo,
+              costoBase:      costoNuevo,
+              precioAnterior: precioBefore,
+              costoAnterior:  costoBefore,
+              cambiadoPor:    Sesion.alias || Sesion.uid || "–",
+              fechaCambio:    serverTimestamp(),
+              fuente:         "edicion_manual",
+              _ts:            Date.now(),
+            }).catch(e => console.warn("[historial_precios]", e));
+          }
+
           window.toast?.("Producto actualizado.", "success");
         }
 

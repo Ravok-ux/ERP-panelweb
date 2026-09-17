@@ -519,8 +519,14 @@ function _bindAcciones() {
             continue;
           }
           const prodRef     = pSnap.docs[0].ref;
-          const stockActual = pSnap.docs[0].data().stock || 0;
-          const costoBefore = pSnap.docs[0].data().costo_base || pSnap.docs[0].data().costoBase || 0;
+          const prodData    = pSnap.docs[0].data();
+          const stockActual = prodData.stock || 0;
+          const costoBefore = prodData.costo_base || prodData.costoBase || 0;
+
+          // Guardar para historial después del commit
+          item._productoId   = pSnap.docs[0].id;
+          item._costoAnterior = costoBefore;
+          item._precioBase   = prodData.precio_base || prodData.precioBase || 0;
 
           // Actualizar stock y costo_base si cambió
           const prodUpd = { stock: increment(item.cantidad), updatedAt: ts };
@@ -559,6 +565,26 @@ function _bindAcciones() {
         });
 
         await batch.commit();
+
+        // Registrar en historial_precios los productos cuyo costo cambió
+        const histPromesas = entradas
+          .filter(item => item._costoAnterior !== undefined && item.costo > 0
+            && Math.abs(item.costo - item._costoAnterior) > 0.01)
+          .map(item => addDoc(collection(db, "historial_precios"), {
+            productoId:     item._productoId || "",
+            nombreProducto: item.nombre,
+            precioBase:     item._precioBase ?? 0,
+            costoBase:      item.costo,
+            precioAnterior: item._precioBase ?? 0,
+            costoAnterior:  item._costoAnterior,
+            cambiadoPor:    Sesion.alias || Sesion.uid || "–",
+            fechaCambio:    serverTimestamp(),
+            fuente:         "recepcion_compra",
+            ocId,
+            _ts:            Date.now(),
+          }).catch(e => console.warn("[historial_precios]", e)));
+        await Promise.all(histPromesas);
+
         window.toast?.(`Recepción registrada — stock actualizado en ${entradas.length} producto(s)`, "success");
         document.getElementById("modal-oc-recepcion")?.classList.add("hidden");
         document.getElementById("modal-oc-detalle")?.classList.add("hidden");

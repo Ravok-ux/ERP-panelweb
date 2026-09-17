@@ -410,9 +410,10 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   flex-direction: column;
 }
 .view.active { display: flex; }
-/* Vistas con layout interno controlado (mapa, dashboard) manejan su propio overflow */
-#view-mapa   { overflow: hidden; }
-#view-feed   { overflow: hidden; }
+/* Vistas con layout interno controlado (mapa, dashboard, auditoría) manejan su propio overflow */
+#view-mapa        { overflow: hidden; }
+#view-feed        { overflow: hidden; }
+#view-auditoria   { overflow: hidden; }
 
 /* ══════════════════════════════
    STATUS BAR

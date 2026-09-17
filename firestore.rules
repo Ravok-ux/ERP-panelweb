@@ -219,11 +219,11 @@ service cloud.firestore {
         'SUPER_ADMIN','GERENTE','ADMINISTRADOR'
       ];
 
-      // Escritura: APK o web panel con flag PUEDE_EDITAR_PRECIO (o rol SUPER_ADMIN/GERENTE)
+      // Escritura: SUPER_ADMIN, GERENTE, ADMINISTRADOR o flag PUEDE_EDITAR_PRECIO
       // Los registros son inmutables — no se permite update ni delete
       allow create: if cuentaActiva()
-                    && (tieneFlag('PUEDE_EDITAR_PRECIO') || miRol() in ['SUPER_ADMIN','GERENTE'])
-                    && request.resource.data.keys().hasAll(['idPretoriano','nombreProducto','precioBase','costoBase','cambiadoPor'])
+                    && (tieneFlag('PUEDE_EDITAR_PRECIO') || miRol() in ['SUPER_ADMIN','GERENTE','ADMINISTRADOR'])
+                    && request.resource.data.keys().hasAll(['productoId','nombreProducto','precioBase','costoBase','cambiadoPor'])
                     && request.resource.data.precioBase is number
                     && request.resource.data.costoBase is number
                     && strValido(request.resource.data.nombreProducto, 200);

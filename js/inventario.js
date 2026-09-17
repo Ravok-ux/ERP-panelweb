@@ -990,9 +990,14 @@ function _montarConteoFisico() {
       // Leer stock personal del ingeniero
       try {
         const ingDoc = await gdc(dc(db, "stock_ingenieros", ingUid));
-        const items = ingDoc.exists() ? (ingDoc.data().items || {}) : {};
-        productos = Object.entries(items).map(([productoId, d]) => ({
-          productoId, nombre: d.nombre || productoId,
+        const raw = ingDoc.exists() ? (ingDoc.data().items ?? null) : null;
+        if (!raw) { window.toast?.("Este ingeniero no tiene stock registrado","warning"); return; }
+        // APK publica items como array; panel puede actualizarlos como mapa — se normaliza aquí
+        const itemsNorm = Array.isArray(raw)
+          ? raw.map(d => ({ id: d.productoId || d.codigoN10 || "?", d }))
+          : Object.entries(raw).map(([k, d]) => ({ id: k, d }));
+        productos = itemsNorm.map(({ id, d }) => ({
+          productoId: id, nombre: d.nombre || id,
           stockSistema: d.cantidad ?? 0, stockConteo: null, diferencia: 0
         }));
         if (!productos.length) { window.toast?.("Este ingeniero no tiene stock registrado","warning"); return; }
