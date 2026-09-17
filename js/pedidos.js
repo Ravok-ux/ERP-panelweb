@@ -387,7 +387,8 @@ async function _avanzarStatus(pedidoId, nuevoStatus) {
       if (cSnap.exists()) {
         const c = cSnap.data();
         const esGerente = Sesion.esSuperAdmin?.() || ["GERENTE","SUPER_ADMIN"].includes(Sesion.rol);
-        const statusBloqueante = ["CRÍTICO","GRAVE"].includes(c.semaforoColor) || c.bloqueado;
+        // CF escribe "ROJO" (>60d) y "NARANJA" (>30d); "CRÍTICO"/"GRAVE" son etiquetas visuales del panel
+        const statusBloqueante = ["ROJO","NARANJA"].includes(c.semaforoColor) || c.bloqueado;
         if (statusBloqueante && !esGerente) {
           const fmt = n => "$" + (n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
           await window.modal?.({
