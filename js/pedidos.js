@@ -562,28 +562,28 @@ async function _comisionN10Entrega(ped) {
   let litrosN10 = 0;
   for (const it of items) {
     // Metadata ya embebida en el item (pedidos nuevos)
-    if (it.familia === "N10" && it.litros_por_unidad > 0) {
-      litrosN10 += (it.cantidad ?? 1) * it.litros_por_unidad;
+    const litrosUnit = it.litros_por_unidad ?? it.peso ?? 0;
+    if (it.marca === "Nutrición de 10" && litrosUnit > 0) {
+      litrosN10 += (it.cantidad ?? 1) * litrosUnit;
       continue;
     }
-    // Fallback: buscar en catálogo de productos y en inventario
+    // Fallback: buscar en catálogo de productos
     const pid = it.productoId || it.id;
     if (pid) {
       let prodData = null;
-      // 1) Buscar en colección "productos" (catálogo principal — tiene familia y litros_por_unidad)
       try {
         const snapProd = await getDoc(doc(db, "productos", pid));
         if (snapProd.exists()) prodData = snapProd.data();
       } catch(_) {}
-      // 2) Fallback: colección "inventario"
       if (!prodData) {
         try {
           const snapInv = await getDoc(doc(db, "inventario", pid));
           if (snapInv.exists()) prodData = snapInv.data();
         } catch(_) {}
       }
-      if (prodData?.familia === "N10" && (prodData.litros_por_unidad ?? 0) > 0) {
-        litrosN10 += (it.cantidad ?? 1) * prodData.litros_por_unidad;
+      if (prodData?.marca === "Nutrición de 10") {
+        const l = prodData.litros_por_unidad ?? prodData.peso ?? 0;
+        if (l > 0) litrosN10 += (it.cantidad ?? 1) * l;
       }
     }
   }
@@ -677,18 +677,27 @@ async function _comisionN10Revertir(ped) {
   const items = ped.items || ped.productos || [];
   let litrosN10 = 0;
   for (const it of items) {
-    if (it.familia === "N10" && it.litros_por_unidad > 0) {
-      litrosN10 += (it.cantidad ?? 1) * it.litros_por_unidad;
+    const litrosUnit = it.litros_por_unidad ?? it.peso ?? 0;
+    if (it.marca === "Nutrición de 10" && litrosUnit > 0) {
+      litrosN10 += (it.cantidad ?? 1) * litrosUnit;
       continue;
     }
     const pid = it.productoId || it.id;
     if (pid) {
-      const snap = await getDoc(doc(db, "inventario", pid));
-      if (snap.exists()) {
-        const prod = snap.data();
-        if (prod.familia === "N10" && prod.litros_por_unidad > 0) {
-          litrosN10 += (it.cantidad ?? 1) * prod.litros_por_unidad;
-        }
+      let prodData = null;
+      try {
+        const snapProd = await getDoc(doc(db, "productos", pid));
+        if (snapProd.exists()) prodData = snapProd.data();
+      } catch(_) {}
+      if (!prodData) {
+        try {
+          const snapInv = await getDoc(doc(db, "inventario", pid));
+          if (snapInv.exists()) prodData = snapInv.data();
+        } catch(_) {}
+      }
+      if (prodData?.marca === "Nutrición de 10") {
+        const l = prodData.litros_por_unidad ?? prodData.peso ?? 0;
+        if (l > 0) litrosN10 += (it.cantidad ?? 1) * l;
       }
     }
   }
