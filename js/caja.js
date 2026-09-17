@@ -402,7 +402,7 @@ function _render(docs) {
     const fecha    = c._ts ? new Date(c._ts).toLocaleString("es-MX", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
     const acciones = c.status === "PENDIENTE" ? `
       <button class="btn-validar" data-id="${c.id}">Validar</button>
-      <button class="btn-rechazar" data-id="${c.id}">Diferencia</button>` : `<span style="font-size:.8rem;color:var(--muted)">${c.validadoPor || "—"}</span>`;
+      <button class="btn-rechazar" data-id="${c.id}">Diferencia</button>` : `<span style="font-size:.8rem;color:var(--muted)">${c.validadoAlias || resolverNombre(c.validadoPor) || "—"}</span>`;
     const origenBadge = c.origen === "AUTO"
       ? `<span class="badge-auto">AUTO</span>`
       : c.origen === "LIQUIDACION"
