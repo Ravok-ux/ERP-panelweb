@@ -456,7 +456,12 @@ function _glRenderKPIs() {
   const kpis = el('gl-kpis');
   if (!kpis) return;
   const totales = {ACTIVO:0, PASIVO:0, CAPITAL:0, INGRESO:0, GASTO:0};
-  _cuentasCache.forEach(c => { if (totales[c.tipo] !== undefined) totales[c.tipo] += c.saldo||0; });
+  const CREDIT_NORMAL = new Set(['PASIVO','CAPITAL','INGRESO']);
+  _cuentasCache.forEach(c => {
+    if (totales[c.tipo] === undefined) return;
+    const s = c.saldo || 0;
+    totales[c.tipo] += CREDIT_NORMAL.has(c.tipo) ? -s : s;
+  });
   const util = totales.INGRESO - totales.GASTO;
   kpis.innerHTML = [
     ['Activos',   '$'+fmt(totales.ACTIVO),  '#3b82f6'],
@@ -522,8 +527,9 @@ function _glCargarPolizas() {
   if (_unsubPolizas) { _unsubPolizas(); _unsubPolizas = null; }
   const tipo  = el('gl-filtro-tipo')?.value || '';
   const mes   = el('gl-filtro-mes')?.value  || hoy().slice(0,7);
-  const inicio = new Date(mes+'-01');
-  const fin    = new Date(inicio.getFullYear(), inicio.getMonth()+1, 0, 23,59,59);
+  const [ym, mm] = mes.split('-').map(Number);
+  const inicio = new Date(ym, mm-1, 1, 0, 0, 0);
+  const fin    = new Date(ym, mm, 0, 23, 59, 59);
 
   const q = query(collection(db,'polizas'),
     where('fecha','>=',Timestamp.fromDate(inicio)),
