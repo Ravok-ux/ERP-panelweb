@@ -44,7 +44,7 @@ export function calcComisionN10(litros) {
  * @returns {{ siguiente: number|null, faltan: number|null, tramoSig: number|null }}
  */
 export function proximoTramo(litros) {
-  const umbrales = [250, 300, 499, 500];
+  const umbrales = [250, 300, 499]; // 500+ ya es T4 (top tramo), no hay siguiente
   for (const u of umbrales) {
     if (litros < u) return { siguiente: u, faltan: u - litros, tramoSig: TRAMOS_N10.find(t => t.desde > u - 1)?.n ?? null };
     if (litros === u) return { siguiente: u + 1, faltan: 1, tramoSig: TRAMOS_N10.find(t => t.desde === u + 1)?.n ?? null };

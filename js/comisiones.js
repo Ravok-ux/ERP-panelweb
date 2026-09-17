@@ -399,7 +399,7 @@ function _escucharLiquidaciones() {
               <div style="font-size:12px;font-weight:700;color:#4ADE80">${fmtMXN(l.totalPago)}</div>
             </div>
           </div>
-          ${Sesion.esSuperAdmin() || Sesion.rol === "ADMINISTRADOR" ? `
+          ${(Sesion.esSuperAdmin() || Sesion.rol === "ADMINISTRADOR") && l.status !== "PAGADO" ? `
           <div style="margin-top:8px;display:flex;gap:8px">
             <button onclick="ComisionesUI.marcarPagado('${d.id}')"
               style="font-size:11px;background:#166534;border:1px solid #16A34A;border-radius:5px;
@@ -574,6 +574,11 @@ function _bindAcciones() {
     toggleVentasN10(uid, mesKey) {
       const det = document.querySelector(`.n10-ventas-detail[data-for-uid="${uid}"][data-for-mes="${mesKey}"]`);
       if (det) det.style.display = det.style.display === "none" ? "" : "none";
+    },
+
+    // Expuesto aquí para que _escucharCobranzaConfigs (scope externo) pueda accederlo
+    abrirEditCobranza(alias) {
+      _abrirModalCobranza(alias);
     }
   };
 
@@ -704,9 +709,7 @@ function _escucharCobranzaConfigs() {
     }).join("");
   }, err => console.error("[Comisiones:cobranza]", err));
 
-  window._abrirEditCobranza = async alias => {
-    await _abrirModalCobranza(alias);
-  };
+  window._abrirEditCobranza = alias => ComisionesUI.abrirEditCobranza(alias);
 }
 
 // ── N10: listener tiempo real ─────────────────────────────────
