@@ -1118,6 +1118,38 @@ async function _confirmarPedido() {
   if (!_pedidoCliente) { window.toast?.("Selecciona un cliente.", "warn"); return; }
   if (!_pedidoLineas.length) { window.toast?.("Agrega al menos un producto.", "warn"); return; }
 
+  // Gate de bloqueo de crédito — igual que en _avanzarStatus
+  {
+    const cSnap = await getDoc(doc(db, "clientes", _pedidoCliente.id));
+    if (cSnap.exists()) {
+      const c = cSnap.data();
+      const esGerente = Sesion.esSuperAdmin?.() || ["GERENTE","SUPER_ADMIN"].includes(Sesion.rol);
+      const statusBloqueante = ["ROJO","NARANJA"].includes(c.semaforoColor) || c.bloqueado;
+      if (statusBloqueante && !esGerente) {
+        const fmt = n => "$" + (n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+        await window.modal?.({
+          title:   "⛔ Crédito bloqueado",
+          message: `${c.nombre || "Este cliente"} tiene semáforo ${c.semaforoColor ?? "bloqueado"}.\n` +
+                   `Deuda: ${fmt(c.totalAPagarTotal ?? c.saldoPendiente)}.\n` +
+                   `Solo GERENTE puede crear pedidos a clientes en mora crítica.`,
+          confirm: "Entendido", cancel: null, danger: true,
+        });
+        return;
+      }
+      if (statusBloqueante && esGerente) {
+        const fmt = n => "$" + (n||0).toLocaleString("es-MX",{minimumFractionDigits:2});
+        const autorizar = await window.modal?.({
+          title:   "⚠️ Cliente con mora crítica",
+          message: `${c.nombre || "Este cliente"} tiene semáforo ${c.semaforoColor ?? "bloqueado"}.\n` +
+                   `Deuda total: ${fmt(c.totalAPagarTotal ?? c.saldoPendiente)}.\n` +
+                   `Como GERENTE puedes autorizar excepcionalmente.`,
+          confirm: "Autorizar excepción", cancel: "Cancelar", danger: true,
+        });
+        if (!autorizar) return;
+      }
+    }
+  }
+
   const btn = document.getElementById("pd-btn-confirmar");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
 
