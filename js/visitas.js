@@ -252,6 +252,7 @@ function _escucharClientes() {
   _unsubCli = onSnapshot(
     query(collection(db, "clientes"), limit(500)),
     snap => {
+      if (snap.size >= 500) window.toast?.("⚠ Se muestran los primeros 500 clientes. Usa filtros para encontrar el resto.", "warn");
       _clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       // Ordenar: primero vencidos, luego por proximaVisita asc, luego sin fecha
       _clientes.sort((a, b) => {

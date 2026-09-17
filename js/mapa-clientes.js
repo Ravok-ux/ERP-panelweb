@@ -403,14 +403,14 @@ function _bindPanelEvents(container) {
     _timer = setTimeout(() => {
       const matches = _allEntries.filter(en => {
         const c = en.data;
-        return [c.nombre, c.zona, c.municipio, c.ingeniero].some(
+        return [c.nombre, c.zona, c.municipio, c.ciudad, c.ingeniero].some(
           f => f && f.toLowerCase().includes(q.toLowerCase())
         );
       }).slice(0, 8);
       if (!matches.length) { res.innerHTML = `<div class="mc-sr-item" style="color:#9CA3AF">Sin resultados</div>`; }
       else res.innerHTML = matches.map(en => {
         const c = en.data;
-        const sub = [c.zona, c.municipio, c.ingeniero].filter(Boolean).join(" · ");
+        const sub = [c.zona, c.municipio || c.ciudad, c.ingeniero].filter(Boolean).join(" · ");
         return `<div class="mc-sr-item" data-idx="${en.idx}">${_hl(c.nombre||"",q)}
           ${sub ? `<div class="mc-sr-sub">${_hl(sub,q)}</div>` : ""}</div>`;
       }).join("");
@@ -556,7 +556,7 @@ function _popupHtml(c, color, dias, visitadoHoy) {
     </div>
     <div style="padding:12px 16px;background:rgba(17,24,39,0.95)">
       ${c.ingeniero ? `<div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">👷 <span style="color:#E5E7EB">${_esc(c.ingeniero)}</span></div>` : ""}
-      ${(c.zona||c.municipio) ? `<div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">📍 <span style="color:#D1D5DB">${_esc([c.zona,c.municipio].filter(Boolean).join(" · "))}</span></div>` : ""}
+      ${(c.zona||c.municipio||c.ciudad) ? `<div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">📍 <span style="color:#D1D5DB">${_esc([c.zona,c.municipio||c.ciudad].filter(Boolean).join(" · "))}</span></div>` : ""}
       <div style="font-size:11px;font-weight:700;color:${diasColor};background:${diasColor}22;padding:3px 10px;border-radius:9px;display:inline-block;margin-bottom:8px">${diasStr}</div>
       ${c.diasVisita ? `<div style="font-size:10px;color:#6B7280;margin-bottom:6px">📅 ${diasTexto(c.diasVisita)}</div>` : ""}
       <div style="font-size:12px;margin-bottom:4px">

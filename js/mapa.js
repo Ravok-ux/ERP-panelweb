@@ -383,15 +383,12 @@ function _escucharUbicacionesMapa(map) {
 }
 
 function _escucharKPIsMapa() {
+  const hoyTs = Timestamp.fromDate(_inicioDia());
   const unsub = onSnapshot(
-    collection(db, "pedidos"),
+    query(collection(db, "pedidos"), where("timestamp", ">=", hoyTs)),
     snap => {
       let vendido = 0;
-      const hoy = _inicioDia();
-      snap.forEach(d => {
-        const p = d.data();
-        if (p.timestamp?.toDate?.() >= hoy) vendido += p.total || 0;
-      });
+      snap.forEach(d => { vendido += d.data().total || 0; });
       _setText("mt-v-val", _fmt(vendido));
       _setText("mt-v-sub", "Actualizado hoy");
     },

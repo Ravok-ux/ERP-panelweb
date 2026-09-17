@@ -639,6 +639,8 @@ function _bindUI() {
       if (m) m.style.display = "none";
       document.body.style.overflow = "";
       _closeTrap("cli-form-modal");
+      _geoBuscadorAbort?.abort();
+      _geoBuscadorAbort = null;
     },
     _guardarFormCliente(clienteId) { return _guardarFormCliente(clienteId); }
   };
@@ -1533,10 +1535,17 @@ async function _abrirFormCliente(clienteId = null) {
   _initGeoBuscador();
 }
 
+let _geoBuscadorAbort = null;
+
 function _initGeoBuscador() {
   const input = document.getElementById("clf-geobus");
   const results = document.getElementById("clf-geobus-results");
   if (!input || !results) return;
+
+  // Cancelar listener previo si el formulario se reabre sin cerrar
+  _geoBuscadorAbort?.abort();
+  _geoBuscadorAbort = new AbortController();
+  const { signal } = _geoBuscadorAbort;
 
   let timer;
   input.addEventListener("input", () => {
@@ -1562,11 +1571,11 @@ function _initGeoBuscador() {
         results.style.display = "block";
       });
     }, 350);
-  });
+  }, { signal });
   document.addEventListener("click", e => {
     if (!results.contains(e.target) && e.target !== input)
       results.style.display = "none";
-  }, { once: false });
+  }, { signal });
 }
 
 function _inputStyle() {
