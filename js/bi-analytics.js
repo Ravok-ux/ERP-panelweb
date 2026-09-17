@@ -1,4 +1,4 @@
-// bi-analytics.js — BI & Analytics: Dashboard drill-down | Rentabilidad | Comparativo | Demanda
+// bi-analytics.js — BI & Analytics: Dashboard drill-down | Rentabilidad | Comparativo | Demanda | Inventario
 
 import { db } from "./firebase-config.js";
 import {
@@ -12,6 +12,11 @@ let _destroyed  = false;
 let _pedidos    = [];   // todos los pedidos confirmados
 let _tab        = "dashboard";
 let _filtros    = { periodo: "30", ingeniero: "", zona: "" };
+
+// Inventario analytics state
+let _invItems   = [];   // {nombre, familia, stockActual, costo, precioVenta, valorCosto, valorPrecio}
+let _cogsData   = { total: 0, dias: 30 };
+let _carryParams = null;
 
 // ── Formato ───────────────────────────────────────────────────────
 const MXN  = v => new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN", minimumFractionDigits:0 }).format(v || 0);
@@ -432,6 +437,287 @@ function _tabDemanda(todos) {
 </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// INVENTARIO ANALYTICS — carga y tab
+// ══════════════════════════════════════════════════════════════════
+
+async function _cargarInventario() {
+  // 1. Mapa costo_base / precio_base / familia desde catálogo productos
+  const costoMap = {}, precioMap = {}, familiaMap = {};
+  try {
+    const prodSnap = await getDocs(collection(db, "productos"));
+    prodSnap.docs.forEach(d => {
+      const p = d.data();
+      const keys = [p.codigoN10, p.codigo, p.nombre].filter(Boolean);
+      const cb = Number(p.costo_base || p.costoBase || 0);
+      const pb = Number(p.precio_base || p.precio_cliente || p.precioBase || 0);
+      const fam = p.familia || p.categoria || "—";
+      keys.forEach(k => {
+        if (cb > 0) { costoMap[k] = cb; costoMap[String(k).toLowerCase().trim()] = cb; }
+        if (pb > 0) { precioMap[k] = pb; precioMap[String(k).toLowerCase().trim()] = pb; }
+        familiaMap[k] = fam;
+        familiaMap[String(k).toLowerCase().trim()] = fam;
+      });
+    });
+  } catch (_) {}
+
+  // 2. Inventario actual
+  try {
+    const norm = s => String(s || "").toLowerCase().trim();
+    const invSnap = await getDocs(query(collection(db, "inventario"), orderBy("nombre"), limit(500)));
+    _invItems = invSnap.docs.map(d => {
+      const data = d.data();
+      const keys = [d.id, data.codigoN10, data.nombre].filter(Boolean);
+      const rawCosto = Number(data.costo);
+      const costo  = rawCosto > 0 ? rawCosto
+        : (keys.reduce((v, k) => v || costoMap[k] || costoMap[norm(k)], 0) || 0);
+      const precio = keys.reduce((v, k) => v || precioMap[k] || precioMap[norm(k)], 0) || 0;
+      const fam    = data.familia || keys.reduce((v, k) => v || familiaMap[k] || familiaMap[norm(k)], "") || "—";
+      const stock  = Number(data.stockActual) || 0;
+      return {
+        id: d.id, nombre: data.nombre || d.id, familia: fam,
+        stockActual: stock, costo, precioVenta: precio,
+        valorCosto:  stock * costo,
+        valorPrecio: stock * precio,
+      };
+    });
+  } catch (_) { _invItems = []; }
+
+  // 3. COGS últimos 30 días desde movimientos_stock tipo salida
+  try {
+    const desde = Date.now() - 30 * 86400000;
+    const costoFallback = k => costoMap[k] || 0;
+    let q;
+    try {
+      q = query(
+        collection(db, "movimientos_stock"),
+        where("tipo", "in", ["SALIDA","AJUSTE_SALIDA","SALIDA_ALMACEN","REABASTO_INGENIERO"]),
+        orderBy("_ts","desc"), limit(2000)
+      );
+    } catch {
+      q = query(collection(db, "movimientos_stock"), orderBy("_ts","desc"), limit(2000));
+    }
+    const movSnap = await getDocs(q);
+    let cogs30 = 0;
+    movSnap.docs.forEach(d => {
+      const m = d.data();
+      if (m._ts < desde) return;
+      const c = m.costoUnitario || costoFallback(m.productoId) || costoFallback(m.nombreProducto) || 0;
+      cogs30 += (m.cantidad || 0) * c;
+    });
+    _cogsData = { total: cogs30, dias: 30 };
+  } catch (_) { _cogsData = { total: 0, dias: 30 }; }
+}
+
+function _loadCarryParams() {
+  if (_carryParams) return _carryParams;
+  try {
+    _carryParams = JSON.parse(localStorage.getItem("bi_carry_params") || "null");
+  } catch (_) {}
+  if (!_carryParams) _carryParams = { tasaCapital: 12, bodegaMes: 0, serviciosMes: 0, mermasPct: 2 };
+  return _carryParams;
+}
+
+function _saveCarryParams(p) {
+  _carryParams = p;
+  try { localStorage.setItem("bi_carry_params", JSON.stringify(p)); } catch (_) {}
+}
+
+// ── Tab Inventario ─────────────────────────────────────────────────
+function _tabInventario() {
+  const p = _loadCarryParams();
+  const rows = _invItems.filter(r => r.stockActual > 0);
+
+  // Totales globales
+  const totalCosto  = rows.reduce((s, r) => s + (Number(r.valorCosto) || 0), 0);
+  const totalPrecio = rows.reduce((s, r) => s + (Number(r.valorPrecio) || 0), 0);
+  const margen      = totalPrecio - totalCosto;
+  const margenPct   = totalCosto > 0 ? margen / totalCosto * 100 : 0;
+
+  // DIO global: (InvProm / COGS_anual) × 365
+  const cogsAnual = _cogsData.total * (365 / Math.max(_cogsData.dias, 1));
+  const dio       = cogsAnual > 0 ? Math.round(totalCosto / cogsAnual * 365) : null;
+  const rotacion  = cogsAnual > 0 ? (cogsAnual / totalCosto).toFixed(1) : null;
+
+  // DIO + valor por familia
+  const famMap = {};
+  rows.forEach(r => {
+    if (!famMap[r.familia]) famMap[r.familia] = { valorCosto: 0, valorPrecio: 0, unidades: 0 };
+    famMap[r.familia].valorCosto  += (Number(r.valorCosto)  || 0);
+    famMap[r.familia].valorPrecio += (Number(r.valorPrecio) || 0);
+    famMap[r.familia].unidades    += (Number(r.stockActual) || 0);
+  });
+  const famRows = Object.entries(famMap)
+    .map(([fam, v]) => {
+      const pct   = totalCosto > 0 ? v.valorCosto / totalCosto * 100 : 0;
+      const dioF  = cogsAnual > 0 ? Math.round(v.valorCosto / (cogsAnual * (v.valorCosto / (totalCosto || 1))) * 365) : null;
+      return { fam, ...v, pct, dio: dioF };
+    })
+    .sort((a, b) => b.valorCosto - a.valorCosto);
+
+  // Carrying cost desglose
+  const costoCapital   = totalCosto * (p.tasaCapital / 100);
+  const costoBodega    = (p.bodegaMes   || 0) * 12;
+  const costoServicios = (p.serviciosMes || 0) * 12;
+  const costoMermas    = totalCosto * ((p.mermasPct || 0) / 100);
+  const costoHolding   = costoCapital + costoBodega + costoServicios + costoMermas;
+  const carryPct       = totalCosto > 0 ? costoHolding / totalCosto * 100 : 0;
+
+  const _cc = (lbl, val, color) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:9px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-sec)">${lbl}</span>
+      <span style="font-weight:700;font-size:13px;color:${color}">${MXN(val)}</span>
+    </div>`;
+
+  const _kpi = (ico, lbl, val, color, sub = "") => `
+    <div class="bi-kpi">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">${ico} ${lbl}</div>
+      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
+      ${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ""}
+    </div>`;
+
+  // Top 20 productos por valor en costo
+  const topProds = [...rows].sort((a, b) => b.valorCosto - a.valorCosto).slice(0, 20);
+  const barMax   = topProds[0]?.valorCosto || 1;
+
+  return `
+<!-- KPIs globales -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
+  ${_kpi("📦", "Valor en costo",  MXN(totalCosto),  "var(--text-primary)")}
+  ${_kpi("🏷️", "Valor en precio", MXN(totalPrecio), "#4ADE80", margen >= 0 ? `+${MXN(margen)} margen` : `${MXN(margen)}`)}
+  ${_kpi("📊", "% Margen bruto",  `${margenPct.toFixed(1)}%`, "#FBBF24")}
+  ${_kpi("🔄", "Rotación anual",  rotacion ? `${rotacion}×` : "—", "#60A5FA", dio ? `${dio} días inv.` : "")}
+  ${_kpi("💸", "Holding cost",    MXN(costoHolding), "#F87171", `${carryPct.toFixed(1)}% del inventario`)}
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+  <!-- Valor y DIO por familia -->
+  <div class="bi-card">
+    <div class="bi-card-title">📂 Valor & DIO por familia</div>
+    <div style="overflow-x:auto;max-height:340px">
+      <table class="bi-table">
+        <thead><tr>
+          <th style="text-align:left">Familia</th>
+          <th>Valor costo</th><th>Valor precio</th>
+          <th>% part.</th><th>DIO (días)</th>
+        </tr></thead>
+        <tbody>${famRows.length ? famRows.map(r => {
+          const dioCol = r.dio == null ? "var(--text-muted)"
+            : r.dio > 90 ? "#F87171" : r.dio > 45 ? "#FBBF24" : "#4ADE80";
+          return `<tr>
+            <td style="text-align:left;font-weight:600">${esc(r.fam)}</td>
+            <td style="font-family:monospace">${MXN(r.valorCosto)}</td>
+            <td style="font-family:monospace;color:#4ADE80">${MXN(r.valorPrecio)}</td>
+            <td>${r.pct.toFixed(1)}%</td>
+            <td style="font-weight:700;color:${dioCol}">${r.dio ?? "—"}</td>
+          </tr>`;
+        }).join("") : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Sin datos con costo configurado</td></tr>`}</tbody>
+      </table>
+    </div>
+    ${cogsAnual > 0 ? `
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">
+      COGS estimado anual: <strong>${MXN(cogsAnual)}</strong>
+      (basado en salidas de los últimos 30 días × 12.17).<br>
+      <span style="color:#F87171">DIO &gt; 90 días</span> ·
+      <span style="color:#FBBF24">DIO 45–90 días</span> ·
+      <span style="color:#4ADE80">DIO &lt; 45 días</span>
+    </div>` : `<div style="margin-top:8px;font-size:11px;color:#F87171">
+      Sin movimientos de salida recientes — COGS = 0. Los DIO no se pueden calcular.
+    </div>`}
+  </div>
+
+  <!-- Costo de almacenamiento parametrizable -->
+  <div class="bi-card">
+    <div class="bi-card-title">💰 Costo de almacenamiento (carrying cost)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">
+          Tasa de capital / WACC (% anual)
+        </label>
+        <input id="bi-cc-capital" type="number" class="form-input" min="0" max="100" step="0.5"
+          value="${p.tasaCapital}" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">
+          % merma / obsolescencia anual
+        </label>
+        <input id="bi-cc-merma" type="number" class="form-input" min="0" max="50" step="0.1"
+          value="${p.mermasPct}" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">
+          Renta / bodega (MXN/mes)
+        </label>
+        <input id="bi-cc-bodega" type="number" class="form-input" min="0" step="100"
+          value="${p.bodegaMes}" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">
+          Servicios / seguros (MXN/mes)
+        </label>
+        <input id="bi-cc-serv" type="number" class="form-input" min="0" step="100"
+          value="${p.serviciosMes}" style="width:100%">
+      </div>
+    </div>
+    <button id="bi-cc-recalc" class="btn-primary" style="width:100%;margin-bottom:14px">
+      Recalcular
+    </button>
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      ${_cc("💼 Costo de capital (" + p.tasaCapital + "% de " + MXN(totalCosto) + ")", costoCapital, "#60A5FA")}
+      ${_cc("🏭 Almacenamiento físico (renta+svc × 12)", costoBodega + costoServicios, "#FBBF24")}
+      ${_cc("⚠️ Riesgo (merma " + p.mermasPct + "% de inventario)", costoMermas, "#F87171")}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px">
+        <span style="font-size:13px;font-weight:700">Total anual estimado</span>
+        <span style="font-size:16px;font-weight:800;color:#F87171">${MXN(costoHolding)}</span>
+      </div>
+      <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:2px">
+        = ${carryPct.toFixed(1)}% del valor inventario en costo
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla de productos por valor -->
+<div class="bi-card">
+  <div class="bi-card-title">📋 Top 20 SKUs por valor en costo</div>
+  <div style="overflow-x:auto;max-height:380px">
+    <table class="bi-table">
+      <thead><tr>
+        <th style="text-align:left">Producto</th>
+        <th>Familia</th><th>Stock</th>
+        <th>Costo unit.</th><th>Precio venta</th>
+        <th>Valor costo</th><th>Valor precio</th><th>% part.</th>
+      </tr></thead>
+      <tbody>${topProds.length ? topProds.map(r => {
+        const pct = totalCosto > 0 ? (r.valorCosto / totalCosto * 100).toFixed(1) : "0.0";
+        const w   = Math.round(r.valorCosto / barMax * 100);
+        return `<tr>
+          <td style="text-align:left;font-weight:600">${esc(r.nombre)}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${esc(r.familia)}</td>
+          <td style="font-variant-numeric:tabular-nums">${NUM(r.stockActual)}</td>
+          <td style="font-family:monospace">${r.costo > 0 ? MXN(r.costo) : "—"}</td>
+          <td style="font-family:monospace;color:#4ADE80">${r.precioVenta > 0 ? MXN(r.precioVenta) : "—"}</td>
+          <td style="font-family:monospace;font-weight:700">${MXN(r.valorCosto)}</td>
+          <td style="font-family:monospace;color:#4ADE80">${r.valorPrecio > 0 ? MXN(r.valorPrecio) : "—"}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:44px;height:6px;background:var(--border);border-radius:3px;flex-shrink:0">
+                <div style="width:${w}%;height:100%;background:#60A5FA;border-radius:3px"></div>
+              </div>
+              <span style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap">${pct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">
+        Sin productos con costo configurado en catálogo
+      </td></tr>`}</tbody>
+    </table>
+  </div>
+</div>`;
+}
+
 // ── Render principal ──────────────────────────────────────────────
 function _render() {
   if (!_container) return;
@@ -452,6 +738,7 @@ function _render() {
     { id:"rentabilidad", label:"💰 Rentabilidad" },
     { id:"comparativo",  label:"📅 Comparativo" },
     { id:"demanda",      label:"🔮 Demanda" },
+    { id:"inventario",   label:"🏭 Inventario" },
   ];
 
   let body = "";
@@ -459,6 +746,7 @@ function _render() {
   if (_tab === "rentabilidad") body = _tabRentabilidad(datos);
   if (_tab === "comparativo")  body = _tabComparativo(_pedidos);
   if (_tab === "demanda")      body = _tabDemanda(_pedidos);
+  if (_tab === "inventario")   body = _tabInventario();
 
   _container.innerHTML = `
 <style>
@@ -505,6 +793,17 @@ function _render() {
   _container.querySelectorAll(".bi-tab").forEach(btn =>
     btn.addEventListener("click", () => { _tab = btn.dataset.tab; _render(); })
   );
+  // Carrying cost recalculate
+  _container.querySelector("#bi-cc-recalc")?.addEventListener("click", () => {
+    const get = id => parseFloat(_container.querySelector(`#${id}`)?.value || "0") || 0;
+    _saveCarryParams({
+      tasaCapital:  get("bi-cc-capital"),
+      bodegaMes:    get("bi-cc-bodega"),
+      serviciosMes: get("bi-cc-serv"),
+      mermasPct:    get("bi-cc-merma"),
+    });
+    _render();
+  });
 }
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -522,7 +821,7 @@ export const BiAnalyticsModule = {
     </div>`;
 
     try {
-      await _cargar();
+      await Promise.all([_cargar(), _cargarInventario()]);
     } catch(e) {
       console.error("[BI] Error:", e);
       container.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-muted)">

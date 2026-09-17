@@ -9,6 +9,9 @@ import { esc } from "./app.js";
 import {
   collection, query, orderBy, limit, getDocs, doc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const FORZAR_URL = "https://us-central1-n10-erp.cloudfunctions.net/forzarMetricas";
 
 const HEALTH_URL = "https://us-central1-n10-erp.cloudfunctions.net/healthCheck";
 
@@ -33,6 +36,7 @@ export const ObservabilidadModule = {
         <h2 class="mod-title">📡 Observabilidad</h2>
         <div class="mod-actions">
           <button class="btn-outline" id="obs-refresh">🔄 Actualizar</button>
+          <button class="btn-outline" id="obs-generar" title="Genera las métricas de hoy sin esperar al cron de las 23:55">⚡ Generar métricas</button>
           <button class="btn-primary" id="obs-ping">🏓 Health check</button>
         </div>
       </div>
@@ -86,6 +90,7 @@ export const ObservabilidadModule = {
     _cargar();
     document.getElementById("obs-refresh")?.addEventListener("click", _cargar);
     document.getElementById("obs-ping")?.addEventListener("click", _pingHealth);
+    document.getElementById("obs-generar")?.addEventListener("click", _forzarMetricas);
   },
   destroy() {},
 };
@@ -185,6 +190,34 @@ async function _cargarBackup() {
       <div style="border-radius:0 0 8px 8px;overflow:hidden">${colRows}</div>`;
   } catch (e) {
     panel.innerHTML = `<div style="color:#DC2626;font-size:13px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Forzar generación de métricas ────────────────────────────────
+
+async function _forzarMetricas() {
+  const btn = document.getElementById("obs-generar");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Generando…"; }
+
+  try {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error("Sin sesión");
+    const token = await user.getIdToken();
+
+    const resp = await fetch(FORZAR_URL, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await resp.json();
+
+    if (!resp.ok) throw new Error(json.error || "Error del servidor");
+
+    // Recargar datos en pantalla
+    await _cargar();
+    if (btn) { btn.disabled = false; btn.textContent = "✅ Generado"; setTimeout(() => { btn.textContent = "⚡ Generar métricas"; }, 3000); }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "⚡ Generar métricas"; }
+    alert(`Error al generar métricas: ${e.message}`);
   }
 }
 

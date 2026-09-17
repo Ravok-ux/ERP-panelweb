@@ -142,7 +142,7 @@ function _html() {
     <div id="com-panel-n10" style="display:none;flex-direction:column;flex:1;overflow:hidden">
       <!-- Subheader N10 -->
       <div style="padding:12px 20px;border-bottom:1px solid var(--border);
-        display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface)">
+        display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface);flex-wrap:wrap">
         <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">
           Mes:
         </div>
@@ -150,6 +150,14 @@ function _html() {
           onchange="ComisionesUI.setMesN10(this.value)"
           style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;
             font-size:12px;background:var(--surface);color:var(--text-primary);cursor:pointer">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">
+          Ingeniero:
+        </div>
+        <select id="n10-ing-picker" onchange="ComisionesUI.setIngenieroN10(this.value)"
+          style="border:1px solid var(--border);border-radius:6px;padding:4px 10px;
+            font-size:12px;background:var(--surface);color:var(--text-primary);cursor:pointer;min-width:170px">
+          <option value="">Todos</option>
+        </select>
         <div style="flex:1"></div>
         <div style="font-size:10.5px;color:var(--text-muted)" id="n10-subtitle">Cargando…</div>
       </div>
@@ -568,7 +576,12 @@ function _bindAcciones() {
     },
 
     setMesN10(mesKey) {
-      _escucharN10(mesKey);
+      _escucharN10(mesKey, document.getElementById("n10-ing-picker")?.value || "");
+    },
+
+    setIngenieroN10(uid) {
+      const mes = document.getElementById("n10-mes-picker")?.value || _mesActual();
+      _escucharN10(mes, uid);
     },
 
     toggleVentasN10(uid, mesKey) {
@@ -714,8 +727,18 @@ function _escucharCobranzaConfigs() {
 
 // ── N10: listener tiempo real ─────────────────────────────────
 let _unsubN10 = null;
+let _unsubN10Users = null;
 
-function _escucharN10(mesKey) {
+function _poblarDropdownIngenieros(todos) {
+  const sel = document.getElementById("n10-ing-picker");
+  if (!sel) return;
+  const valorActual = sel.value;
+  // Mantener opción "Todos" y agregar ingenieros del mes
+  sel.innerHTML = `<option value="">Todos</option>` +
+    todos.map(r => `<option value="${esc(r.uid)}" ${r.uid === valorActual ? "selected" : ""}>${esc(r.alias)}</option>`).join("");
+}
+
+function _escucharN10(mesKey, filtroUid = "") {
   _unsubN10?.();
   const el = document.getElementById("n10-tabla");
   if (!el) return;
@@ -723,26 +746,34 @@ function _escucharN10(mesKey) {
 
   const q = query(collection(db, "comisiones_n10"), where("mes_key", "==", mesKey));
   _unsubN10 = onSnapshot(q, snap => {
-    _unsubs = _unsubs.filter(fn => fn !== _unsubN10); // evitar duplicado
+    _unsubs = _unsubs.filter(fn => fn !== _unsubN10);
     _unsubs.push(_unsubN10);
 
-    const registros = snap.docs.map(d => d.data()).sort((a, b) => b.litros - a.litros);
+    const todos = snap.docs.map(d => d.data()).sort((a, b) => b.litros - a.litros);
+    _poblarDropdownIngenieros(todos);
+
+    // Filtrar por ingeniero si se seleccionó uno
+    const registros = filtroUid ? todos.filter(r => r.uid === filtroUid) : todos;
+
     const totalLitros   = registros.reduce((s, r) => s + (r.litros ?? 0), 0);
     const totalComision = registros.reduce((s, r) => s + (r.comision ?? 0), 0);
-    const top           = registros[0];
+    const top           = todos[0]; // top siempre del mes completo
 
     // KPIs
     _setN10Text("n10-k-litros",   fmtL(totalLitros));
     _setN10Text("n10-k-comision", fmtMXN(totalComision));
-    _setN10Text("n10-k-activos",  String(registros.length));
+    _setN10Text("n10-k-activos",  String(filtroUid ? registros.length : todos.length));
     _setN10Text("n10-k-top",      top ? `${esc(top.alias)} · ${fmtL(top.litros)}` : "–");
 
     const sub = document.getElementById("n10-subtitle");
-    if (sub) sub.textContent = `${registros.length} ingeniero${registros.length !== 1 ? "s" : ""} · ${mesKey}`;
+    if (sub) {
+      const ing = filtroUid && registros[0] ? ` · ${esc(registros[0].alias)}` : "";
+      sub.textContent = `${todos.length} ingeniero${todos.length !== 1 ? "s" : ""} · ${mesKey}${ing}`;
+    }
 
     if (registros.length === 0) {
       el.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:40px">
-        Sin ventas N10 registradas para ${mesKey}.<br>
+        Sin ventas N10 registradas para ${mesKey}${filtroUid ? " · ingeniero seleccionado" : ""}.<br>
         <span style="font-size:11px">Las comisiones se generan automáticamente al marcar un pedido como Entregado.</span>
       </div>`;
       return;

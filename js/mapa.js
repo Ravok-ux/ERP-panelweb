@@ -261,12 +261,15 @@ function _escucharUbicacionesMapa(map) {
     snap.forEach(d => {
       const u   = d.data();
       const id  = d.id;
-      const lat = parseFloat(u.lat);
-      const lng = parseFloat(u.lng);
 
-      if (!lat || !lng) return;
+      // Contar en campo ANTES del guard de coordenadas — así el contador y el semáforo
+      // de GPS se actualizan en cuanto arranca la jornada, aunque el GPS aún no tenga fix.
       const enJornada = estaEnJornadaHoy(u);
       if (enJornada) enCampo++;
+
+      const lat = parseFloat(u.lat);
+      const lng = parseFloat(u.lng);
+      if (!lat || !lng) return;
 
       // Siempre actualizar datos vivos (necesario para que los closures de hover/click
       // lean el estado actual y no el de cuando se creó el marker)

@@ -244,7 +244,7 @@ async function _montarStock() {
             <input type="hidden" id="inv-prod-unidad">
           </div>
 
-          <!-- Cantidad + Motivo -->
+          <!-- Cantidad + Costo + Motivo -->
           <div style="display:flex;gap:10px">
             <div style="flex:0.7">
               <label style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;
@@ -254,6 +254,18 @@ async function _montarStock() {
               <input class="form-input" type="number" id="inv-cantidad" min="0" step="1" placeholder="0"
                 style="width:100%;font-size:16px;font-weight:700;text-align:center;
                   font-variant-numeric:tabular-nums">
+            </div>
+            <div style="flex:0.7">
+              <label style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;
+                letter-spacing:.06em;display:block;margin-bottom:5px">
+                Costo unitario
+              </label>
+              <div style="position:relative">
+                <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);
+                  font-size:12px;color:#64748B;pointer-events:none">$</span>
+                <input class="form-input" type="number" id="inv-costo" min="0" step="0.01" placeholder="0.00"
+                  style="width:100%;padding-left:20px;font-variant-numeric:tabular-nums">
+              </div>
             </div>
             <div style="flex:1.3">
               <label style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;
@@ -480,6 +492,7 @@ async function _montarStock() {
     // Resetear buscador
     window._invLimpiarProducto?.();
     document.getElementById("inv-cantidad").value = "";
+    document.getElementById("inv-costo").value    = "";
     document.getElementById("inv-motivo").value   = "";
     window._invSelFamilia?.("");
     document.getElementById("inv-litros-u").value = "";
@@ -520,9 +533,11 @@ async function _montarStock() {
   document.getElementById("inv-filtro-estado")?.addEventListener("change", _filtrar);
   document.getElementById("inv-xlsx-btn")?.addEventListener("click", () => _exportXlsx(_allRows));
 
-  // Cargar catálogo de unidades ANTES del snapshot para que siempre esté disponible
+  // Cargar catálogo de unidades y costo_base ANTES del snapshot
   const _prodUnidadMap   = {}; // codigoN10 → unidad
   const _prodUnidadByNom = {}; // norm(nombre) → unidad  (fallback cuando falta codigoN10)
+  const _prodCostoMap    = {}; // codigoN10 → costo_base
+  const _prodCostoByNom  = {}; // norm(nombre) → costo_base
   try {
     const prodSnap = await getDocs(collection(db, "productos"));
     prodSnap.docs.forEach(d => {
@@ -530,6 +545,11 @@ async function _montarStock() {
       if (p.unidad) {
         if (p.codigoN10) _prodUnidadMap[p.codigoN10] = p.unidad;
         if (p.nombre)    _prodUnidadByNom[norm(p.nombre)] = p.unidad;
+      }
+      const cb = p.costo_base || p.costoBase || 0;
+      if (cb > 0) {
+        if (p.codigoN10) _prodCostoMap[p.codigoN10] = cb;
+        if (p.nombre)    _prodCostoByNom[norm(p.nombre)] = cb;
       }
     });
   } catch (_) {}
@@ -542,6 +562,13 @@ async function _montarStock() {
         || _prodUnidadMap[data.codigoN10]
         || _prodUnidadByNom[norm(data.nombre || "")]
         || data.unidad || "";
+      // Usar costo_base del catálogo si el doc de inventario no tiene costo propio
+      if (!(data.costo > 0)) {
+        data.costo = _prodCostoMap[d.id]
+          || _prodCostoMap[data.codigoN10]
+          || _prodCostoByNom[norm(data.nombre || "")]
+          || 0;
+      }
       return { id: d.id, ...data };
     });
     _filtrar();
@@ -626,17 +653,19 @@ function _renderStock(rows) {
         document.getElementById("inv-prod-docid").value = docIdProd;
       } catch { document.getElementById("inv-prod-docid").value = ""; }
 
-      // Pre-poblar campos N10 desde Firestore
+      // Pre-poblar campos N10 y costo desde Firestore
       try {
         const snap = await getDoc(doc(db, "inventario", id));
         if (snap.exists()) {
           const d = snap.data();
-          const famEl  = document.getElementById("inv-familia");
-          const litEl  = document.getElementById("inv-litros-u");
-          const wrap   = document.getElementById("inv-litros-wrap");
-          if (famEl) famEl.value = d.familia || "";
-          if (litEl) litEl.value = d.litros_por_unidad || "";
-          if (wrap)  wrap.style.opacity = d.familia === "N10" ? "1" : ".4";
+          const famEl   = document.getElementById("inv-familia");
+          const litEl   = document.getElementById("inv-litros-u");
+          const wrap    = document.getElementById("inv-litros-wrap");
+          const costoEl = document.getElementById("inv-costo");
+          if (famEl)   famEl.value = d.familia || "";
+          if (litEl)   litEl.value = d.litros_por_unidad || "";
+          if (wrap)    wrap.style.opacity = d.familia === "N10" ? "1" : ".4";
+          if (costoEl) costoEl.value = d.costo > 0 ? d.costo : "";
         }
       } catch { /* no bloquear si falla */ }
       document.getElementById("inv-modal")?.classList.remove("hidden");
@@ -651,6 +680,7 @@ async function _guardarAjuste() {
   const prodNom    = document.getElementById("inv-prod-nom")?.value.trim();
   const prodUnidad = document.getElementById("inv-prod-unidad")?.value.trim() || "";
   const cant       = parseFloat(document.getElementById("inv-cantidad")?.value || "0");
+  const costo      = parseFloat(document.getElementById("inv-costo")?.value    || "0") || 0;
   const motivo     = document.getElementById("inv-motivo")?.value.trim();
   const familia    = document.getElementById("inv-familia")?.value || "";
   const litrosU    = parseFloat(document.getElementById("inv-litros-u")?.value || "0");
@@ -682,7 +712,8 @@ async function _guardarAjuste() {
         quienRegistro: Sesion.alias, _ts: Date.now()
       });
       const unidadData = prodUnidad ? { unidad: prodUnidad } : {};
-      await setDoc(invRef, { nombre: prodNom, stockActual: stockDespues, ...unidadData, ...n10Meta, _ts: Date.now() }, { merge: true });
+      const costoData  = costo > 0  ? { costo }            : {};
+      await setDoc(invRef, { nombre: prodNom, stockActual: stockDespues, ...unidadData, ...costoData, ...n10Meta, _ts: Date.now() }, { merge: true });
       // Sincronizar `productos`: stock (leído por productos-control) y stockActual (leído por el APK)
       // prodDocId es el Firestore doc ID real; si no está (ajuste desde tabla), buscar por codigoN10
       let docIdParaProductos = prodDocId;
@@ -711,6 +742,7 @@ async function _guardarAjuste() {
     document.getElementById("inv-prod-id").disabled  = false;
     document.getElementById("inv-prod-nom").disabled = false;
     document.getElementById("inv-cantidad").value  = "";
+    document.getElementById("inv-costo").value     = "";
     document.getElementById("inv-motivo").value    = "";
     window._invSelFamilia?.("");
     document.getElementById("inv-litros-u").value  = "";
@@ -776,7 +808,7 @@ function _escucharMovimientos() {
   const q = query(collection(db, "movimientos_stock"), ...constraints);
 
   const tbody = document.getElementById("mov-body");
-  const ICON = { SALIDA:"🔴", ENTRADA:"🟢", DEVOLUCION:"🔵",
+  const ICON = { SALIDA:"🔴", ENTRADA:"🟢", ENTRADA_ALMACEN:"🟢", DEVOLUCION:"🔵",
     AJUSTE_ENTRADA:"➕", AJUSTE_SALIDA:"➖", AJUSTE_INVENTARIO:"🔁" };
 
   _unsubsMov.push(onSnapshot(q, snap => {

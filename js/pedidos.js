@@ -204,7 +204,7 @@ function _bindUI() {
 function _escuchar() {
   const q = query(collection(db, "pedidos"), orderBy("fechaPedido", "desc"), limit(500));
   _unsub = onSnapshot(q, snap => {
-    _pedidos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _pedidos = snap.docs.map(d => ({ ...d.data(), id: d.id }));
 
     // Poblar selector de ingenieros — deduplicar por nombre resuelto
     const rawAliases = [...new Set(
@@ -285,8 +285,13 @@ function _renderTabla() {
       <td style="padding:10px 14px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:12px">
         ${fmt.format(p.total || 0)}</td>
       <td style="padding:10px 14px;text-align:center">
-        <span style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px;
-          background:${color}1A;color:${color}">${esc(p.status?.replace(/_/g," ") || "–")}</span></td>
+        ${p.status === "PENDIENTE_AUTORIZACION"
+          ? `<span style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px;
+              background:#DC262633;color:#F87171;animation:pd-pulse 1.2s ease-in-out infinite"
+              >PENDIENTE AUTORIZACION</span>`
+          : `<span style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px;
+              background:${color}1A;color:${color}">${esc(p.status?.replace(/_/g," ") || "–")}</span>`
+        }</td>
       <td style="padding:10px 14px;text-align:center;font-size:11px;color:var(--text-sec)">
         ${_tipoLabel(p.tipoVenta)}</td>
     </tr>`;
@@ -324,11 +329,11 @@ function _renderTabla() {
             <th style="text-align:right;padding:3px 6px;font-weight:600">Subtotal</th>
           </tr>
           ${itms.map(it => `<tr>
-            <td style="padding:3px 6px">${esc(it.nombre || it.producto || "–")}</td>
+            <td style="padding:3px 6px">${esc(it.nombre || it.nombreProducto || it.producto || "–")}</td>
             <td style="padding:3px 6px;text-align:center">${it.cantidad ?? 1}</td>
-            <td style="padding:3px 6px;text-align:right">$${(it.precio||0).toLocaleString("es-MX")}</td>
+            <td style="padding:3px 6px;text-align:right">$${(it.precio||it.precioUnitario||0).toLocaleString("es-MX")}</td>
             <td style="padding:3px 6px;text-align:right;font-weight:700">
-              $${((it.cantidad||1)*(it.precio||0)).toLocaleString("es-MX")}</td>
+              $${((it.cantidad||1)*(it.precio||it.precioUnitario||0)).toLocaleString("es-MX")}</td>
           </tr>`).join("")}
         </table>`
       : `<span style="color:var(--text-muted);font-size:11px">Sin detalle de productos</span>`;
@@ -590,8 +595,15 @@ async function _comisionN10Entrega(ped) {
 
   if (litrosN10 <= 0) return;
 
-  const uid   = ped.ingenieroUid || ped.uid || ped.vendedorUid;
+  let uid     = ped.ingenieroUid || ped.uid || ped.vendedorUid || ped.ingenieroId;
   const alias = ped.ingenieroAlias || ped.vendedor || ped.ingeniero || "–";
+  if (!uid && alias && alias !== "–") {
+    try {
+      const q = query(collection(db, "usuarios"), where("alias", "==", alias), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) uid = snap.docs[0].id;
+    } catch (_) {}
+  }
   if (!uid) { console.warn("[N10] Sin UID de ingeniero en pedido", ped.id); return; }
 
   const res = await registrarVentaN10({
@@ -702,9 +714,17 @@ async function _comisionN10Revertir(ped) {
     }
   }
   if (litrosN10 <= 0) return;
-  const uid = ped.ingenieroUid || ped.uid || ped.vendedorUid;
-  if (!uid) return;
-  await revertirVentaN10({ uid, litros: litrosN10, ventaId: ped.id, fecha: new Date(ped.entregadoEn || Date.now()) });
+  let uid2 = ped.ingenieroUid || ped.uid || ped.vendedorUid || ped.ingenieroId;
+  const alias2 = ped.ingenieroAlias || ped.vendedor || ped.ingeniero || "–";
+  if (!uid2 && alias2 && alias2 !== "–") {
+    try {
+      const q2 = query(collection(db, "usuarios"), where("alias", "==", alias2), limit(1));
+      const snap2 = await getDocs(q2);
+      if (!snap2.empty) uid2 = snap2.docs[0].id;
+    } catch (_) {}
+  }
+  if (!uid2) return;
+  await revertirVentaN10({ uid: uid2, litros: litrosN10, ventaId: ped.id, fecha: new Date(ped.entregadoEn || Date.now()) });
   console.info(`[N10] Revertidos ${litrosN10}L de pedido cancelado ${ped.id}`);
 }
 

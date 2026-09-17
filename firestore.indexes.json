@@ -184,6 +184,30 @@
         { "fieldPath": "uid",   "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pedidos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ingenieroAlias", "order": "ASCENDING" },
+        { "fieldPath": "fechaPedido",    "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visitas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aliasVendedor", "order": "ASCENDING" },
+        { "fieldPath": "timestamp",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comisiones_n10",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "mes_key", "order": "ASCENDING" },
+        { "fieldPath": "uid",     "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

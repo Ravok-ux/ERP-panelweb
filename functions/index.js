@@ -822,51 +822,115 @@ exports.healthCheck = onRequest(
   }
 );
 
+// ── Helper: calcular y guardar métricas para una fecha ─────────
+async function _calcularMetricasFecha(fecha) {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const desdeTs   = new Date(y, m - 1, d, 0, 0, 0).getTime();
+  const hastaTs   = desdeTs + 86_399_999;
+
+  const [pedSnap, visSnap, aboSnap, notSnap, cotSnap] = await Promise.all([
+    db.collection("pedidos")
+      .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
+    db.collection("visitas_programadas")
+      .where("fechaTs", ">=", desdeTs).where("fechaTs", "<=", hastaTs).get()
+      .then(s => ({ data: () => ({ count: s.docs.filter(d => d.data().status === "COMPLETADA").length }) })),
+    db.collection("abonos")
+      .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
+    db.collection("notificaciones_web")
+      .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
+    db.collection("cotizaciones")
+      .where("_ts", ">=", desdeTs).count().get(),
+  ]);
+
+  const [cliSnap, usrSnap] = await Promise.all([
+    db.collection("clientes").where("activo", "==", true).count().get(),
+    db.collection("usuarios").where("activo", "==", true).count().get(),
+  ]);
+
+  const metricas = {
+    fecha,
+    pedidosHoy:         pedSnap.data().count,
+    visitasCompletadas: visSnap.data().count,
+    abonosHoy:          aboSnap.data().count,
+    notificacionesHoy:  notSnap.data().count,
+    cotizacionesHoy:    cotSnap.data().count,
+    clientesActivos:    cliSnap.data().count,
+    usuariosActivos:    usrSnap.data().count,
+    generadoEn:         FSTimestamp.now(),
+    _ts:                Date.now(),
+  };
+
+  await db.collection("metricas_diarias").doc(fecha).set(metricas, { merge: true });
+  logger.info(`[metricasDiarias] ${fecha}:`, metricas);
+  return metricas;
+}
+
+// ── Helper: calcular y guardar manifesto de backup ─────────────
+async function _calcularBackupManifesto(fecha) {
+  const colecciones = [
+    "clientes", "pedidos", "remisiones", "abonos",
+    "cotizaciones", "usuarios", "visitas_programadas",
+    "geocercas", "productos", "kardex",
+  ];
+  const conteos  = {};
+  let totalDocs  = 0;
+  await Promise.all(
+    colecciones.map(async (col) => {
+      try {
+        const snap    = await db.collection(col).count().get();
+        conteos[col]  = snap.data().count;
+        totalDocs    += conteos[col];
+      } catch (_) { conteos[col] = -1; }
+    })
+  );
+  const manifesto = { fecha, conteos, totalDocs, generadoEn: FSTimestamp.now(), _ts: Date.now() };
+  await db.collection("backups_manifesto").doc(fecha).set(manifesto);
+  logger.info(`[backupManifesto] ${fecha} — ${totalDocs} docs totales`);
+  return manifesto;
+}
+
 // ── S9-B: Métricas diarias (23:55 hora CDMX) ───────────────────
 exports.metricasDiarias = onSchedule(
   { schedule: "55 23 * * *", timeZone: "America/Mexico_City", region: "us-central1" },
   async () => {
-    const hoy    = new Date();
-    const fecha  = hoy.toISOString().slice(0, 10);
-    const desdeTs = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0).getTime();
-    const hastaTs = desdeTs + 86_399_999;
+    const fecha = new Date().toISOString().slice(0, 10);
+    await _calcularMetricasFecha(fecha);
+  }
+);
 
-    // Contar documentos del día en colecciones clave
-    const [pedSnap, visSnap, aboSnap, notSnap, cotSnap] = await Promise.all([
-      db.collection("pedidos")
-        .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
-      db.collection("visitas_programadas")
-        .where("status", "==", "COMPLETADA")
-        .where("fechaTs", ">=", desdeTs).where("fechaTs", "<=", hastaTs).count().get(),
-      db.collection("abonos")
-        .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
-      db.collection("notificaciones_web")
-        .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
-      db.collection("cotizaciones")
-        .where("_ts", ">=", desdeTs).count().get(),
-    ]);
+// ── S9-D: Forzar métricas + backup vía HTTP (solo SUPER_ADMIN) ─
+exports.forzarMetricas = onRequest(
+  { region: "us-central1", cors: ["https://n10-erp.web.app"] },
+  async (req, res) => {
+    // Verificar token de Firebase Auth en el header Authorization
+    const auth    = req.headers.authorization || "";
+    const idToken = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+    if (!idToken) { res.status(401).json({ error: "Sin token" }); return; }
 
-    // Totales acumulados (sin filtro de fecha — snapshot del momento)
-    const [cliSnap, usrSnap] = await Promise.all([
-      db.collection("clientes").where("activo", "==", true).count().get(),
-      db.collection("usuarios").where("activo", "==", true).count().get(),
-    ]);
+    let uid;
+    try {
+      const decoded = await getAuth().verifyIdToken(idToken);
+      uid = decoded.uid;
+    } catch (_) { res.status(401).json({ error: "Token inválido" }); return; }
 
-    const metricas = {
-      fecha,
-      pedidosHoy:         pedSnap.data().count,
-      visitasCompletadas: visSnap.data().count,
-      abonosHoy:          aboSnap.data().count,
-      notificacionesHoy:  notSnap.data().count,
-      cotizacionesHoy:    cotSnap.data().count,
-      clientesActivos:    cliSnap.data().count,
-      usuariosActivos:    usrSnap.data().count,
-      generadoEn:         FSTimestamp.now(),
-      _ts:                Date.now(),
-    };
+    // Verificar que sea SUPER_ADMIN o GERENTE
+    const userDoc = await db.collection("usuarios").doc(uid).get();
+    const rol     = userDoc.exists ? userDoc.data().rol : null;
+    if (!["SUPER_ADMIN", "GERENTE", "ADMINISTRADOR"].includes(rol)) {
+      res.status(403).json({ error: "Sin permiso" }); return;
+    }
 
-    await db.collection("metricas_diarias").doc(fecha).set(metricas, { merge: true });
-    logger.info(`[metricasDiarias] ${fecha}:`, metricas);
+    const fecha = req.query.fecha || new Date().toISOString().slice(0, 10);
+    try {
+      const [metricas, manifesto] = await Promise.all([
+        _calcularMetricasFecha(fecha),
+        _calcularBackupManifesto(fecha),
+      ]);
+      res.json({ status: "OK", fecha, metricas, manifesto });
+    } catch (e) {
+      logger.error("[forzarMetricas]", e);
+      res.status(500).json({ error: e.message });
+    }
   }
 );
 
@@ -875,38 +939,7 @@ exports.backupManifesto = onSchedule(
   { schedule: "0 2 * * *", timeZone: "America/Mexico_City", region: "us-central1" },
   async () => {
     const fecha = new Date().toISOString().slice(0, 10);
-
-    // Contar documentos de las colecciones críticas → manifesto de integridad
-    const colecciones = [
-      "clientes", "pedidos", "remisiones", "abonos",
-      "cotizaciones", "usuarios", "visitas_programadas",
-      "geocercas", "productos", "kardex",
-    ];
-
-    const conteos = {};
-    let totalDocs = 0;
-    await Promise.all(
-      colecciones.map(async (col) => {
-        try {
-          const snap = await db.collection(col).count().get();
-          conteos[col] = snap.data().count;
-          totalDocs   += conteos[col];
-        } catch (_) {
-          conteos[col] = -1; // colección no accesible
-        }
-      })
-    );
-
-    const manifesto = {
-      fecha,
-      conteos,
-      totalDocs,
-      generadoEn: FSTimestamp.now(),
-      _ts:        Date.now(),
-    };
-
-    await db.collection("backups_manifesto").doc(fecha).set(manifesto);
-    logger.info(`[backupManifesto] ${fecha} — ${totalDocs} docs totales`);
+    await _calcularBackupManifesto(fecha);
   }
 );
 

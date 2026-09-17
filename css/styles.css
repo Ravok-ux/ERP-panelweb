@@ -739,6 +739,11 @@ input:not([class]), select:not([class]), textarea:not([class]) {
   background: var(--green-dark); color: #fff; border-color: var(--green-dark);
 }
 
+@keyframes pd-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 #DC262655; }
+  50%       { opacity: .75; box-shadow: 0 0 0 5px #DC262600; }
+}
+
 /* ══════════════════════════════
    CARDS / TABLES (shared)
    ══════════════════════════════ */

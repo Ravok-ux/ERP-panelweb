@@ -19,11 +19,11 @@ const fmtFecha = ts => ts
   : "—";
 
 const ETAPAS = [
-  { id:"NUEVO",      label:"Nuevo",      color:"#6B7280", bg:"#F3F4F6" },
-  { id:"CONTACTADO", label:"Contactado", color:"#1D4ED8", bg:"#DBEAFE" },
-  { id:"PROPUESTA",  label:"Propuesta",  color:"#D97706", bg:"#FEF3C7" },
-  { id:"GANADO",     label:"Ganado",     color:"#16A34A", bg:"#DCFCE7" },
-  { id:"PERDIDO",    label:"Perdido",    color:"#DC2626", bg:"#FEE2E2" },
+  { id:"NUEVO",      label:"Nuevo",      color:"#6B7280", bg:"#6B728020" },
+  { id:"CONTACTADO", label:"Contactado", color:"#1D4ED8", bg:"#1D4ED820" },
+  { id:"PROPUESTA",  label:"Propuesta",  color:"#D97706", bg:"#D9770620" },
+  { id:"GANADO",     label:"Ganado",     color:"#16A34A", bg:"#16A34A20" },
+  { id:"PERDIDO",    label:"Perdido",    color:"#DC2626", bg:"#DC262620" },
 ];
 const etapaMap = Object.fromEntries(ETAPAS.map(e => [e.id, e]));
 
@@ -67,11 +67,15 @@ export const CrmModule = {
 
       <!-- KPIs -->
       <div class="kpi-row" style="margin-bottom:16px">
-        ${ETAPAS.slice(0,4).map(e => `
+        ${ETAPAS.map(e => `
         <div class="kpi-card" style="border-left-color:${e.color}">
           <div class="kpi-val" id="crm-kpi-${e.id}">–</div>
           <div class="kpi-label">${e.label}</div>
         </div>`).join("")}
+        <div class="kpi-card" style="border-left-color:#0891B2">
+          <div class="kpi-val" id="crm-kpi-conv" style="font-size:18px">–</div>
+          <div class="kpi-label">Tasa conversión</div>
+        </div>
         <div class="kpi-card" style="border-left-color:#7C3AED">
           <div class="kpi-val" id="crm-kpi-pipeline" style="font-size:13px">–</div>
           <div class="kpi-label">Pipeline ponderado</div>
@@ -299,18 +303,27 @@ function _bindUI() {
   };
   document.getElementById("crm-nuevo-btn")?.addEventListener("click", () => {
     document.getElementById("crm-modal-title").textContent = "Nuevo prospecto";
-    ["crm-nombre","crm-telefono","crm-giro","crm-direccion","crm-notas"]
+    document.getElementById("crm-modal").dataset.editId = "";
+    ["crm-nombre","crm-telefono","crm-giro","crm-direccion","crm-notas",
+     "crm-producto","crm-valor","crm-prob"]
       .forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+    const selEtapa = document.getElementById("crm-etapa");
+    if (selEtapa) selEtapa.value = "NUEVO";
+    const selIng = document.getElementById("crm-ing-asig");
+    if (selIng) selIng.value = "";
     document.getElementById("crm-modal")?.classList.remove("hidden");
   });
   document.getElementById("crm-modal-close")?.addEventListener("click", cerrarModal);
   document.getElementById("crm-cancel")?.addEventListener("click", cerrarModal);
   document.getElementById("crm-guardar")?.addEventListener("click", _guardarProspecto);
 
-  document.getElementById("crm-conv-close")?.addEventListener("click", () =>
-    document.getElementById("crm-conv-modal")?.classList.add("hidden"));
-  document.getElementById("crm-conv-cancel")?.addEventListener("click", () =>
-    document.getElementById("crm-conv-modal")?.classList.add("hidden"));
+  const _cerrarConvModal = () => {
+    document.getElementById("crm-conv-modal")?.classList.add("hidden");
+    // Revertir select si el usuario canceló sin convertir (el snapshot tardará en llegar)
+    _renderVista();
+  };
+  document.getElementById("crm-conv-close")?.addEventListener("click", _cerrarConvModal);
+  document.getElementById("crm-conv-cancel")?.addEventListener("click", _cerrarConvModal);
   document.getElementById("crm-conv-ok")?.addEventListener("click", _convertirACliente);
 
   document.getElementById("crm-panel-close")?.addEventListener("click", () =>
@@ -344,10 +357,18 @@ function _iniciarListeners() {
 const fmtM = n => "$" + Math.round(n).toLocaleString("es-MX");
 
 function _actualizarKPIs(rows) {
-  ETAPAS.slice(0,4).forEach(e => {
+  ETAPAS.forEach(e => {
     const el = document.getElementById(`crm-kpi-${e.id}`);
     if (el) el.textContent = rows.filter(r => r.etapa === e.id).length;
   });
+  // Tasa de conversión = GANADO / (GANADO + PERDIDO)
+  const ganados = rows.filter(r => r.etapa === "GANADO").length;
+  const perdidos = rows.filter(r => r.etapa === "PERDIDO").length;
+  const elConv = document.getElementById("crm-kpi-conv");
+  if (elConv) {
+    const base = ganados + perdidos;
+    elConv.textContent = base > 0 ? `${Math.round(ganados / base * 100)}%` : "–";
+  }
   // Pipeline ponderado = Σ (valorEstimado * probabilidad / 100) para no PERDIDOS
   const pipeline = rows
     .filter(r => r.etapa !== "PERDIDO")
@@ -451,6 +472,7 @@ function _renderKanban(rows) {
             <div style="font-weight:700;font-size:13px">${esc(r.nombre||"–")}</div>
             <div style="font-size:11px;color:var(--text-sec)">${esc(r.giro||"")}</div>
             <div style="font-size:11px;margin-top:6px">👷 ${esc(resolverNombre(r.ingenieroAlias) || "Sin asignar")}</div>
+            ${r.valorEstimado ? `<div style="font-size:11px;margin-top:4px;font-weight:600;color:var(--text-pri)">${fmtM(r.valorEstimado)} · ${r.probabilidad ?? 0}%</div>` : ""}
             <div style="font-size:10px;color:var(--text-sec);margin-top:4px">${fmtFecha(r._ts)}</div>
           </div>`).join("")}
       </div>
@@ -503,7 +525,7 @@ function _abrirPanel(id) {
         style="background:#16A34A;margin-top:4px">🎉 Marcar como GANADO → Convertir a cliente</button>
       <button class="btn-outline" id="crm-perder-btn" data-id="${r.id}"
         style="color:#DC2626;border-color:#DC2626">✗ Marcar como PERDIDO</button>` : ""}
-      ${esGanado ? `<div style="padding:12px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#15803D">
+      ${esGanado ? `<div style="padding:12px;background:#16A34A20;border-radius:8px;font-size:12px;color:#16A34A">
         ✅ Prospecto convertido a cliente</div>` : ""}
     </div>`;
 
@@ -514,7 +536,10 @@ function _abrirPanel(id) {
     await updateDoc(doc(db,"prospectos",id), { notas, _ts: Date.now() })
       .catch(e => window.toast?.(e.message,"error"));
     window.toast?.("Nota guardada","success");
-    document.getElementById("crm-nota-txt").value = "";
+    // Actualizar local inmediatamente para que el panel refleje la nota sin esperar snapshot
+    const idx = _todosProspectos.findIndex(p => p.id === id);
+    if (idx !== -1) _todosProspectos[idx] = { ..._todosProspectos[idx], notas };
+    _abrirPanel(id);
   });
 
   document.getElementById("crm-avanzar-btn")?.addEventListener("click", async () => {
@@ -537,12 +562,15 @@ function _abrirPanel(id) {
 }
 
 async function _cambiarEtapa(id, etapa) {
-  await updateDoc(doc(db,"prospectos",id), { etapa, _ts: Date.now() })
-    .catch(e => window.toast?.(e.message,"error"));
   if (etapa === "GANADO") {
+    // No escribir todavía — el modal de conversión escribe etapa+clienteId juntos.
+    // Si el usuario cancela el modal, el prospecto no queda marcado como GANADO sin cliente.
     document.getElementById("crm-conv-modal").dataset.prospectoId = id;
     document.getElementById("crm-conv-modal")?.classList.remove("hidden");
+    return;
   }
+  await updateDoc(doc(db,"prospectos",id), { etapa, _ts: Date.now() })
+    .catch(e => window.toast?.(e.message,"error"));
 }
 
 // ── Guardar prospecto ─────────────────────────────────────────

@@ -43,10 +43,11 @@ const TIPOS = {
   USUARIO_MODIFICADO:     { icon: "✏️", sev: "media", label: "Usuario modificado"     },
   ROL_CAMBIADO:           { icon: "🔑", sev: "alta",  label: "Rol cambiado"           },
   CONFIG_MODIFICADA:      { icon: "⚙️", sev: "media", label: "Configuración modificada"},
-  PEDIDO_CANCELADO:       { icon: "❌", sev: "media", label: "Pedido rechazado"       },
+  PEDIDO_CANCELADO:       { icon: "❌", sev: "media", label: "Pedido cancelado"       },
   PEDIDO_APROBADO:        { icon: "✅", sev: "alta",  label: "Pedido aprobado"        },
   PEDIDO_RECHAZADO:       { icon: "🚫", sev: "alta",  label: "Pedido rechazado"       },
   PEDIDO_INFO_REQUERIDA:  { icon: "💬", sev: "media", label: "Info solicitada"        },
+  PEDIDO_PENDIENTE_AUTH:  { icon: "⏳", sev: "media", label: "Pendiente autorización" },
   // Almacén
   STOCK_ENTRADA:          { icon: "📥", sev: "media", label: "Entrada de stock"       },
   STOCK_SALIDA:           { icon: "📤", sev: "media", label: "Salida de stock"        },
@@ -248,13 +249,22 @@ async function _escuchar() {
   const tbody = document.getElementById("aud-body");
   if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center">Cargando…</td></tr>`;
 
-  // Sin orderBy — Firestore no requiere índice compuesto; sort en JS
-  const _buildQ = col => query(
-    collection(db, col),
-    where("_ts", ">=", desdeTs),
-    where("_ts", "<=", hastaTs),
-    limit(500)
-  );
+  // Normaliza un doc a _ts numérico (ms) sin importar el tipo almacenado
+  const _normDoc = (id, col, data) => {
+    let ts = data._ts ?? data.timestamp;
+    if (ts && typeof ts === "object" && typeof ts.toMillis === "function") ts = ts.toMillis();
+    ts = Number(ts) || 0;
+    return { id, _fuente: col, ...data, _ts: ts };
+  };
+
+  // audit_log usa _ts (number) → podemos filtrar en Firestore
+  // log_actividades mezcla Timestamp y number → filtramos client-side para evitar errores de tipo
+  const _buildQ = col => {
+    if (col === "audit_log") {
+      return query(collection(db, col), where("_ts", ">=", desdeTs), where("_ts", "<=", hastaTs), limit(500));
+    }
+    return query(collection(db, col), limit(500)); // filtro de fecha en JS después de normalizar
+  };
 
   const _onErr = err => {
     console.error("[Auditoria]", err);
@@ -269,15 +279,17 @@ async function _escuchar() {
     _unsubA = onSnapshot(_buildQ("audit_log"), snap => {
       snap.docChanges().forEach(ch => {
         if (ch.type === "removed") delete _mapaAmbasA[ch.doc.id];
-        else _mapaAmbasA[ch.doc.id] = { id: ch.doc.id, _fuente: "audit_log", ...ch.doc.data() };
+        else _mapaAmbasA[ch.doc.id] = _normDoc(ch.doc.id, "audit_log", ch.doc.data());
       });
       _alertarNuevos(snap, _prevSize);
       _mergeAmbas();
     }, _onErr);
     _unsubB = onSnapshot(_buildQ("log_actividades"), snap => {
       snap.docChanges().forEach(ch => {
-        if (ch.type === "removed") delete _mapaAmbasB[ch.doc.id];
-        else _mapaAmbasB[ch.doc.id] = { id: ch.doc.id, _fuente: "log_actividades", ...ch.doc.data() };
+        if (ch.type === "removed") { delete _mapaAmbasB[ch.doc.id]; return; }
+        const r = _normDoc(ch.doc.id, "log_actividades", ch.doc.data());
+        if (r._ts >= desdeTs && r._ts <= hastaTs) _mapaAmbasB[ch.doc.id] = r;
+        else delete _mapaAmbasB[ch.doc.id];
       });
       _mergeAmbas();
     }, _onErr);
@@ -285,7 +297,8 @@ async function _escuchar() {
     const col = fuente === "actividades" ? "log_actividades" : "audit_log";
     _unsub = onSnapshot(_buildQ(col), snap => {
       _rowsRaw = snap.docs
-        .map(d => ({ id: d.id, _fuente: col, ...d.data() }))
+        .map(d => _normDoc(d.id, col, d.data()))
+        .filter(r => r._ts >= desdeTs && r._ts <= hastaTs)
         .sort((a, b) => (b._ts || 0) - (a._ts || 0));
       _alertarNuevos(snap, _prevSize);
       _aplicarFiltrosCliente();
@@ -451,6 +464,8 @@ function _descripcion(r) {
       return `${r.productoNombre || r.productoId || "–"}: -${r.cantidad} unidades → stock ${r.stockDespues}`;
     case "AJUSTE_INVENTARIO":
       return `${r.productoNombre || r.productoId || "–"}: ${r.stockAntes} → ${r.stockDespues} · ${r.motivo || "–"}`;
+    case "PEDIDO_PENDIENTE_AUTH":
+      return `${r.folio || "–"} · ${r.cliente || r.clienteNombre || "–"} · ${r.motivo || "requiere autorización"}`;
     case "PROSPECTO_CREADO":
       return `${r.nombre || "–"} · ${r.empresa || "–"}`;
     case "PROSPECTO_CONVERTIDO":
@@ -500,12 +515,35 @@ window._audDetalle = function(idx) {
       </table>
     </div>`;
 
-  window.modal?.({
-    title: `Detalle de evento — ${esc(r.folio || r.id || "")}`,
-    message: html,
-    confirmLabel: "Cerrar",
-    danger: false,
-  });
+  // window.modal escapa el HTML, usamos overlay propio para contenido de tabla
+  const existing = document.getElementById("_aud-detalle-modal");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "_aud-detalle-modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9990;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)";
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      padding:24px 28px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;
+      box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span>Detalle de evento — ${esc(r.folio || r.id || "")}</span>
+        <button id="_aud-dm-close" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-sec);line-height:1">×</button>
+      </div>
+      <div style="overflow-y:auto;flex:1">${html}</div>
+      <div style="margin-top:16px;text-align:right">
+        <button id="_aud-dm-ok" style="padding:8px 20px;border-radius:7px;font-size:13px;font-weight:600;
+          cursor:pointer;background:var(--primary,#1D5C33);color:#fff;border:1px solid #16A34A">Cerrar</button>
+      </div>
+    </div>`;
+
+  const close = () => { overlay.remove(); document.removeEventListener("keydown", _audKey); };
+  const _audKey = e => { if (e.key === "Escape") close(); };
+  overlay.querySelector("#_aud-dm-close").onclick = close;
+  overlay.querySelector("#_aud-dm-ok").onclick    = close;
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+  document.addEventListener("keydown", _audKey);
+  document.body.appendChild(overlay);
 };
 
 // ── Exportar Excel ────────────────────────────────────────────
