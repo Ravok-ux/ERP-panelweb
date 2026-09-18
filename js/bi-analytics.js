@@ -512,7 +512,7 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
       const brecha = (best.p - worst.p) * 100;
       if (brecha > 30) {
         insights.push({ tipo:"critico", texto: `${kd.label}: ${resolverNombre(best.a)||best.a} promedia ${Math.round(best.p*100)}% de meta vs ${resolverNombre(worst.a)||worst.a} ${Math.round(worst.p*100)}% — brecha de ${Math.round(brecha)} pp` });
-        recs.push(`Nivelar ${kd.label.toLowerCase()}: acompanar a ${resolverNombre(worst.a)||worst.a} para identificar brechas operativas vs ${resolverNombre(best.a)||best.a}`);
+        recs.push(`Nivelar ${kd.label.toLowerCase()}: acompañar a ${resolverNombre(worst.a)||worst.a} para identificar brechas operativas vs ${resolverNombre(best.a)||best.a}`);
       }
     });
   }
@@ -523,8 +523,8 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
     if (!pcts.length) return;
     const minP = Math.min(...pcts), maxP = Math.max(...pcts);
     if (maxP < 0.6) {
-      insights.push({ tipo:"critico", texto: `${kd.label}: ningun ingeniero supera el 60% de meta (rango ${Math.round(minP*100)}%–${Math.round(maxP*100)}%)` });
-      recs.push(`Revisar meta de ${kd.label.toLowerCase()}: todos estan por debajo del 60%; puede ser meta fuera de rango o dato no registrado`);
+      insights.push({ tipo:"critico", texto: `${kd.label}: ningún ingeniero supera el 60% de meta (rango ${Math.round(minP*100)}%–${Math.round(maxP*100)}%)` });
+      recs.push(`Revisar meta de ${kd.label.toLowerCase()}: todos están por debajo del 60%; puede ser meta fuera de rango o dato no registrado`);
     }
   });
 
@@ -534,7 +534,7 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
     const pCon = pctProm(alias, KPI_DEFS[5]);
     if (pVis !== null && pCon !== null && pVis > 0.7 && pCon < 0.45) {
       insights.push({ tipo:"alerta", texto: `${resolverNombre(alias)||alias}: visita al ${Math.round(pVis*100)}% pero convierte al ${Math.round(pCon*100)}% — posible problema en cierre, no en actividad` });
-      recs.push(`Foco en cierre para ${resolverNombre(alias)||alias}: visitas (${Math.round(pVis*100)}%) son suficientes; la conversion (${Math.round(pCon*100)}%) requiere acompanamiento en ruta`);
+      recs.push(`Foco en cierre para ${resolverNombre(alias)||alias}: visitas (${Math.round(pVis*100)}%) son suficientes; la conversión (${Math.round(pCon*100)}%) requiere acompañamiento en ruta`);
     }
   });
 
@@ -899,7 +899,7 @@ function _tabKpiIngenieros() {
       </div>`);
 
       bloques.push(`<div class="bi-card" style="margin-bottom:14px">
-        <div class="bi-card-title">&#x1F9F2; Embudo de conversion: Prospectos → Convertidos</div>
+        <div class="bi-card-title">&#x1F9F2; Embudo de conversión: Prospectos → Convertidos</div>
         ${_grafEmbudo(kpiData,metas,aliases,semanas)}
       </div>`);
 
@@ -925,13 +925,13 @@ function _tabKpiIngenieros() {
         : `<p style="color:var(--text-muted);font-size:13px">No se detectaron insights significativos para el periodo seleccionado.</p>`;
 
       const recsHtml = recs.length
-        ? `<ol style="margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:var(--text-secondary)">${recs.map(r=>`<li>${esc(r)}</li>`).join("")}</ol>`
+        ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">${recs.map((r,i)=>`<div style="display:flex;align-items:flex-start;gap:10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-left:3px solid #6366F1;border-radius:7px;padding:9px 12px"><span style="flex-shrink:0;min-width:20px;height:20px;border-radius:50%;background:#6366F1;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${i+1}</span><span style="font-size:12.5px;line-height:1.55;color:var(--text-secondary)">${esc(r)}</span></div>`).join("")}</div>`
         : "";
 
       bloques.push(`<div class="bi-card" style="margin-bottom:14px">
         <div class="bi-card-title">&#x1F4A1; Insights del periodo</div>
         ${insHtml}
-        ${recs.length?`<div class="bi-card-title" style="margin-top:14px">&#x1F3AF; Recomendaciones</div>${recsHtml}`:""}
+        ${recs.length?`<div class="bi-card-title" style="margin-top:16px">&#x1F3AF; Recomendaciones</div>${recsHtml}`:""}
       </div>`);
 
       res.innerHTML = bloques.join("");
