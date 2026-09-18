@@ -99,7 +99,7 @@ function _html() {
     </div>
 
     <!-- KPIs rápidos -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px" id="pd-kpis">
+    <div class="kpi-row" id="pd-kpis" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
       ${[
         {l:"Total",        id:"Total",        c:"var(--text-primary)"},
         {l:"Confirmados",  id:"Confirmados",  c:"#2563EB"},
@@ -107,12 +107,9 @@ function _html() {
         {l:"Entregados",   id:"Entregados",   c:"#16A34A"},
         {l:"Monto total",  id:"Monto",        c:"#0E7490"},
       ].map(({l,id,c}) =>
-        `<div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);
-          padding:14px 16px;box-shadow:var(--shadow)">
-          <div style="font-size:20px;font-weight:900;color:${c};font-variant-numeric:tabular-nums"
-            id="pd-k-${id}">–</div>
-          <div style="font-size:10px;font-weight:700;color:var(--text-sec);margin-top:3px;
-            text-transform:uppercase;letter-spacing:.04em">${l}</div>
+        `<div class="kpi-card" style="border-left-color:${c}">
+          <div class="kpi-val" id="pd-k-${id}">–</div>
+          <div class="kpi-label">${l}</div>
         </div>`).join("")}
     </div>
 

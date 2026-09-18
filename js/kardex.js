@@ -87,10 +87,7 @@ function _html() {
 
   return `
   <style>
-    .kx-kpi { padding:14px 16px;border-right:1px solid var(--border) }
-    .kx-kpi-val { font-size:22px;font-weight:800;font-variant-numeric:tabular-nums }
-    .kx-kpi-lbl { font-size:10px;font-weight:600;color:#9CA3AF;
-      text-transform:uppercase;letter-spacing:.05em;margin-top:2px }
+    /* KPIs — usa .kpi-card global */
     .kx-tabla-wrap { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 250px) }
     .kx-tabla { width:100%;border-collapse:collapse;font-size:12.5px }
     .kx-tabla th { background:var(--surface);padding:9px 13px;
@@ -148,27 +145,30 @@ function _html() {
     </div>
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);
-      border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">
-      <div class="kx-kpi">
-        <div class="kx-kpi-lbl">Total movimientos</div>
-        <div class="kx-kpi-val" id="kx-k-total" style="color:var(--text-primary)">—</div>
+    <div class="kpi-row">
+      <div class="kpi-card" style="border-left-color:var(--text-primary)">
+        <div class="kpi-val" id="kx-k-total">—</div>
+        <div class="kpi-label">Total movimientos</div>
       </div>
-      <div class="kx-kpi">
-        <div class="kx-kpi-lbl">↑ Entradas</div>
-        <div class="kx-kpi-val" id="kx-k-entrada" style="color:#16A34A">—</div>
+      <div class="kpi-card" style="border-left-color:#16A34A">
+        <div class="kpi-icon">↑</div>
+        <div class="kpi-val" id="kx-k-entrada">—</div>
+        <div class="kpi-label">Entradas</div>
       </div>
-      <div class="kx-kpi">
-        <div class="kx-kpi-lbl">↓ Salidas</div>
-        <div class="kx-kpi-val" id="kx-k-salida" style="color:#DC2626">—</div>
+      <div class="kpi-card" style="border-left-color:#DC2626">
+        <div class="kpi-icon">↓</div>
+        <div class="kpi-val" id="kx-k-salida">—</div>
+        <div class="kpi-label">Salidas</div>
       </div>
-      <div class="kx-kpi">
-        <div class="kx-kpi-lbl">± Ajustes</div>
-        <div class="kx-kpi-val" id="kx-k-ajuste" style="color:#2563EB">—</div>
+      <div class="kpi-card" style="border-left-color:#2563EB">
+        <div class="kpi-icon">±</div>
+        <div class="kpi-val" id="kx-k-ajuste">—</div>
+        <div class="kpi-label">Ajustes</div>
       </div>
-      <div class="kx-kpi" style="border-right:none">
-        <div class="kx-kpi-lbl">⚠ Stock bajo</div>
-        <div class="kx-kpi-val" id="kx-k-alertas" style="color:#D97706">—</div>
+      <div class="kpi-card" style="border-left-color:#D97706">
+        <div class="kpi-icon">⚠</div>
+        <div class="kpi-val" id="kx-k-alertas">—</div>
+        <div class="kpi-label">Stock bajo</div>
       </div>
     </div>
 

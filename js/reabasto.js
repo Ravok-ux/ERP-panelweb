@@ -115,7 +115,7 @@ function _html() {
   return `
   <div style="padding:16px 20px;max-width:1200px;margin:0 auto">
     <!-- KPIs -->
-    <div id="reb-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px"></div>
+    <div id="reb-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
 
     <!-- Tabs -->
     <div id="reb-tabs" style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px">
@@ -194,9 +194,9 @@ function _renderKPIs() {
   const hoyN    = _solicitudes.filter(s => s._ts >= hoy.getTime() && s.estado === "PENDIENTE").length;
 
   const kpi = (id, val, label, color) => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
-      <div style="font-size:22px;font-weight:800;color:${color}">${val}</div>
-      <div style="font-size:10px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;margin-top:2px">${label}</div>
+    <div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${label}</div>
     </div>`;
 
   el.innerHTML =

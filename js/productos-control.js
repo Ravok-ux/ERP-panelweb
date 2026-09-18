@@ -221,14 +221,13 @@ function _html() {
       </div>
 
       <!-- KPIs -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;flex-shrink:0;
-        border-bottom:1px solid var(--border)">
+      <div class="kpi-row" style="flex-shrink:0;padding:10px 20px">
         ${[["pc-kpi-total","Total","#9CA3AF"],["pc-kpi-activos","Activos","#4ADE80"],
            ["pc-kpi-inact","Inactivos","#F87171"],["pc-kpi-sinprecio","Sin precio","#FBBF24"]
           ].map(([id,lbl,col]) => `
-          <div style="padding:12px 18px;border-right:1px solid var(--border)">
-            <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${lbl}</div>
-            <div id="${id}" style="font-size:18px;font-weight:800;color:${col}">–</div>
+          <div class="kpi-card" style="border-left-color:${col}">
+            <div class="kpi-val" id="${id}">–</div>
+            <div class="kpi-label">${lbl}</div>
           </div>`).join("")}
       </div>
 

@@ -103,8 +103,7 @@ function _html() {
   <div style="padding:0 0 24px">
 
     <!-- KPIs -->
-    <div id="ing-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-      gap:10px;margin-bottom:14px"></div>
+    <div id="ing-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"></div>
 
     <!-- Controles -->
     <div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);
@@ -599,11 +598,10 @@ function _renderKPIs(total, enJornada, enVivo, sinSenal) {
     ["En vivo (GPS)",  enVivo,    "#2563EB",             "📡"],
     ["Sin señal GPS",  sinSenal,  "#DC2626",             "📵"],
   ].map(([label, val, color, ico]) => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
-      padding:12px 16px;border-left:4px solid ${color};box-shadow:0 1px 3px rgba(0,0,0,.06)">
-      <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;
-        letter-spacing:.06em;margin-bottom:4px">${ico} ${label}</div>
-      <div style="font-size:22px;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${val}</div>
+    <div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-icon">${ico}</div>
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${label}</div>
     </div>`).join("");
 }
 

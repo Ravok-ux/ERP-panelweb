@@ -111,11 +111,7 @@ function _html() {
       border-bottom:2px solid transparent;margin-bottom:-2px;
       transition:color .15s,border-color .15s }
     .cart-tab.active { color:var(--accent,#3B82F6);border-bottom-color:var(--accent,#3B82F6);font-weight:700 }
-    .cart-kpi { background:var(--surface);border:1px solid var(--border);
-      border-radius:10px;padding:13px 16px }
-    .cart-kpi-val { font-size:20px;font-weight:800;font-variant-numeric:tabular-nums }
-    .cart-kpi-lbl { font-size:10px;font-weight:600;color:#9CA3AF;
-      text-transform:uppercase;letter-spacing:.05em;margin-top:2px }
+    /* KPIs — usa .kpi-card global */
     .cart-pill { padding:5px 13px;border-radius:20px;border:1.5px solid;
       font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;
       background:transparent }
@@ -155,7 +151,7 @@ function _html() {
     <div id="cart-panel-aging">
 
       <!-- KPIs -->
-      <div id="cart-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+      <div id="cart-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
         ${[1,2,3,4,5,6,7].map(() =>
           `<div style="height:68px;border-radius:10px;background:var(--surface);border:1px solid var(--border);
             animation:pulse 1.5s ease-in-out infinite alternate"></div>`).join("")}
@@ -388,9 +384,9 @@ function _renderKpis() {
   const desbloq  = _clientes.filter(c => c.desbloqueoHasta > Date.now()).length;
 
   const kpi = (val, lbl, color="var(--text-primary)") =>
-    `<div class="cart-kpi">
-      <div class="cart-kpi-val" style="color:${color}">${val}</div>
-      <div class="cart-kpi-lbl">${lbl}</div>
+    `<div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${lbl}</div>
     </div>`;
 
   el.innerHTML =

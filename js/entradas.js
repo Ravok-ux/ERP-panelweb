@@ -59,7 +59,7 @@ function _html() {
 <div style="padding:16px 20px;max-width:1300px;margin:0 auto">
 
   <!-- KPIs -->
-  <div id="ent-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px"></div>
+  <div id="ent-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
 
   <!-- Filtros + botón nuevo -->
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
@@ -242,10 +242,10 @@ function _renderKpis() {
     .reduce((s, e) => s + (e.totalCosto || 0), 0);
 
   const kpi = (icon, label, val, color) =>
-    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
-      <div style="font-size:20px">${icon}</div>
-      <div style="font-size:22px;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${val}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${label}</div>
+    `<div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-icon">${icon}</div>
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${label}</div>
     </div>`;
 
   const wrap = _container.querySelector("#ent-kpis");

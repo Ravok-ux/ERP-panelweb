@@ -61,7 +61,7 @@ function _html() {
   <div style="display:flex;flex-direction:column;height:100%;gap:0;padding:0">
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 20px;flex-shrink:0">
+    <div class="kpi-row" style="padding:14px 20px;flex-shrink:0">
       ${[
         ["rst-k-notas",    "NOTAS ACTIVAS",   "📋", "var(--text-primary)"],
         ["rst-k-vencidas", "VENCIDAS",         "⚠️",  "#DC2626"],
@@ -69,9 +69,10 @@ function _html() {
         ["rst-k-interes",  "INTERÉS GENERADO", "📈",  "#F59E0B"],
         ["rst-k-total",    "TOTAL A PAGAR",    "💰",  "#F97316"],
       ].map(([id,lbl,ico,col]) => `
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow)">
-          <div style="font-size:10px;color:var(--text-sec);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${ico} ${lbl}</div>
-          <div style="font-size:17px;font-weight:800;color:${col};font-variant-numeric:tabular-nums" id="${id}">–</div>
+        <div class="kpi-card" style="border-left-color:${col}">
+          <div class="kpi-icon">${ico}</div>
+          <div class="kpi-val" id="${id}">–</div>
+          <div class="kpi-label">${lbl}</div>
         </div>`).join("")}
     </div>
 

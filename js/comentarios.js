@@ -82,11 +82,7 @@ function _html() {
 
   return `
   <style>
-    .com-kpi { background:var(--surface);border:1px solid var(--border);
-      border-radius:10px;padding:12px 16px }
-    .com-kpi-val { font-size:22px;font-weight:800;font-variant-numeric:tabular-nums }
-    .com-kpi-lbl { font-size:10px;font-weight:600;color:#9CA3AF;
-      text-transform:uppercase;letter-spacing:.05em;margin-top:2px }
+    /* KPIs — usa .kpi-card global */
     .com-card { background:var(--surface);border:1px solid var(--border);
       border-radius:10px;padding:12px 16px;margin-bottom:8px }
     .com-input { width:100%;padding:7px 10px;border:1px solid var(--border);
@@ -128,27 +124,28 @@ function _html() {
       </div>
 
       <!-- KPIs -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
-        gap:8px;margin-bottom:12px;flex-shrink:0">
-        <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-total" style="color:var(--text-primary)">—</div>
-          <div class="com-kpi-lbl">Total</div>
+      <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));margin-bottom:12px;flex-shrink:0">
+        <div class="kpi-card" style="border-left-color:var(--text-primary)">
+          <div class="kpi-val" id="com-k-total">—</div>
+          <div class="kpi-label">Total</div>
         </div>
-        <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-hoy" style="color:#2563EB">—</div>
-          <div class="com-kpi-lbl">Hoy</div>
+        <div class="kpi-card" style="border-left-color:#2563EB">
+          <div class="kpi-val" id="com-k-hoy">—</div>
+          <div class="kpi-label">Hoy</div>
         </div>
-        <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-semana" style="color:var(--green-dark,#1B5E20)">—</div>
-          <div class="com-kpi-lbl">Esta semana</div>
+        <div class="kpi-card" style="border-left-color:var(--green-dark,#1B5E20)">
+          <div class="kpi-val" id="com-k-semana">—</div>
+          <div class="kpi-label">Esta semana</div>
         </div>
-        <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-alertas" style="color:#DC2626">—</div>
-          <div class="com-kpi-lbl">🚨 Alertas</div>
+        <div class="kpi-card" style="border-left-color:#DC2626">
+          <div class="kpi-icon">🚨</div>
+          <div class="kpi-val" id="com-k-alertas">—</div>
+          <div class="kpi-label">Alertas</div>
         </div>
-        <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-promesas" style="color:#D97706">—</div>
-          <div class="com-kpi-lbl">📅 Promesas</div>
+        <div class="kpi-card" style="border-left-color:#D97706">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-val" id="com-k-promesas">—</div>
+          <div class="kpi-label">Promesas</div>
         </div>
       </div>
 

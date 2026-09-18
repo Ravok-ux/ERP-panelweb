@@ -76,12 +76,7 @@ const AQ_CSS = `
   background:var(--surface);color:var(--text-primary);font-size:12px;cursor:pointer;font-weight:600}
 .aq-btn-filter:hover{background:var(--surface-2)}
 
-/* KPIs */
-.aq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
-.aq-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  padding:14px 16px;border-left:4px solid var(--kpi-color,#6366F1);display:flex;flex-direction:column;gap:4px}
-.aq-kpi-val{font-size:22px;font-weight:900;color:var(--kpi-color,#6366F1);font-variant-numeric:tabular-nums}
-.aq-kpi-label{font-size:11px;color:var(--text-sec);font-weight:600}
+/* KPIs — usa .kpi-card global */
 
 /* Badge de etapa */
 .aq-badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700}
@@ -810,22 +805,26 @@ function _montarTrazabilidad() {
       <button class="aq-btn-primary" id="trz-nuevo-btn">+ Registrar aplicación</button>
     </div>
 
-    <div class="aq-kpis">
-      <div class="aq-kpi" style="--kpi-color:#6366F1">
-        <div class="aq-kpi-val" id="trz-kpi-apps">–</div>
-        <div class="aq-kpi-label">🌿 Aplicaciones</div>
+    <div class="kpi-row">
+      <div class="kpi-card" style="border-left-color:#6366F1">
+        <div class="kpi-icon">🌿</div>
+        <div class="kpi-val" id="trz-kpi-apps">–</div>
+        <div class="kpi-label">Aplicaciones</div>
       </div>
-      <div class="aq-kpi" style="--kpi-color:#16A34A">
-        <div class="aq-kpi-val" id="trz-kpi-cultivos">–</div>
-        <div class="aq-kpi-label">🌾 Cultivos distintos</div>
+      <div class="kpi-card" style="border-left-color:#16A34A">
+        <div class="kpi-icon">🌾</div>
+        <div class="kpi-val" id="trz-kpi-cultivos">–</div>
+        <div class="kpi-label">Cultivos distintos</div>
       </div>
-      <div class="aq-kpi" style="--kpi-color:#0369A1">
-        <div class="aq-kpi-val" id="trz-kpi-productos">–</div>
-        <div class="aq-kpi-label">📦 Productos aplicados</div>
+      <div class="kpi-card" style="border-left-color:#0369A1">
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-val" id="trz-kpi-productos">–</div>
+        <div class="kpi-label">Productos aplicados</div>
       </div>
-      <div class="aq-kpi" style="--kpi-color:#D97706">
-        <div class="aq-kpi-val" id="trz-kpi-ings">–</div>
-        <div class="aq-kpi-label">🧑‍🌾 Ingenieros activos</div>
+      <div class="kpi-card" style="border-left-color:#D97706">
+        <div class="kpi-icon">🧑‍🌾</div>
+        <div class="kpi-val" id="trz-kpi-ings">–</div>
+        <div class="kpi-label">Ingenieros activos</div>
       </div>
     </div>
 

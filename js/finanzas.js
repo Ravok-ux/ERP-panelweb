@@ -83,20 +83,8 @@ const FIN_CSS = `
 }
 .fin-tab-icon { font-size: 15px; }
 
-/* KPI tiles */
+/* KPI tiles — usa .kpi-card global */
 .fin-kpis { display: grid; gap: 12px; margin-bottom: 18px; }
-.fin-kpi {
-  background: var(--surface, #fff);
-  border-radius: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--border, #e2e8f0);
-  border-left: 4px solid var(--kpi-color, #3b82f6);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.fin-kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted, #64748b); }
-.fin-kpi-val { font-size: 20px; font-weight: 700; color: var(--kpi-color, #3b82f6); font-variant-numeric: tabular-nums; }
 
 /* Section headings */
 .fin-sec {
@@ -385,11 +373,11 @@ function _activarTab(id) {
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
 function _kpiBar(items) {
-  return `<div class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+  return `<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
     ${items.map(([l,v,color]) => `
-      <div class="fin-kpi" style="--kpi-color:${color}">
-        <div class="fin-kpi-label">${l}</div>
-        <div class="fin-kpi-val">${v}</div>
+      <div class="kpi-card" style="border-left-color:${color}">
+        <div class="kpi-label">${l}</div>
+        <div class="kpi-val">${v}</div>
       </div>`).join('')}
   </div>`;
 }
@@ -428,7 +416,7 @@ function _modal(id, title, bodyHtml, footHtml, width = '480px') {
 function _montarGL() {
   const c = el('fin-content');
   c.innerHTML = `
-    <div id="gl-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px"></div>
+    <div id="gl-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="fin-card">
         ${_secHead('Catálogo de Cuentas')}
@@ -533,9 +521,9 @@ function _glRenderKPIs() {
     ['Ingresos',  '$'+fmt(totales.INGRESO), '#10b981'],
     ['Gastos',    '$'+fmt(totales.GASTO),   '#f59e0b'],
     ['Utilidad',  '$'+fmt(util),            util>=0?'#10b981':'#ef4444'],
-  ].map(([l,v,color]) => `<div class="fin-kpi" style="--kpi-color:${color}">
-    <div class="fin-kpi-label">${l}</div>
-    <div class="fin-kpi-val">${v}</div>
+  ].map(([l,v,color]) => `<div class="kpi-card" style="border-left-color:${color}">
+    <div class="kpi-label">${l}</div>
+    <div class="kpi-val">${v}</div>
   </div>`).join('');
 }
 
@@ -843,7 +831,7 @@ function _glLineaPoliza(l, i, disabled) {
 function _montarAP() {
   const c = el('fin-content');
   c.innerHTML = `
-    <div id="ap-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+    <div id="ap-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="fin-card">
         ${_secHead('Facturas de Proveedores')}
@@ -913,9 +901,9 @@ function _apCargarFacturas() {
       ['Pagado',   '$'+fmt(pagado),   '#10b981'],
       ['Por pagar','$'+fmt(pendiente),'#f59e0b'],
       ['Vencido',  '$'+fmt(vencidas), '#ef4444'],
-    ].map(([l,v,color])=>`<div class="fin-kpi" style="--kpi-color:${color}">
-      <div class="fin-kpi-label">${l}</div>
-      <div class="fin-kpi-val">${v}</div>
+    ].map(([l,v,color])=>`<div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-label">${l}</div>
+      <div class="kpi-val">${v}</div>
     </div>`).join('');
 
     // Calendario
@@ -1040,13 +1028,13 @@ function _apModalPago(factura) {
   const pendiente = (factura.total||0) - (factura.pagado||0);
   const body = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div class="fin-kpi" style="--kpi-color:#ef4444">
-        <div class="fin-kpi-label">Por pagar</div>
-        <div class="fin-kpi-val">$${fmt(pendiente)}</div>
+      <div class="kpi-card" style="border-left-color:#ef4444">
+        <div class="kpi-label">Por pagar</div>
+        <div class="kpi-val">$${fmt(pendiente)}</div>
       </div>
-      <div class="fin-kpi" style="--kpi-color:#10b981">
-        <div class="fin-kpi-label">Ya pagado</div>
-        <div class="fin-kpi-val">$${fmt(factura.pagado||0)}</div>
+      <div class="kpi-card" style="border-left-color:#10b981">
+        <div class="kpi-label">Ya pagado</div>
+        <div class="kpi-val">$${fmt(factura.pagado||0)}</div>
       </div>
     </div>
     <div style="font-size:13px;margin-bottom:14px;color:var(--text-muted)">
@@ -1432,7 +1420,7 @@ function _montarPresupuesto() {
         <button class="fin-btn fin-btn-primary fin-btn-sm" onclick="window._presNueva()">+ Partida</button>
       </div>
     </div>
-    <div id="pres-kpis" class="fin-kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+    <div id="pres-kpis" class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
       <div class="fin-card" id="pres-tabla-wrap"><div class="fin-loading">Cargando…</div></div>
       <div class="fin-card">
@@ -1476,8 +1464,8 @@ function _presRenderizar(partidas, mes) {
     ['Real',       '$'+fmt(totalReal),'#10b981'],
     ['Variación',  (variacion>=0?'+':'')+'$'+fmt(variacion), variacion<=0?'#10b981':'#ef4444'],
     ['Ejecución',  pct.toFixed(1)+'%', pct>100?'#ef4444':pct>80?'#f59e0b':'#3b82f6'],
-  ].map(([l,v,color])=>`<div class="fin-kpi" style="--kpi-color:${color}">
-    <div class="fin-kpi-label">${l}</div><div class="fin-kpi-val">${v}</div>
+  ].map(([l,v,color])=>`<div class="kpi-card" style="border-left-color:${color}">
+    <div class="kpi-label">${l}</div><div class="kpi-val">${v}</div>
   </div>`).join('');
 
   const wrap = el('pres-tabla-wrap');

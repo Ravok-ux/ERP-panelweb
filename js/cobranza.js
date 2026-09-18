@@ -65,7 +65,7 @@ function _html() {
     </div>
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+    <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
       ${[
         ["cob-k-abonos",   "ABONOS",          "💳", "var(--text-primary)"],
         ["cob-k-total",    "TOTAL COBRADO",    "💵", "#16A34A"],
@@ -73,12 +73,10 @@ function _html() {
         ["cob-k-interes",  "INTERÉS COBRADO",  "📈", "#F59E0B"],
         ["cob-k-liquidadas","NOTAS LIQUIDADAS","✅", "#7C3AED"],
       ].map(([id,l,ico,col]) => `
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
-          padding:14px 16px;box-shadow:var(--shadow)">
-          <div style="font-size:9.5px;font-weight:700;color:var(--text-sec);text-transform:uppercase;
-            letter-spacing:.06em;margin-bottom:5px">${ico} ${l}</div>
-          <div style="font-size:17px;font-weight:800;color:${col};font-variant-numeric:tabular-nums"
-            id="${id}">–</div>
+        <div class="kpi-card" style="border-left-color:${col}">
+          <div class="kpi-icon">${ico}</div>
+          <div class="kpi-val" id="${id}">–</div>
+          <div class="kpi-label">${l}</div>
         </div>`).join("")}
     </div>
 

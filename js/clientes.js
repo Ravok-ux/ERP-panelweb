@@ -117,7 +117,7 @@ function _html() {
   <div style="padding:0 0 24px">
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+    <div class="kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
       ${_kpi("cli-k-total",  "CLIENTES",       "var(--text-primary)")}
       ${_kpi("cli-k-activos","ACTIVOS",        "#16A34A")}
       ${_kpi("cli-k-saldo",  "SALDO TOTAL",    "#2563EB")}
@@ -386,10 +386,9 @@ function _html() {
 }
 
 function _kpi(id, label, color = "var(--text-primary)") {
-  return `<div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);
-    padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-    <div style="font-size:20px;font-weight:800;color:${color};font-variant-numeric:tabular-nums" id="${id}">–</div>
-    <div style="font-size:11px;font-weight:600;color:var(--text-sec);margin-top:2px">${label}</div>
+  return `<div class="kpi-card" style="border-left-color:${color}">
+    <div class="kpi-val" id="${id}">–</div>
+    <div class="kpi-label">${label}</div>
   </div>`;
 }
 
