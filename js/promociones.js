@@ -159,7 +159,7 @@ export const PromocionesModule = (() => {
           <div style="font-size:11px;color:var(--text-sec);margin-top:2px">Campañas, puntos de lealtad e historial de canje</div>
         </div>
         ${btnNuevo ? btnNuevo.replace('class="btn-primary"',
-          'style="padding:9px 18px;border-radius:8px;border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer"') : ""}
+          'style="padding:9px 18px;border-radius:8px;border:none;background:var(--green-dark,#1B5E20);color:#fff;font-size:13px;font-weight:700;cursor:pointer"') : ""}
       </div>
 
       <!-- Tabs pill -->

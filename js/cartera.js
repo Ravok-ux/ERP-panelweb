@@ -333,7 +333,7 @@ function _renderTabla(filtrados) {
       ? (desbl
           ? `<span class="cart-chip" style="background:#FEF9C3;color:#854D0E">🔓 Desbloqueado</span>`
           : `<span class="cart-chip" style="background:#FEE2E2;color:#991B1B">🔒 Bloqueado</span>`)
-      : `<span class="cart-chip" style="background:#DCFCE7;color:#166534">✓ Activo</span>`;
+      : `<span class="cart-chip" style="background:#DCFCE7;color:var(--green-dark,#1B5E20)">✓ Activo</span>`;
 
     const accionDesbl = (bloq && !desbl && puedeD)
       ? `<button class="cart-btn-sm cart-desbloquear" data-id="${esc(c.id)}" data-nom="${esc(c.nombre||c.id)}"

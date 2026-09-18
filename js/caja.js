@@ -44,7 +44,7 @@ function _html() {
       <select id="caja-filtro-alias" class="form-input" style="width:auto">
         <option value="">Todos</option>
       </select>
-      <button id="caja-btn-nuevo" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:.4rem .9rem;font-size:.9rem;font-weight:700;cursor:pointer">+ Nuevo corte</button>
+      <button id="caja-btn-nuevo" style="background:var(--green-dark,#1B5E20);color:#fff;border:none;border-radius:6px;padding:.4rem .9rem;font-size:.9rem;font-weight:700;cursor:pointer">+ Nuevo corte</button>
     </div>
   </div>
 
@@ -95,7 +95,7 @@ function _html() {
         TOTAL SISTEMA (calculado)
         <span id="caja-sistema-loading" style="display:none;margin-left:8px;font-size:.72rem;font-weight:400;color:#2563EB">⏳ calculando…</span>
       </div>
-      <div id="caja-f-sistema" style="font-size:1.4rem;font-weight:800;color:#16A34A">$0.00</div>
+      <div id="caja-f-sistema" style="font-size:1.4rem;font-weight:800;color:var(--green-dark,#1B5E20)">$0.00</div>
       <div id="caja-f-sistema-detalle" style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem"></div>
     </div>
 
@@ -124,7 +124,7 @@ function _html() {
       </div>
       <div style="display:flex;gap:.5rem">
         <button id="caja-btn-cancelar" style="background:none;border:1px solid var(--border);border-radius:6px;padding:.5rem 1.2rem;font-weight:600;cursor:pointer;color:var(--text-primary)">Cancelar</button>
-        <button id="caja-btn-guardar" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:.5rem 1.2rem;font-weight:700;cursor:pointer">Guardar corte</button>
+        <button id="caja-btn-guardar" style="background:var(--green-dark,#1B5E20);color:#fff;border:none;border-radius:6px;padding:.5rem 1.2rem;font-weight:700;cursor:pointer">Guardar corte</button>
       </div>
     </div>
   </div>
@@ -295,7 +295,7 @@ function _actualizarTotalesModal() {
   _container.querySelector("#caja-f-declarado").textContent = _fmt(declarado);
   const difEl = _container.querySelector("#caja-f-diferencia");
   difEl.textContent = _fmt(dif);
-  difEl.style.color = Math.abs(dif) < 0.5 ? "#16A34A" : "#DC2626";
+  difEl.style.color = Math.abs(dif) < 0.5 ? "var(--green-dark,#1B5E20)" : "#DC2626";
 }
 
 async function _guardarCorte() {
@@ -393,7 +393,7 @@ function _render(docs) {
   const totalDeclarado = filtrados.reduce((s, d) => s + (d.totalDeclarado || 0), 0);
   const totalSistema   = filtrados.reduce((s, d) => s + (d.totalSistema   || 0), 0);
   const difTotal       = totalDeclarado - totalSistema;
-  resumen.innerHTML = `${filtrados.length} cortes · Declarado: <b>${_fmt(totalDeclarado)}</b> · Sistema: <b>${_fmt(totalSistema)}</b> · Diferencia: <b style="color:${difTotal < 0 ? '#DC2626' : '#16A34A'}">${_fmt(difTotal)}</b>`;
+  resumen.innerHTML = `${filtrados.length} cortes · Declarado: <b>${_fmt(totalDeclarado)}</b> · Sistema: <b>${_fmt(totalSistema)}</b> · Diferencia: <b style="color:${difTotal < 0 ? '#DC2626' : 'var(--green-dark,#1B5E20)'}">${_fmt(difTotal)}</b>`;
 
   tbody.innerHTML = filtrados.map(c => {
     const dif     = (c.totalDeclarado || 0) - (c.totalSistema || 0);

@@ -126,7 +126,7 @@ function _montarAsistencia() {
         value="${new Date().toISOString().slice(0,7)}">
       <div style="display:flex;gap:8px;flex-shrink:0;margin-left:auto">
         <button class="btn-primary" id="asi-reg-btn">+ Registrar asistencia</button>
-        <button id="asi-xlsx-btn" style="padding:7px 12px;background:#16A34A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬇️ Excel</button>
+        <button id="asi-xlsx-btn" style="padding:7px 12px;background:var(--green-dark,#1B5E20);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⬇️ Excel</button>
       </div>
     </div>
 
@@ -1463,7 +1463,7 @@ function _renderEvaluaciones(rows) {
     return `<tr>
       <td style="font-weight:600">${esc(r.alias||"—")}</td>
       <td style="font-size:12px">${esc(r.periodo||"—")}</td>
-      ${califs.map(v => `<td style="text-align:center;font-weight:600;color:${v>=4?"#16A34A":v>=3?"#D97706":"#DC2626"}">${v||"—"}</td>`).join("")}
+      ${califs.map(v => `<td style="text-align:center;font-weight:600;color:${v>=4?"var(--green-dark,#1B5E20)":v>=3?"#D97706":"#DC2626"}">${v||"—"}</td>`).join("")}
       <td style="text-align:center;font-weight:800;font-size:16px;color:${col}">${prom.toFixed(1)}</td>
       <td style="font-size:12px;color:var(--text-sec);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.comentario||"—")}</td>
       <td style="font-size:11px;color:var(--text-sec)">${esc(r.evaluadoPor||"—")}</td>

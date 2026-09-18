@@ -627,8 +627,8 @@ function _escucharUsuarios() {
           ${colsAdmin}
           <td>
             ${activo
-              ? `<div style="display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#16A34A">
-                   <span style="width:5px;height:5px;border-radius:50%;background:#16A34A;display:inline-block"></span> Activo
+              ? `<div style="display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--green-dark,#1B5E20)">
+                   <span style="width:5px;height:5px;border-radius:50%;background:var(--green-dark,#1B5E20);display:inline-block"></span> Activo
                  </div>`
               : `<div style="display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#DC2626">
                    <span style="width:5px;height:5px;border-radius:50%;background:#DC2626;display:inline-block"></span> Inactivo
@@ -929,7 +929,7 @@ function _renderPresetPreview(el, rol) {
   const flags  = ROLES_ADMIN.has(rol) ? TODOS_FLAGS_ADMIN : TODOS_FLAGS;
   const lineas = flags.map(f => {
     const ok = preset[f.key];
-    return `<span style="color:${ok ? '#16A34A' : '#DC2626'}">${ok ? "✓" : "✗"} ${f.icon} ${f.label}</span>`;
+    return `<span style="color:${ok ? 'var(--green-dark,#1B5E20)' : '#DC2626'}">${ok ? "✓" : "✗"} ${f.icon} ${f.label}</span>`;
   });
   el.innerHTML = `<b style="color:var(--text-primary)">Preset ${rol}:</b> ` + lineas.join("&nbsp;&nbsp;");
 }

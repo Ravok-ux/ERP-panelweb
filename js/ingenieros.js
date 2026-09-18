@@ -609,7 +609,7 @@ function _renderKPIs(total, enJornada, enVivo, sinSenal) {
 
 // ── Tarjeta individual ────────────────────────────────────────
 function _renderTarjeta(u) {
-  const senalColor = u.enVivo ? "#16A34A" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
+  const senalColor = u.enVivo ? "var(--green-dark,#1B5E20)" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
   const jornadaBadge = u.enJornada
     ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;
         background:#DCFCE7;color:#16A34A">● En jornada</span>`
@@ -628,7 +628,7 @@ function _renderTarjeta(u) {
 
   const prodHtml = (_pedidosHoy[u.alias]||_visitasHoy[u.alias])
     ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-        ${_pedidosHoy[u.alias] ? `<span style="font-size:10px;background:#F0FDF4;color:#15803D;
+        ${_pedidosHoy[u.alias] ? `<span style="font-size:10px;background:#F0FDF4;color:#16A34A;
           padding:2px 7px;border-radius:6px;font-weight:600">📦 ${_pedidosHoy[u.alias]} pedido${_pedidosHoy[u.alias]>1?"s":""}</span>` : ""}
         ${_visitasHoy[u.alias] ? `<span style="font-size:10px;background:#FEF3C7;color:#92400E;
           padding:2px 7px;border-radius:6px;font-weight:600">🏠 ${_visitasHoy[u.alias]} visita${_visitasHoy[u.alias]>1?"s":""}</span>` : ""}
@@ -659,7 +659,7 @@ function _renderTarjeta(u) {
     <!-- GPS -->
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
       <span style="width:8px;height:8px;border-radius:50%;background:${senalColor};flex-shrink:0"></span>
-      <span style="font-size:11px;color:${u.enVivo?"#16A34A":"var(--text-sec)"};font-weight:${u.enVivo?700:400}">${senalTxt}</span>
+      <span style="font-size:11px;color:${u.enVivo?"var(--green-dark,#1B5E20)":"var(--text-sec)"};font-weight:${u.enVivo?700:400}">${senalTxt}</span>
       ${u.ts ? `<span style="font-size:11px;color:var(--text-muted);margin-left:auto">${fmtHora(new Date(u.ts))}</span>` : ""}
     </div>
 
@@ -679,7 +679,7 @@ function _renderTarjeta(u) {
       display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       ${u.diaLiquidacion !== undefined ? `<span style="font-size:10px;background:#EFF6FF;color:#1D4ED8;
           padding:2px 7px;border-radius:6px;font-weight:600">📅 Liq. ${DIAS[u.diaLiquidacion??1]}</span>` : ""}
-      ${u.salarioBase > 0 ? `<span style="font-size:10px;background:#F0FDF4;color:#15803D;
+      ${u.salarioBase > 0 ? `<span style="font-size:10px;background:#F0FDF4;color:#16A34A;
           padding:2px 7px;border-radius:6px;font-weight:600">💵 ${fmt(u.salarioBase)}/sem</span>` : ""}
       ${u.zona ? `<span style="font-size:10px;background:#F5F3FF;color:#6D28D9;
           padding:2px 7px;border-radius:6px;font-weight:600">🗺️ ${u.zona}</span>` : ""}
@@ -718,7 +718,7 @@ function _renderTabla(lista) {
         <th style="${thStyle}"></th>
       </tr></thead>
       <tbody>${lista.map(u => {
-        const senalColor = u.enVivo ? "#16A34A" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
+        const senalColor = u.enVivo ? "var(--green-dark,#1B5E20)" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
         const senalTxt   = u.mins === null ? "Sin señal" : u.mins < 5 ? "En vivo" : u.mins < 60 ? `${u.mins}m` : "Sin señal";
         const rolColor   = u.rol === "RECUPERADOR" ? "#15803D" : u.rol === "GERENTE_ZONA" ? "#7C3AED" : "#1565C0";
         return `<tr style="cursor:pointer" onclick="IngenierosUI.abrirDrawer('${u.alias}')"
@@ -743,7 +743,7 @@ function _renderTabla(lista) {
           </td>
           <td style="${tdStyle};color:var(--text-muted)">${u.ts ? fmtHora(new Date(u.ts)) : "—"}</td>
           <td style="${tdStyle};text-align:center">
-            ${_pedidosHoy[u.alias] ? `<span style="font-weight:700;color:#15803D">${_pedidosHoy[u.alias]}</span>` : `<span style="color:var(--text-muted)">—</span>`}
+            ${_pedidosHoy[u.alias] ? `<span style="font-weight:700;color:#16A34A">${_pedidosHoy[u.alias]}</span>` : `<span style="color:var(--text-muted)">—</span>`}
           </td>
           <td style="${tdStyle};text-align:center">
             ${_visitasHoy[u.alias] ? `<span style="font-weight:700;color:#92400E">${_visitasHoy[u.alias]}</span>` : `<span style="color:var(--text-muted)">—</span>`}
@@ -773,13 +773,13 @@ function _renderDrawer(u) {
   const body = document.getElementById("ing-drawer-body");
   if (!body) return;
   const rolColor   = u.rol === "RECUPERADOR" ? "#15803D" : u.rol === "GERENTE_ZONA" ? "#7C3AED" : "#1565C0";
-  const senalColor = u.enVivo ? "#16A34A" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
+  const senalColor = u.enVivo ? "var(--green-dark,#1B5E20)" : u.mins !== null && u.mins < 60 ? "#D97706" : "#9CA3AF";
   const senalTxt   = u.mins === null ? "Sin señal GPS" : u.mins < 5 ? "● En vivo" : u.mins < 60 ? `${u.mins} min sin señal` : "Sin señal reciente";
 
   const row = (ico, label, val, href) => {
     if (!val) return "";
     const content = href
-      ? `<a href="${href}" target="_blank" style="color:#1565C0;text-decoration:none;font-weight:600">${val}</a>`
+      ? `<a href="${href}" target="_blank" style="color:#16A34A;text-decoration:none;font-weight:600">${val}</a>`
       : `<span style="font-weight:600;color:var(--text-primary)">${val}</span>`;
     return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:14px;flex-shrink:0">${ico}</span>
@@ -835,7 +835,7 @@ function _renderDrawer(u) {
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
         padding:10px 12px;border-left:3px solid #15803D">
         <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">📦 Pedidos hoy</div>
-        <div style="font-size:20px;font-weight:800;color:#15803D">${_pedidosHoy[u.alias]||0}</div>
+        <div style="font-size:20px;font-weight:800;color:var(--green-dark,#1B5E20)">${_pedidosHoy[u.alias]||0}</div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
         padding:10px 12px;border-left:3px solid #92400E">

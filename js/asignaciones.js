@@ -281,7 +281,7 @@ function _renderBusquedaGlobal() {
                 ${esc(c.zona || "")}${c.ciudad ? ` · ${esc(c.ciudad)}` : ""}
               </div>
               <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                <span style="font-size:10px;background:#EFF6FF;color:#1565C0;padding:2px 8px;
+                <span style="font-size:10px;background:#EFF6FF;color:var(--green-dark,#1B5E20);padding:2px 8px;
                   border-radius:9px;font-weight:600">
                   👤 ${esc(resolverNombre(c.ingeniero) || c.ingeniero || "Sin asignar")}
                 </span>
@@ -334,7 +334,7 @@ function _renderAsignar() {
             border:1px solid ${activo ? "#BFDBFE" : "transparent"};transition:all .1s"
           onmouseover="this.style.background='${activo?"#EFF6FF":"var(--surface-2)"}'"
           onmouseout="this.style.background='${activo ? "#EFF6FF" : "transparent"}'">
-          <div style="font-size:12px;font-weight:${activo?"800":"600"};color:${activo?"#1565C0":"var(--text-primary)"}">
+          <div style="font-size:12px;font-weight:${activo?"800":"600"};color:${activo?"var(--green-dark,#1B5E20)":"var(--text-primary)"}">
             ${esc(nombre)}
           </div>
           ${nombre !== alias ? `<div style="font-size:10px;color:var(--text-sec);margin-top:1px">@${esc(alias)}</div>` : ""}
@@ -344,7 +344,7 @@ function _renderAsignar() {
           </div>
           ${saldo > 0 ? `
           <div style="margin-top:6px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:#1565C0;border-radius:2px;transition:width .3s"></div>
+            <div style="height:100%;width:${pct}%;background:var(--green-dark,#1B5E20);border-radius:2px;transition:width .3s"></div>
           </div>` : ""}
         </div>`;
       }).join("")}
@@ -563,13 +563,13 @@ function _abrirModalReasignar() {
         </div>
         <div>
           <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">
-            <span style="color:#1565C0;font-weight:700">Destino</span> — <span id="asig-dist-dest-label">—</span>
+            <span style="color:var(--green-dark,#1B5E20);font-weight:700">Destino</span> — <span id="asig-dist-dest-label">—</span>
           </div>
           <div id="asig-dist-destino" style="font-size:13px;font-weight:800;color:var(--text-primary)">
             <span id="asig-dist-dest-pre">—</span> → <span id="asig-dist-dest-post">—</span>
           </div>
           <div style="margin-top:4px;height:6px;background:var(--border);border-radius:3px">
-            <div id="asig-dist-bar-dest" style="height:100%;background:#1565C0;border-radius:3px;width:0%;transition:width .3s"></div>
+            <div id="asig-dist-bar-dest" style="height:100%;background:var(--green-dark,#1B5E20);border-radius:3px;width:0%;transition:width .3s"></div>
           </div>
         </div>
       </div>

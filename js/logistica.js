@@ -30,7 +30,7 @@ const FRECUENCIA_DIAS = { SEMANAL:7, QUINCENAL:15, MENSUAL:30, BIMESTRAL:60 };
 const FREQ_LABEL      = { SEMANAL:"Semanal",QUINCENAL:"Quincenal",MENSUAL:"Mensual",BIMESTRAL:"Bimestral" };
 const STATUS_BADGE = {
   PENDIENTE: `<span class="badge badge-amber">PENDIENTE</span>`,
-  COMPLETADA:`<span class="badge" style="background:#DCFCE7;color:#15803D">COMPLETADA</span>`,
+  COMPLETADA:`<span class="badge" style="background:#DCFCE7;color:#16A34A">COMPLETADA</span>`,
   OMITIDA:   `<span class="badge badge-gray">OMITIDA</span>`,
 };
 
@@ -384,7 +384,7 @@ function _renderClientesFrecuencia(rows) {
     const faltan = nuncaVisitado ? -9999 : Math.ceil((proxTs - ahora) / 86400000);
     const atrasado = faltan < 0;
     const hoy      = faltan === 0;
-    const colorDias = atrasado ? "#DC2626" : hoy ? "#D97706" : faltan <= 2 ? "#D97706" : "#16A34A";
+    const colorDias = atrasado ? "#DC2626" : hoy ? "#D97706" : faltan <= 2 ? "#D97706" : "var(--green-dark,#1B5E20)";
 
     return `<tr>
       <td style="font-weight:700">${esc(r.nombre||"–")}</td>
@@ -547,7 +547,7 @@ async function _cargarVistaSemana() {
               ${data.total ? `
                 <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">${data.total} visita${data.total!==1?"s":""}</div>
                 <div style="height:4px;border-radius:2px;background:var(--border);margin-bottom:4px;overflow:hidden">
-                  <div style="height:100%;width:${barW}%;background:#16A34A;border-radius:2px;transition:width .3s"></div>
+                  <div style="height:100%;width:${barW}%;background:var(--green-dark,#1B5E20);border-radius:2px;transition:width .3s"></div>
                 </div>
                 <div style="font-size:10px;display:flex;gap:4px;flex-wrap:wrap">
                   ${data.comp ? `<span style="color:#16A34A">✓${data.comp}</span>` : ""}
@@ -1100,7 +1100,7 @@ async function _montarEntregas() {
           <button id="ent-cancel" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);
             background:transparent;color:#94A3B8;font-size:12px;cursor:pointer">Cancelar</button>
           <button id="ent-guardar" style="padding:8px 22px;border-radius:8px;border:none;
-            background:#16A34A;color:#fff;font-size:12px;font-weight:700;cursor:pointer">✔ Registrar entrega</button>
+            background:var(--green-dark,#1B5E20);color:#fff;font-size:12px;font-weight:700;cursor:pointer">✔ Registrar entrega</button>
         </div>
       </div>
     </div>`;
@@ -1567,7 +1567,7 @@ async function _calcularCumplimiento() {
           <div class="kpi-icon">📋</div><div class="kpi-val">${total}</div>
           <div class="kpi-label">Programadas</div>
         </div>
-        <div class="kpi-card" style="border-left-color:#16A34A">
+        <div class="kpi-card" style="border-left-color:var(--green-dark,#1B5E20)">
           <div class="kpi-icon">✅</div><div class="kpi-val">${comp}</div>
           <div class="kpi-label">Completadas</div>
         </div>
@@ -1581,7 +1581,7 @@ async function _calcularCumplimiento() {
         </div>
         <div class="kpi-card" style="border-left-color:#1D4ED8">
           <div class="kpi-icon">📊</div>
-          <div class="kpi-val" style="color:${pct>=80?"#16A34A":pct>=60?"#D97706":"#DC2626"}">${pct}%</div>
+          <div class="kpi-val" style="color:${pct>=80?"var(--green-dark,#1B5E20)":pct>=60?"#D97706":"#DC2626"}">${pct}%</div>
           <div class="kpi-label">% Cumplimiento</div>
         </div>
       </div>

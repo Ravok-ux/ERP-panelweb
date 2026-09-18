@@ -225,7 +225,7 @@ function _filtrar() {
         </td>
         <td style="padding:10px 8px;text-align:center">
           ${esRehab
-            ? `<span style="background:#DCFCE7;color:#16A34A;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">✓ Rehabilitado</span>`
+            ? `<span style="background:#DCFCE7;color:var(--green-dark,#1B5E20);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">✓ Rehabilitado</span>`
             : `<span style="background:#FEE2E2;color:#DC2626;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">🚫 Activo</span>`}
         </td>
         <td style="padding:10px 8px;text-align:right">
@@ -275,7 +275,7 @@ async function _abrirDetalle(id) {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">
       ${_dfield("Categoría", esc(r.categoria||"–"))}
       ${_dfield("Estado", esRehab
-        ? `<span style="color:#16A34A;font-weight:700">✓ Rehabilitado</span>`
+        ? `<span style="color:var(--green-dark,#1B5E20);font-weight:700">✓ Rehabilitado</span>`
         : `<span style="color:#DC2626;font-weight:700">🚫 En lista negra</span>`)}
       ${_dfield("Adeudo", r.montoAdeudo > 0
         ? `<span style="color:#DC2626;font-weight:700">${Number(r.montoAdeudo).toLocaleString("es-MX",{style:"currency",currency:"MXN"})}</span>`
@@ -331,7 +331,7 @@ async function _abrirDetalle(id) {
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:8px">
       ${!esRehab && puedeGestionar ? `
         <button class="btn-outline" onclick="_blEditar('${id}')">✏️ Editar expediente</button>
-        <button class="btn-primary" style="background:#16A34A" onclick="_blAprobarRehab('${id}')">✓ Rehabilitar cliente</button>` : ""}
+        <button class="btn-primary" style="background:var(--green-dark,#1B5E20)" onclick="_blAprobarRehab('${id}')">✓ Rehabilitar cliente</button>` : ""}
       ${!esRehab && !puedeGestionar ? `
         ${rehabPendiente
           ? `<span style="color:#D97706;font-size:13px;padding:8px">⏳ Solicitud pendiente de aprobación</span>`

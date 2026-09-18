@@ -438,7 +438,7 @@ function _html() {
                 font-weight:600;cursor:pointer">Cancelar</button>
             <button onclick="ProdCtrlUI.guardarCols()"
               style="padding:7px 18px;border:none;border-radius:6px;
-                background:#1B5E20;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Aplicar</button>
+                background:var(--green-dark,#1B5E20);color:#fff;font-size:12px;font-weight:700;cursor:pointer">Aplicar</button>
           </div>
         </div>
       </div>

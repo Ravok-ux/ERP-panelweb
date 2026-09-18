@@ -139,7 +139,7 @@ function _html() {
           <div class="com-kpi-lbl">Hoy</div>
         </div>
         <div class="com-kpi">
-          <div class="com-kpi-val" id="com-k-semana" style="color:#16A34A">—</div>
+          <div class="com-kpi-val" id="com-k-semana" style="color:var(--green-dark,#1B5E20)">—</div>
           <div class="com-kpi-lbl">Esta semana</div>
         </div>
         <div class="com-kpi">

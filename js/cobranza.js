@@ -289,7 +289,7 @@ function _renderTabla() {
               <span style="font-weight:700;font-variant-numeric:tabular-nums">${fmt.format(monto)}</span>
             </div>
             <div style="height:5px;background:var(--border);border-radius:3px">
-              <div style="height:100%;border-radius:3px;width:${pct}%;background:#16A34A"></div>
+              <div style="height:100%;border-radius:3px;width:${pct}%;background:var(--green-dark,#1B5E20)"></div>
             </div>
           </div>`;
         }).join("")
@@ -314,12 +314,12 @@ function _renderTabla() {
       : puedeConc
         ? `<button onclick="CobranzaUI.conciliar('${esc(a.remisionId)}', ${a.abonoIdx})"
              style="font-size:10px;padding:3px 9px;background:#14532D;color:#4ADE80;
-             border:1px solid #16A34A;border-radius:5px;cursor:pointer;font-weight:600">Conciliar</button>`
+             border:1px solid var(--green-dark,#1B5E20);border-radius:5px;cursor:pointer;font-weight:600">Conciliar</button>`
         : `<span style="font-size:10px;color:var(--text-muted)">Pendiente</span>`;
 
     const tipoBadge = a.esLiquidacion
       ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;
-          background:#16A34A22;color:#22C55E">LIQUIDACIÓN</span>`
+          background:var(--green-dark,#1B5E20)22;color:#22C55E">LIQUIDACIÓN</span>`
       : `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;
           background:#1E3A5F;color:#60A5FA">PARCIAL</span>`;
 

@@ -134,7 +134,7 @@ function _html() {
               background:transparent;color:var(--text-sec);font-size:12px;cursor:pointer">Cancelar</button>
           <button onclick="ProveedoresUI.guardar()"
             style="padding:8px 22px;border:none;border-radius:6px;
-              background:#1565C0;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>
+              background:var(--green-dark,#1B5E20);color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>
         </div>
       </div>
     </div>
@@ -185,7 +185,7 @@ function _render() {
       <td style="padding:10px 14px;font-size:11px;font-family:monospace;color:#9CA3AF">${esc(p.rfc||"—")}</td>
       <td style="padding:10px 14px">
         ${p.categoria ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;
-          background:#1565C022;color:#1565C0">${esc(p.categoria)}</span>` : "—"}
+          background:var(--green-dark,#1B5E20)22;color:var(--green-dark,#1B5E20)">${esc(p.categoria)}</span>` : "—"}
       </td>
       <td style="padding:10px 14px;font-size:12px;color:var(--text-sec)">${esc(p.contacto||"—")}</td>
       <td style="padding:10px 14px;font-size:12px;color:var(--text-sec)">${esc(p.telefono||"—")}</td>
@@ -199,7 +199,7 @@ function _render() {
       <td style="padding:10px 14px;white-space:nowrap">
         <button onclick="ProveedoresUI.editar('${esc(p.id)}')"
           style="padding:4px 10px;border:1px solid #1565C0;border-radius:5px;background:transparent;
-            color:#1565C0;font-size:11px;cursor:pointer;margin-right:4px">Editar</button>
+            color:var(--green-dark,#1B5E20);font-size:11px;cursor:pointer;margin-right:4px">Editar</button>
         <button onclick="ProveedoresUI.eliminar('${esc(p.id)}','${esc(p.nombre||"")}')"
           style="padding:4px 10px;border:1px solid #DC2626;border-radius:5px;background:transparent;
             color:#DC2626;font-size:11px;cursor:pointer">Eliminar</button>

@@ -289,7 +289,7 @@ function _bindUI() {
               ${calcPost.deudaRestante > 0 ? fmt.format(calcPost.deudaRestante) : "SALDADO"}</td>
             <td style="padding:8px 14px;text-align:center">
               ${esLiq
-                ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;background:#16A34A22;color:#22C55E">LIQUIDACIÓN</span>`
+                ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;background:var(--green-dark,#1B5E20)22;color:#22C55E">LIQUIDACIÓN</span>`
                 : `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px;background:#1E3A5F;color:#60A5FA">PARCIAL</span>`}
             </td>
             <td style="padding:8px 14px;font-family:monospace;font-size:10px;color:var(--text-muted)">

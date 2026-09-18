@@ -554,7 +554,7 @@ function _renderCelda(val, tipo) {
       return `<td style="white-space:nowrap;font-size:.8rem">${d ? d.toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"}) : "—"}</td>`;
     }
     case "bool":
-      return `<td style="text-align:center">${val ? '<span class="rc-badge" style="background:#DCFCE7;color:#166534">Sí</span>' : '<span class="rc-badge" style="background:#FEE2E2;color:#DC2626">No</span>'}</td>`;
+      return `<td style="text-align:center">${val ? '<span class="rc-badge" style="background:#DCFCE7;color:var(--green-dark,#1B5E20)">Sí</span>' : '<span class="rc-badge" style="background:#FEE2E2;color:#DC2626">No</span>'}</td>`;
     case "numero":
       return `<td style="font-variant-numeric:tabular-nums;text-align:right">${val != null ? Number(val).toLocaleString("es-MX") : "—"}</td>`;
     case "status":

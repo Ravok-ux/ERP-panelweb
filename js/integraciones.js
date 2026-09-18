@@ -607,7 +607,7 @@ function _montarSpei() {
             <div style="font-size:11px;color:#64748B">Por: ${esc(r.quienCargó||"—")}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <span style="background:#DCFCE7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">
+            <span style="background:#DCFCE7;color:#16A34A;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">
               ✅ ${r.matches} conciliados</span>
             <span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">
               ⚠️ ${r.parciales} parciales</span>
@@ -702,13 +702,13 @@ function _montarWhatsapp() {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
         ${PLANTILLAS.map(p => {
           const on = cfg.plantillas?.[p.id] !== false;
-          return `<div style="border:1px solid ${on?"#16A34A":"var(--border)"};border-radius:10px;padding:14px;
+          return `<div style="border:1px solid ${on?"var(--green-dark,#1B5E20)":"var(--border)"};border-radius:10px;padding:14px;
             background:${on?"#F0FDF4":"var(--surface-2)"}">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
               <div style="font-size:12px;font-weight:700">${esc(p.label)}</div>
               ${SA() ? `<label style="cursor:pointer">
                 <input type="checkbox" id="wa-plt-${p.id}" ${on?"checked":""} style="accent-color:#16A34A">
-              </label>` : `<span style="font-size:10px;color:${on?"#166534":"#94A3B8"};font-weight:700">${on?"ACTIVA":"INACTIVA"}</span>`}
+              </label>` : `<span style="font-size:10px;color:${on?"var(--green-dark,#1B5E20)":"#94A3B8"};font-weight:700">${on?"ACTIVA":"INACTIVA"}</span>`}
             </div>
             <div style="font-size:10px;color:#64748B">Variables: ${p.vars.map(v=>`<code style="background:var(--surface);padding:1px 4px;border-radius:3px">${v}</code>`).join(", ")}</div>
           </div>`;
@@ -938,7 +938,7 @@ function _montarApi() {
             <td style="font-weight:700">${esc(r.nombre||"—")}</td>
             <td><span style="background:${tipoBg};color:${tipoCol};padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700">${esc(r.tipo)}</span></td>
             <td style="font-family:monospace;font-size:11px;color:#64748B">${esc(preview)}</td>
-            <td><span style="background:${r.activo?"#DCFCE7":"#F1F5F9"};color:${r.activo?"#166534":"#64748B"};
+            <td><span style="background:${r.activo?"#DCFCE7":"#F1F5F9"};color:${r.activo?"var(--green-dark,#1B5E20)":"#64748B"};
               padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">
               ${r.activo?"ACTIVO":"REVOCADO"}</span></td>
             <td style="font-size:11px;white-space:nowrap">${fmt(r._ts)}</td>
@@ -1036,7 +1036,7 @@ function _montarApi() {
               </div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-              <span style="background:${r.activo?"#DCFCE7":"#F1F5F9"};color:${r.activo?"#166534":"#64748B"};
+              <span style="background:${r.activo?"#DCFCE7":"#F1F5F9"};color:${r.activo?"var(--green-dark,#1B5E20)":"#64748B"};
                 padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700">${r.activo?"ACTIVO":"INACTIVO"}</span>
               ${SA() ? `<div style="display:flex;gap:4px">
                 <button data-id="${esc(r.id)}" data-activo="${r.activo}" class="wh-toggle-btn"
@@ -1095,7 +1095,7 @@ function _montarApi() {
                   padding:2px 8px;border-radius:5px;font-size:10px;font-weight:800;font-family:monospace">${m}</span>`).join("")}
               </div>
               <code style="font-family:monospace;font-size:12px;font-weight:700;flex:1">${esc(ep.path)}</code>
-              <span style="background:${cfg.activo?"#DCFCE7":"#F1F5F9"};color:${cfg.activo?"#166534":"#94A3B8"};
+              <span style="background:${cfg.activo?"#DCFCE7":"#F1F5F9"};color:${cfg.activo?"var(--green-dark,#1B5E20)":"#94A3B8"};
                 padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700">
                 ${cfg.activo?"DISPONIBLE":"INACTIVO"}</span>
             </div>

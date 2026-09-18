@@ -107,7 +107,7 @@ async function _montarStock() {
         <div class="kpi-icon">⚠️</div><div class="kpi-val" id="inv-kpi-bajo">–</div>
         <div class="kpi-label">Bajo mínimo</div>
       </div>
-      <div class="kpi-card" style="border-left-color:#16A34A">
+      <div class="kpi-card" style="border-left-color:var(--green-dark,#1B5E20)">
         <div class="kpi-icon">💰</div><div class="kpi-val" id="inv-kpi-valor">–</div>
         <div class="kpi-label">Valor estimado</div>
       </div>
@@ -601,7 +601,7 @@ function _renderStock(rows) {
       ? `<span class="badge badge-red">SIN STOCK</span>`
       : bajoMin
       ? `<span class="badge badge-amber">BAJO MÍN</span>`
-      : `<span class="badge" style="background:#DCFCE7;color:#15803D">OK</span>`;
+      : `<span class="badge" style="background:#DCFCE7;color:#16A34A">OK</span>`;
     const rowBg = sinStock ? "background:rgba(220,38,38,.04)" : bajoMin ? "background:rgba(217,119,6,.03)" : "";
     const editBtn = _puedeEditar()
       ? `<button class="btn-sm btn-outline inv-edit-btn"
@@ -939,7 +939,7 @@ function _montarConteoFisico() {
         const prods   = c.productos?.length ?? 0;
         const difs    = (c.productos||[]).filter(p => p.diferencia !== 0).length;
         const estado  = c.estado === "CERRADO"
-          ? `<span class="badge" style="background:#DCFCE7;color:#15803D">CERRADO</span>`
+          ? `<span class="badge" style="background:#DCFCE7;color:#16A34A">CERRADO</span>`
           : `<span class="badge badge-amber">ABIERTO</span>`;
         const accion  = c.estado === "ABIERTO"
           ? `<button class="btn-sm btn-outline cnt-open-btn" data-id="${esc(c.id)}">Continuar ▶</button>`
@@ -961,7 +961,7 @@ function _montarConteoFisico() {
           <td style="font-size:11px">${almLabel}${adeudoBadge}</td>
           <td>${estado}</td>
           <td style="text-align:right;font-variant-numeric:tabular-nums">${prods}</td>
-          <td style="text-align:right;font-weight:700;color:${difs>0?"#D97706":"#16A34A"}">${difs}</td>
+          <td style="text-align:right;font-weight:700;color:${difs>0?"#D97706":"var(--green-dark,#1B5E20)"}">${difs}</td>
           <td style="font-size:11px;color:var(--text-sec)">${esc(c.quienCreo||"–")}</td>
           <td>${accion}</td>
         </tr>`;
@@ -1056,11 +1056,11 @@ function _montarConteoFisico() {
 
     tbody.innerHTML = _conteoItems.map((p, i) => {
       const dif = (p.stockConteo ?? p.stockSistema) - p.stockSistema;
-      const difColor = dif > 0 ? "#16A34A" : dif < 0 ? "#DC2626" : "var(--text-sec)";
+      const difColor = dif > 0 ? "var(--green-dark,#1B5E20)" : dif < 0 ? "#DC2626" : "var(--text-sec)";
       const badge = dif === 0
         ? `<span class="badge" style="background:#F1F5F9;color:#64748B">Sin diferencia</span>`
         : dif > 0
-        ? `<span class="badge" style="background:#DCFCE7;color:#15803D">Sobrante ▲</span>`
+        ? `<span class="badge" style="background:#DCFCE7;color:#16A34A">Sobrante ▲</span>`
         : `<span class="badge badge-red">Faltante ▼</span>`;
       return `<tr data-nombre="${esc(p.nombre)}">
         <td style="font-weight:600">${esc(p.nombre)}</td>
@@ -1094,7 +1094,7 @@ function _montarConteoFisico() {
           const difEl = tbody.querySelector(`[data-dif-idx="${i}"]`);
           if (difEl) {
             difEl.textContent = dif === 0 ? "0" : (dif > 0 ? "+" : "") + dif;
-            difEl.style.color  = dif > 0 ? "#16A34A" : dif < 0 ? "#DC2626" : "var(--text-sec)";
+            difEl.style.color  = dif > 0 ? "var(--green-dark,#1B5E20)" : dif < 0 ? "#DC2626" : "var(--text-sec)";
           }
           _actualizarResumen();
         });
@@ -1365,7 +1365,7 @@ function _montarAlertas() {
         <div class="kpi-icon">🟣</div><div class="kpi-val" id="alr-kpi-sobre">–</div>
         <div class="kpi-label">Sobre máximo</div>
       </div>
-      <div class="kpi-card" style="border-left-color:#16A34A">
+      <div class="kpi-card" style="border-left-color:var(--green-dark,#1B5E20)">
         <div class="kpi-icon">✅</div><div class="kpi-val" id="alr-kpi-ok">–</div>
         <div class="kpi-label">En rango</div>
       </div>
@@ -1460,7 +1460,7 @@ function _montarAlertas() {
         CRITICO:   `<span class="badge badge-red">🔴 SIN STOCK</span>`,
         BAJO_MIN:  `<span class="badge badge-amber">⚠️ BAJO MÍN</span>`,
         SOBRE_MAX: `<span class="badge" style="background:#F3E8FF;color:#7C3AED">🟣 SOBRE MÁX</span>`,
-        OK:        `<span class="badge" style="background:#DCFCE7;color:#15803D">✅ OK</span>`,
+        OK:        `<span class="badge" style="background:#DCFCE7;color:var(--green-dark,#1B5E20)">✅ OK</span>`,
         SIN_MAX:   `<span class="badge" style="background:#F1F5F9;color:#64748B">⚙️ Sin máx</span>`,
       }[alerta] || "";
       const pct    = max > 0 ? Math.min(100, Math.round(stock/max*100)) : (min > 0 ? Math.min(100,Math.round(stock/min*100)) : 50);

@@ -69,7 +69,7 @@ function _html() {
       <option value="COTEJO">En cotejo</option>
       <option value="CONFIRMADO">Confirmadas</option>
     </select>
-    ${PUEDE() ? `<button id="ent-btn-nueva" style="margin-left:auto;background:#16A34A;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px">+ Nueva entrada</button>` : ""}
+    ${PUEDE() ? `<button id="ent-btn-nueva" style="margin-left:auto;background:var(--green-dark,#1B5E20);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px">+ Nueva entrada</button>` : ""}
   </div>
 
   <!-- Tabla -->
@@ -168,7 +168,7 @@ function _html() {
         <!-- Botones acción -->
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button id="ent-btn-cancelar" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 20px;font-weight:600;cursor:pointer;color:var(--text-primary);font-size:13px">Cancelar</button>
-          <button id="ent-btn-accion" style="background:#16A34A;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;cursor:pointer;font-size:13px">Guardar borrador</button>
+          <button id="ent-btn-accion" style="background:var(--green-dark,#1B5E20);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;cursor:pointer;font-size:13px">Guardar borrador</button>
         </div>
 
       </div>

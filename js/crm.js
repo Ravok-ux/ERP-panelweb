@@ -190,7 +190,7 @@ export const CrmModule = {
         </div>
         <div class="modal-footer">
           <button class="btn-outline" id="crm-conv-cancel">Cancelar</button>
-          <button class="btn-primary" id="crm-conv-ok" style="background:#16A34A">✓ Convertir a cliente</button>
+          <button class="btn-primary" id="crm-conv-ok" style="background:var(--green-dark,#1B5E20)">✓ Convertir a cliente</button>
         </div>
       </div>
     </div>`;
@@ -522,10 +522,10 @@ function _abrirPanel(id) {
       <button class="btn-outline" id="crm-avanzar-btn" data-id="${r.id}">Cambiar etapa</button>` : ""}
       ${!esGanado && !esPerdido ? `
       <button class="btn-primary" id="crm-ganar-btn" data-id="${r.id}"
-        style="background:#16A34A;margin-top:4px">🎉 Marcar como GANADO → Convertir a cliente</button>
+        style="background:var(--green-dark,#1B5E20);margin-top:4px">🎉 Marcar como GANADO → Convertir a cliente</button>
       <button class="btn-outline" id="crm-perder-btn" data-id="${r.id}"
         style="color:#DC2626;border-color:#DC2626">✗ Marcar como PERDIDO</button>` : ""}
-      ${esGanado ? `<div style="padding:12px;background:#16A34A20;border-radius:8px;font-size:12px;color:#16A34A">
+      ${esGanado ? `<div style="padding:12px;background:var(--green-dark,#1B5E20)20;border-radius:8px;font-size:12px;color:var(--green-dark,#1B5E20)">
         ✅ Prospecto convertido a cliente</div>` : ""}
     </div>`;
 
