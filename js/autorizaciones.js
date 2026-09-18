@@ -365,6 +365,20 @@ function _actualizarTimers() {
   });
 }
 
+// ── Helpers internos ───────────────────────────────────────────────────────────
+async function _resolverLogsAuth(folio) {
+  if (!folio) return;
+  try {
+    const snap = await getDocs(query(
+      collection(db, "log_actividades"),
+      where("tipo",  "==", "PEDIDO_PENDIENTE_AUTH"),
+      where("folio", "==", folio)
+    ));
+    const updates = snap.docs.map(d => updateDoc(d.ref, { resuelto: true }));
+    await Promise.all(updates);
+  } catch (_) { /* silencioso — no bloquear la acción principal */ }
+}
+
 // ── Acciones ───────────────────────────────────────────────────────────────────
 const _enProgreso = new Set();
 
@@ -386,6 +400,7 @@ window._autAprobar = async id => {
       fechaAutorizacion: Date.now(),
       updatedAt:         serverTimestamp()
     });
+    await _resolverLogsAuth(folio);
     logAudit("PEDIDO_APROBADO", {
       folio: p?.folio || id,
       clienteNombre: p?.clienteNombre,
@@ -444,6 +459,7 @@ window._autRechazar = id => {
         fechaAutorizacion: Date.now(),
         updatedAt:         serverTimestamp()
       });
+      await _resolverLogsAuth(p?.folio || rid);
       logAudit("PEDIDO_RECHAZADO", {
         folio: p?.folio || rid,
         clienteNombre: p?.clienteNombre,

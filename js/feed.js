@@ -322,7 +322,9 @@ function _updateAliasSelect() {
 
 // ── Card HTML reutilizable ────────────────────────────────────
 function _cardHTML(a) {
-  if (a.tipo === "PEDIDO_PENDIENTE_AUTH") return _cardAlarm(a);
+  if (a.tipo === "PEDIDO_PENDIENTE_AUTH") {
+    return a.resuelto ? _cardAlarmResuelta(a) : _cardAlarm(a);
+  }
   const c   = EV_COLOR[a.tipo]      || "#6B7280";
   const ico = EV_ICON[a.tipo]       || "•";
   const pc  = EV_PILL_CLASS[a.tipo] || "pill-off";
@@ -373,6 +375,32 @@ function _cardAlarm(a) {
         <div style="font-size:10px;color:var(--text-sec);margin-top:1px">${ts.fecha}</div>
         <span class="pill pill-venc" style="margin-top:4px;display:inline-block;
           background:#EF4444;color:#fff;font-size:9px">⚠️ Pendiente</span>
+      </div>
+    </div>`;
+}
+
+function _cardAlarmResuelta(a) {
+  const ts = typeof a.timestamp === "number"
+    ? _fmtTs(new Date(a.timestamp))
+    : _fmtTs(a.timestamp?.toDate?.() || new Date());
+  return `
+    <div class="feed-card" style="border-radius:10px;padding:12px 16px;
+      border:1px solid var(--border);display:flex;gap:12px;align-items:center;margin-bottom:7px;
+      cursor:pointer;opacity:.6">
+      <div style="width:36px;height:36px;border-radius:8px;background:#6B72801A;
+        display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">✅</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary)">
+          ${esc(a.folio) || esc(a.cliente) || "–"} · Autorización resuelta
+        </div>
+        <div style="font-size:11px;color:var(--text-sec);margin-top:2px">
+          Registrado por: ${esc(a.alias) || "–"} · ${esc(a.motivo) || "–"}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:10px;color:var(--text-sec)">${ts.hora}</div>
+        <div style="font-size:10px;color:var(--text-sec);margin-top:1px">${ts.fecha}</div>
+        <span class="pill pill-entg" style="margin-top:4px;display:inline-block;font-size:9px">Resuelto</span>
       </div>
     </div>`;
 }

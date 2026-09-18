@@ -187,8 +187,11 @@ service cloud.firestore {
                     && strValido(request.resource.data.tipo, 50)
                     && request.resource.data.keys().hasAll(['alias','tipo','timestamp']);
 
-      // No se puede editar ni borrar logs (inmutabilidad de auditoría)
-      allow update, delete: if false;
+      // Solo admins pueden marcar resuelto=true (resolución de auth pendiente)
+      // El resto de campos permanece inmutable: solo se permite agregar/cambiar 'resuelto'
+      allow update: if cuentaActiva() && esAdminOSuperior()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resuelto']);
+      allow delete: if false;
     }
 
     // ── /comentarios_cliente ──────────────────────────────────────────────────
