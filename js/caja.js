@@ -222,6 +222,7 @@ async function _calcularSistema(alias) {
 
   const ahora     = new Date();
   const inicioDia = new Date(ahora); inicioDia.setHours(0,0,0,0);
+  const finDia    = new Date(inicioDia.getTime() + 86400000);
   const tsInicio  = Timestamp.fromDate(inicioDia);
 
   let ef = 0, tj = 0, tr = 0;
@@ -237,7 +238,7 @@ async function _calcularSistema(alias) {
     (r.abonos || []).forEach(ab => {
       if (!ab.fecha) return;
       const fechaAb = new Date(ab.fecha + (ab.fecha.includes("T") ? "" : "T12:00:00"));
-      if (fechaAb < inicioDia) return;
+      if (fechaAb < inicioDia || fechaAb >= finDia) return;
       const monto = ab.monto || 0;
       const forma = (ab.formaPago || "EFECTIVO").toUpperCase();
       if (forma.includes("TARJETA")) tj += monto;
@@ -251,12 +252,14 @@ async function _calcularSistema(alias) {
     getDocs(query(collection(db, "pedidos"),
       where("ingenieroAlias", "==", alias),
       where("status", "==", "ENTREGADO"),
-      where("entregadoEn", ">=", inicioDia.getTime())
+      where("entregadoEn", ">=", inicioDia.getTime()),
+      where("entregadoEn", "<",  finDia.getTime())
     )),
     getDocs(query(collection(db, "pedidos"),
       where("alias", "==", alias),
       where("status", "==", "ENTREGADO"),
-      where("entregadoEn", ">=", inicioDia.getTime())
+      where("entregadoEn", ">=", inicioDia.getTime()),
+      where("entregadoEn", "<",  finDia.getTime())
     )),
   ]);
 
@@ -393,11 +396,11 @@ function _render(docs) {
   const totalDeclarado = filtrados.reduce((s, d) => s + (d.totalDeclarado || 0), 0);
   const totalSistema   = filtrados.reduce((s, d) => s + (d.totalSistema   || 0), 0);
   const difTotal       = totalDeclarado - totalSistema;
-  resumen.innerHTML = `${filtrados.length} cortes · Declarado: <b>${_fmt(totalDeclarado)}</b> · Sistema: <b>${_fmt(totalSistema)}</b> · Diferencia: <b style="color:${difTotal < 0 ? '#DC2626' : 'var(--green-dark,#1B5E20)'}">${_fmt(difTotal)}</b>`;
+  resumen.innerHTML = `${filtrados.length} cortes · Declarado: <b>${_fmt(totalDeclarado)}</b> · Sistema: <b>${_fmt(totalSistema)}</b> · Diferencia: <b style="color:${Math.abs(difTotal) < 1 ? 'var(--green-dark,#1B5E20)' : '#DC2626'}">${_fmt(difTotal)}</b>`;
 
   tbody.innerHTML = filtrados.map(c => {
     const dif     = (c.totalDeclarado || 0) - (c.totalSistema || 0);
-    const difCls  = dif < -1 ? "monto-neg" : dif > 1 ? "monto-pos" : "";
+    const difCls  = Math.abs(dif) < 1 ? "" : "monto-neg";
     const badgeCls = c.status === "VALIDADO" ? "badge-val" : c.status === "DIFERENCIA" ? "badge-dif" : "badge-pend";
     const fecha    = c._ts ? new Date(c._ts).toLocaleString("es-MX", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
     const acciones = c.status === "PENDIENTE" ? `
