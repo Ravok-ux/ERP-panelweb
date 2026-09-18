@@ -229,10 +229,12 @@ function _cardHtml(m) {
       </div>
       <div class="met-sub-row">
         <div class="met-sub">💰 <span>${_fmtMXN(m.metaMonto || 0)}</span></div>
-        ${m.metaLitros     ? `<div class="met-sub">💧 <span>${m.metaLitros} L</span></div>` : ""}
-        ${m.metaVisitas    ? `<div class="met-sub">📍 <span>${m.metaVisitas} vis.</span></div>` : ""}
-        ${m.metaProspectos ? `<div class="met-sub">🧲 <span>${m.metaProspectos} prosp.</span></div>` : ""}
-        ${m.semana         ? `<div class="met-sub" style="color:#7C3AED">S${m.semana}</div>` : ""}
+        ${m.metaLitros       ? `<div class="met-sub">💧 <span>${m.metaLitros} L</span></div>` : ""}
+        ${m.metaVisitas      ? `<div class="met-sub">📍 <span>${m.metaVisitas} vis.</span></div>` : ""}
+        ${m.metaProspectos   ? `<div class="met-sub">🧲 <span>${m.metaProspectos} prosp.</span></div>` : ""}
+        ${m.metaConvertidos  ? `<div class="met-sub">🔄 <span>${m.metaConvertidos} conv.</span></div>` : ""}
+        ${m.metaRecuperacion ? `<div class="met-sub">💳 <span>${_fmtMXN(m.metaRecuperacion)}</span></div>` : ""}
+        ${m.semana           ? `<div class="met-sub" style="color:#7C3AED">S${m.semana}</div>` : ""}
       </div>
       <div class="met-sub-row" id="prog-extras-${esc(m.id)}"></div>
       <div class="met-actions">
@@ -445,6 +447,16 @@ function _abrirForm(id) {
         <input id="mfProspectos" type="number" min="0" value="${m?.metaProspectos ?? ""}" placeholder="0" />
       </div>
     </div>
+    <div class="mf-row">
+      <div class="mf-field">
+        <label>🔄 Convertidos a cliente</label>
+        <input id="mfConvertidos" type="number" min="0" value="${m?.metaConvertidos ?? ""}" placeholder="0" />
+      </div>
+      <div class="mf-field">
+        <label>💳 Recuperación cartera (MXN)</label>
+        <input id="mfRecuperacion" type="number" min="0" step="100" value="${m?.metaRecuperacion ?? ""}" placeholder="0.00" />
+      </div>
+    </div>
     <div class="mf-actions">
       <button class="btn-primary" id="mfBtnGuardar">Guardar</button>
       <button class="btn-secondary" id="mfBtnCancelar">Cancelar</button>
@@ -471,11 +483,13 @@ async function _guardarForm(id) {
   const activa = document.getElementById("mfActiva").value === "1";
   const fi     = document.getElementById("mfFi").value;
   const ff     = document.getElementById("mfFf").value;
-  const monto     = parseFloat(document.getElementById("mfMonto").value) || 0;
-  const litros    = parseFloat(document.getElementById("mfLitros")?.value) || 0;
-  const vis       = parseInt(document.getElementById("mfVisitas").value) || 0;
-  const prosp     = parseInt(document.getElementById("mfProspectos")?.value) || 0;
-  const semana    = parseInt(document.getElementById("mfSemana")?.value) || 0;
+  const monto        = parseFloat(document.getElementById("mfMonto").value) || 0;
+  const litros       = parseFloat(document.getElementById("mfLitros")?.value) || 0;
+  const vis          = parseInt(document.getElementById("mfVisitas").value) || 0;
+  const prosp        = parseInt(document.getElementById("mfProspectos")?.value) || 0;
+  const convertidos  = parseInt(document.getElementById("mfConvertidos")?.value) || 0;
+  const recuperacion = parseFloat(document.getElementById("mfRecuperacion")?.value) || 0;
+  const semana       = parseInt(document.getElementById("mfSemana")?.value) || 0;
 
   if (!alias) { window.toast?.("Selecciona un ingeniero.", "warn"); return; }
   if (!fi || !ff) { window.toast?.("Las fechas son obligatorias.", "warn"); return; }
@@ -484,10 +498,12 @@ async function _guardarForm(id) {
     alias, tipo, activa,
     fechaInicio:    new Date(fi + "T00:00:00").getTime(),
     fechaFin:       new Date(ff + "T23:59:59").getTime(),
-    metaMonto:      monto,
-    metaLitros:     litros,
-    metaVisitas:    vis,
-    metaProspectos: prosp,
+    metaMonto:        monto,
+    metaLitros:       litros,
+    metaVisitas:      vis,
+    metaProspectos:   prosp,
+    metaConvertidos:  convertidos,
+    metaRecuperacion: recuperacion,
     ...(semana ? { semana } : {}),
     actualizadoPor: Sesion.alias,
     updatedAt: serverTimestamp()

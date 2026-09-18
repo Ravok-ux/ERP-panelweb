@@ -50,6 +50,7 @@ const ADMIN_FLAGS = [
   { key:"PUEDE_REPORTES_CUSTOM",     label:"Reportes custom",        icon:"📉" },
   { key:"PUEDE_ACCESO_SMS",          label:"Módulo SMS",             icon:"📱" },
   { key:"PUEDE_ACCESO_BI",           label:"BI Analytics",           icon:"📊" },
+  { key:"PUEDE_BI_COMPARATIVO",      label:"BI Comparativo ingenieros", icon:"👥" },
   { key:"PUEDE_ACCESO_GASTOS",       label:"Módulo gastos",          icon:"🧾" },
   { key:"PUEDE_VER_HISTORIAL",       label:"Historial ventas",       icon:"📅" },
   { key:"PUEDE_ACCESO_CAJA",         label:"Cortes de caja",         icon:"🏦" }
