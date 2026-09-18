@@ -1215,6 +1215,7 @@ async function _confirmarPedido() {
     creadoPor:       Sesion.alias ?? "web",
     confirmadoEn:    Date.now(),
     confirmadoPor:   Sesion.alias ?? "web",
+    _ts:             Date.now(),
   };
 
   try {

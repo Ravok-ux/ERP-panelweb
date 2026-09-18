@@ -48,8 +48,11 @@ exports.onPedidoEntregado = onDocumentUpdated(
       const cantidad = Number(item.cantidad) || 0;
       if (cantidad <= 0) continue;
 
-      // Buscar producto por idPretoriano o productoId
-      const idPret = item.idPretoriano || item.productoId;
+      // Buscar producto por idPretoriano.
+      // NOTA: Items creados desde el panel web usan productoId (doc ID de Firestore, no numérico).
+      // Number(docId) → NaN → where("idPretoriano","==",NaN) no hace match → sin descuento doble para web.
+      // Solo pedidos del APK (que sí incluyen idPretoriano numérico) activan este descuento.
+      const idPret = item.idPretoriano;
       if (!idPret) continue;
 
       let prodRef = null;
@@ -831,15 +834,19 @@ async function _calcularMetricasFecha(fecha) {
   const [pedSnap, visSnap, aboSnap, notSnap, cotSnap] = await Promise.all([
     db.collection("pedidos")
       .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
-    db.collection("visitas_programadas")
-      .where("fechaTs", ">=", desdeTs).where("fechaTs", "<=", hastaTs).get()
-      .then(s => ({ data: () => ({ count: s.docs.filter(d => d.data().status === "COMPLETADA").length }) })),
-    db.collection("abonos")
+    db.collection("visitas")
+      .where("timestamp", ">=", FSTimestamp.fromMillis(desdeTs))
+      .where("timestamp", "<=", FSTimestamp.fromMillis(hastaTs)).get()
+      .then(s => ({ data: () => ({ count: s.docs.filter(d => {
+        const st = (d.data().estadoVisita || d.data().status || "").toUpperCase();
+        return st === "COMPLETADA";
+      }).length }) })),
+    db.collection("remisiones_credito")
       .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
     db.collection("notificaciones_web")
       .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
     db.collection("cotizaciones")
-      .where("_ts", ">=", desdeTs).count().get(),
+      .where("_ts", ">=", desdeTs).where("_ts", "<=", hastaTs).count().get(),
   ]);
 
   const [cliSnap, usrSnap] = await Promise.all([
@@ -868,9 +875,9 @@ async function _calcularMetricasFecha(fecha) {
 // ── Helper: calcular y guardar manifesto de backup ─────────────
 async function _calcularBackupManifesto(fecha) {
   const colecciones = [
-    "clientes", "pedidos", "remisiones", "abonos",
-    "cotizaciones", "usuarios", "visitas_programadas",
-    "geocercas", "productos", "kardex",
+    "clientes", "pedidos", "remisiones_credito", "visitas",
+    "cotizaciones", "usuarios", "comisiones_n10",
+    "productos", "movimientos_stock", "notificaciones_web",
   ];
   const conteos  = {};
   let totalDocs  = 0;
@@ -1207,8 +1214,8 @@ exports.reporteSemanalGerente = onSchedule(
     const ventasPorIng = {}; // alias → monto
     try {
       const pedSnap = await db.collection("pedidos")
-        .where("fechaPedido", ">=", tsLunes)
-        .where("fechaPedido", "<=", tsDomingo)
+        .where("_ts", ">=", tsLunes)
+        .where("_ts", "<=", tsDomingo)
         .get();
       pedSnap.docs.forEach(d => {
         const p = d.data();

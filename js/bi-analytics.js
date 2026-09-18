@@ -51,12 +51,14 @@ async function _cargar() {
     const tsRaw = r.fechaPedido ?? r.createdAt;
     const fecha = tsRaw?.toDate?.()
       || (typeof tsRaw === "number" ? new Date(tsRaw) : new Date(0));
+    const rawAlias = r.ingenieroAlias || r.alias || r.ingeniero || "";
     return {
       id:        d.id,
       monto:     Number(r.monto || r.total || 0),
       fecha,
       zona:      r.zona      || "Sin zona",
-      ingeniero: resolverNombre(r.ingenieroAlias || r.alias || r.ingeniero) || "Desconocido",
+      ingeniero: resolverNombre(rawAlias) || rawAlias || "Desconocido",
+      _rawAlias: rawAlias,
       cliente:   r.clienteNombre  || r.cliente || "Desconocido",
       clienteId: r.clienteId || "",
       productos: Array.isArray(r.items) ? r.items : (Array.isArray(r.productos) ? r.productos : []),
@@ -316,7 +318,7 @@ const KPI_DEFS = [
   { key:"venta",        label:"Venta semanal",       icon:"&#x1F4B0;", metaField:"metaMonto",        fmt:MXN,              peso:0.20 },
   { key:"visitas",      label:"Visitas",              icon:"&#x1F4CD;", metaField:"metaVisitas",       fmt:NUM,              peso:0.20 },
   { key:"litros",       label:"Litros N10",           icon:"&#x1F4A7;", metaField:"metaLitros",        fmt:v=>`${NUM(v)} L`, peso:0.20 },
-  { key:"recuperacion", label:"Recuperacion cartera", icon:"&#x1F4B3;", metaField:"metaRecuperacion",  fmt:MXN,              peso:0.20 },
+  { key:"recuperacion", label:"Recuperación cartera", icon:"&#x1F4B3;", metaField:"metaRecuperacion",  fmt:MXN,              peso:0.20 },
   { key:"prospectos",   label:"Prospectos",           icon:"&#x1F9F2;", metaField:"metaProspectos",    fmt:NUM,              peso:0.05 },
   { key:"convertidos",  label:"Convertidos",          icon:"&#x1F504;", metaField:"metaConvertidos",   fmt:NUM,              peso:0.15 },
 ];
@@ -332,8 +334,11 @@ async function _cargarIngenieros() {
         nombre: resolverNombre(d.data().alias || d.id) || d.data().nombre || d.data().alias || d.id
       }));
   } catch(_) {}
-  const aliases = [...new Set(_pedidos.map(p => p.ingeniero).filter(Boolean))];
-  return aliases.map(a => ({ alias: a, nombre: a }));
+  // Fallback: extraer alias crudos de pedidos (no nombres resueltos)
+  const rawAliases = [...new Set(
+    _pedidos.map(p => p._rawAlias).filter(Boolean)
+  )];
+  return rawAliases.map(a => ({ alias: a, nombre: resolverNombre(a) || a }));
 }
 
 async function _cargarKPIs(aliases, semanas, year) {
@@ -382,12 +387,12 @@ async function _cargarKPIs(aliases, semanas, year) {
     } catch(_) { visitasPorAlias[alias] = []; }
   }
 
-  // Comisiones N10 por alias
+  // Comisiones N10 por alias (documentos mensuales con sub-array ventas[])
   const comisionesPorAlias = {};
   for (const alias of aliases) {
     try {
       const snap = await getDocs(query(collection(db, "comisiones_n10"),
-        where("ingenieroAlias", "==", alias), limit(500)));
+        where("alias", "==", alias), limit(200)));
       comisionesPorAlias[alias] = snap.docs.map(d => d.data());
     } catch(_) { comisionesPorAlias[alias] = null; }
   }
@@ -429,15 +434,18 @@ async function _cargarKPIs(aliases, semanas, year) {
       });
       const visitas = visSem.length;
 
-      // Litros N10
+      // Litros N10 — iterar sub-array ventas[] de cada doc mensual
       let litros = 0;
-      if (comisionesPorAlias[alias]) {
-        const comSem = comisionesPorAlias[alias].filter(c => {
-          const d = _toDate(c.fecha);
-          return d && d.getTime() >= startMs && d.getTime() <= endMs;
+      if (comisionesPorAlias[alias] && comisionesPorAlias[alias].length > 0) {
+        comisionesPorAlias[alias].forEach(comDoc => {
+          (Array.isArray(comDoc.ventas) ? comDoc.ventas : []).forEach(venta => {
+            const d = venta.fecha ? new Date(venta.fecha) : null;
+            if (d && d.getTime() >= startMs && d.getTime() <= endMs)
+              litros += Number(venta.litros || 0);
+          });
         });
-        litros = comSem.reduce((s,c) => s + Number(c.litros || 0), 0);
       } else {
+        // Fallback: suma litros de pedidos del período
         pedSem.forEach(p => {
           (Array.isArray(p.items) ? p.items : []).forEach(it => {
             const marc = (it.marca || "").toLowerCase();
@@ -599,12 +607,12 @@ function _grafTendencia(kpiData, metas, aliases, semanas, kd) {
 
   const gridLines = [0,0.25,0.5,0.75,1].map(r => {
     const y = pT + iH - r*iH;
-    return `<line x1="${pL}" y1="${y}" x2="${pL+iW}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>
-    <text x="${pL-4}" y="${y+3}" text-anchor="end" font-size="8" fill="var(--text-muted)">${fmtY(r*maxVal)}</text>`;
+    return `<line x1="${pL}" y1="${y}" x2="${pL+iW}" y2="${y}" stroke="#374151" stroke-width="0.5"/>
+    <text x="${pL-4}" y="${y+3}" text-anchor="end" font-size="9" fill="#9CA3AF">${fmtY(r*maxVal)}</text>`;
   }).join("");
 
   const xLabels = semanas.map((s,i) =>
-    `<text x="${xPos(i)}" y="${H-6}" text-anchor="middle" font-size="8" fill="var(--text-muted)">S${s}</text>`
+    `<text x="${xPos(i)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9CA3AF">S${s}</text>`
   ).join("");
 
   let svgLines = "";
@@ -627,8 +635,8 @@ function _grafTendencia(kpiData, metas, aliases, semanas, kd) {
   aliases.forEach((alias,ai) => {
     const color = ING_COLORS[ai % ING_COLORS.length];
     const lx = pL + ai * 120;
-    legend += `<rect x="${lx}" y="6" width="10" height="3" fill="${color}" rx="1"/>
-    <text x="${lx+13}" y="10" font-size="8" fill="var(--text-secondary)">${esc(resolverNombre(alias)||alias)}</text>`;
+    legend += `<rect x="${lx}" y="11" width="12" height="3" fill="${color}" rx="1"/>
+    <text x="${lx+16}" y="16" font-size="10" fill="#E5E7EB" font-weight="500">${esc(resolverNombre(alias)||alias)}</text>`;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto">
@@ -638,25 +646,28 @@ function _grafTendencia(kpiData, metas, aliases, semanas, kd) {
 
 function _grafBarrasCumplimiento(kpiData, metas, aliases, semanas) {
   if (!aliases.length) return "<p>Sin datos</p>";
-  const W=580, barH=22, gap=4, padL=110, padR=50, padT=28, padB=16;
+  const W=580, barH=22, gap=4, padL=120, padR=50, padT=40, padB=16;
   const groupH = (barH+gap)*aliases.length;
   const groupGap = 14;
   const H = padT + KPI_DEFS.length*(groupH+groupGap) + padB;
 
-  let rects = `<text x="${padL}" y="16" font-size="9" fill="var(--text-muted)">Promedio del periodo — linea punteada = 100% de meta</text>`;
+  let rects = `<text x="${padL}" y="33" font-size="9" fill="#9CA3AF">Promedio del periodo — linea punteada = 100% de meta</text>`;
   KPI_DEFS.forEach((kd,ki) => {
     const gY = padT + ki*(groupH+groupGap);
-    rects += `<text x="${padL-6}" y="${gY+groupH/2+4}" text-anchor="end" font-size="8" fill="var(--text-secondary)">${esc(kd.label)}</text>`;
+    rects += `<text x="${padL-6}" y="${gY+groupH/2+4}" text-anchor="end" font-size="9" fill="#D1D5DB">${esc(kd.label)}</text>`;
     aliases.forEach((alias,ai) => {
       const avg = semanas.reduce((s,w)=>s+(kpiData[alias]?.[w]?.[kd.key]||0),0)/Math.max(semanas.length,1);
       const metaVal = metas[alias]?.[kd.metaField]||0;
-      const pctVal = metaVal>0 ? Math.min(avg/metaVal,1.5) : 0;
-      const pctDisp = metaVal>0 ? Math.round(avg/metaVal*100) : 0;
-      const barW = pctVal*(W-padL-padR);
-      const y = gY+ai*(barH+gap);
-      const fillCol = pctDisp>=100?"#16A34A":pctDisp>=60?"#FBBF24":"#EF4444";
-      rects += `<rect x="${padL}" y="${y}" width="${barW}" height="${barH}" rx="3" fill="${fillCol}" opacity="0.85"/>
-      <text x="${padL+barW+4}" y="${y+barH/2+4}" font-size="8" fill="var(--text-primary)" font-weight="600">${pctDisp}%</text>`;
+      const pctVal  = metaVal>0 ? Math.min(avg/metaVal,1.5) : (avg>0 ? 0.4 : 0);
+      const pctDisp = metaVal>0 ? Math.round(avg/metaVal*100) : null;
+      const barW    = pctVal*(W-padL-padR);
+      const y       = gY+ai*(barH+gap);
+      const ingColor   = ING_COLORS[ai%ING_COLORS.length];
+      const semCol     = pctDisp===null ? "#9CA3AF" : pctDisp>=100?"#16A34A":pctDisp>=60?"#FBBF24":"#EF4444";
+      const barOpacity = pctDisp===null ? 0.35 : pctDisp>=100?0.9:pctDisp>=60?0.75:0.55;
+      const label      = pctDisp===null ? (avg>0 ? `${kd.fmt(avg)} s/meta` : "—") : `${pctDisp}%`;
+      rects += `<rect x="${padL}" y="${y}" width="${Math.max(barW,1)}" height="${barH}" rx="3" fill="${ingColor}" opacity="${barOpacity}"/>
+      <text x="${padL+Math.max(barW,1)+4}" y="${y+barH/2+4}" font-size="9" fill="${semCol}" font-weight="700">${label}</text>`;
     });
     const x100 = padL+(W-padL-padR);
     rects += `<line x1="${x100}" y1="${gY}" x2="${x100}" y2="${gY+groupH}" stroke="#6B7280" stroke-width="0.8" stroke-dasharray="3 2"/>`;
@@ -665,8 +676,8 @@ function _grafBarrasCumplimiento(kpiData, metas, aliases, semanas) {
   let legend = "";
   aliases.forEach((alias,ai) => {
     const color = ING_COLORS[ai%ING_COLORS.length];
-    legend += `<rect x="${padL+ai*130}" y="0" width="10" height="3" fill="${color}" rx="1"/>
-    <text x="${padL+ai*130+13}" y="4" font-size="8" fill="var(--text-secondary)">${esc(resolverNombre(alias)||alias)}</text>`;
+    legend += `<rect x="${padL+ai*145}" y="8" width="12" height="3" fill="${color}" rx="1"/>
+    <text x="${padL+ai*145+16}" y="15" font-size="10" fill="#E5E7EB" font-weight="500">${esc(resolverNombre(alias)||alias)}</text>`;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto">
@@ -675,8 +686,8 @@ function _grafBarrasCumplimiento(kpiData, metas, aliases, semanas) {
 }
 
 function _grafEmbudo(kpiData, metas, aliases, semanas) {
-  const W=560, rowH=36, padL=120, padR=80, padT=22;
-  const H = padT + aliases.length*(rowH+8)+20;
+  const W=560, rowH=30, padL=150, padR=60, padT=24, gap=14;
+  const H = padT + aliases.length*(rowH+gap) + 20;
   let rows = "";
   aliases.forEach((alias,ai) => {
     const color = ING_COLORS[ai%ING_COLORS.length];
@@ -684,17 +695,19 @@ function _grafEmbudo(kpiData, metas, aliases, semanas) {
     const totC = semanas.reduce((s,w)=>s+(kpiData[alias]?.[w]?.convertidos||0),0);
     const tasa = totP>0?Math.round(totC/totP*100):0;
     const maxW = W-padL-padR;
-    const cBarW = totP>0?Math.round(totC/totP*maxW):0;
-    const y = padT+ai*(rowH+8);
-    rows += `<text x="${padL-6}" y="${y+rowH/2+4}" text-anchor="end" font-size="9" fill="var(--text-secondary)" font-weight="600">${esc(resolverNombre(alias)||alias)}</text>
-    <rect x="${padL}" y="${y}" width="${maxW}" height="${rowH/2-2}" rx="2" fill="${color}" opacity="0.18"/>
-    <text x="${padL+maxW/2}" y="${y+rowH/4+3}" text-anchor="middle" font-size="8" fill="var(--text-secondary)">${NUM(totP)} prospectos</text>
-    <rect x="${padL}" y="${y+rowH/2+2}" width="${cBarW}" height="${rowH/2-2}" rx="2" fill="${color}" opacity="0.75"/>
-    <text x="${padL+Math.max(cBarW/2,4)}" y="${y+rowH-4}" text-anchor="middle" font-size="8" fill="var(--surface)">${NUM(totC)} conv.</text>
-    <text x="${padL+maxW+6}" y="${y+rowH/2+4}" font-size="9" fill="${tasa>=50?"#16A34A":tasa>=25?"#D97706":"#DC2626"}" font-weight="700">${tasa}%</text>`;
+    const convW = totP>0?Math.round(totC/totP*maxW):0;
+    const y = padT + ai*(rowH+gap);
+    const lcy = y + rowH/2 + 4;
+    const semCol = tasa>=50?"#16A34A":tasa>=25?"#D97706":"#DC2626";
+    rows += `
+    <text x="${padL-8}" y="${lcy}" text-anchor="end" font-size="10" fill="#E5E7EB" font-weight="700">${esc(resolverNombre(alias)||alias)}</text>
+    <rect x="${padL}" y="${y}" width="${maxW}" height="${rowH}" rx="4" fill="${color}" opacity="0.14"/>
+    ${convW>0?`<rect x="${padL}" y="${y}" width="${convW}" height="${rowH}" rx="4" fill="${color}" opacity="0.82"/>`:""}
+    <text x="${padL+maxW/2}" y="${lcy}" text-anchor="middle" font-size="9" fill="#E5E7EB">${NUM(totP)} prosp. → ${NUM(totC)} conv.</text>
+    <text x="${padL+maxW+8}" y="${lcy}" font-size="11" fill="${semCol}" font-weight="700">${tasa}%</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto">
-    <text x="${padL}" y="14" font-size="9" fill="var(--text-muted)">Prospectos → Convertidos (total del periodo)</text>
+    <text x="${padL}" y="16" font-size="9" fill="#9CA3AF">Prospectos → Convertidos (total del periodo)</text>
     ${rows}
   </svg>`;
 }
@@ -712,13 +725,13 @@ function _grafHeatmap(kpiData, metas, aliases, semanas) {
   cols.forEach((col,ci) => {
     const x = labelW+ci*(cellW+2);
     const nm = (resolverNombre(col.alias)||col.alias).split(" ")[0];
-    cells += `<text x="${x+cellW/2}" y="12" text-anchor="middle" font-size="7" fill="var(--text-muted)">${esc(nm)}</text>
-    <text x="${x+cellW/2}" y="22" text-anchor="middle" font-size="7" fill="var(--text-muted)">S${col.sem}</text>`;
+    cells += `<text x="${x+cellW/2}" y="13" text-anchor="middle" font-size="8" fill="#D1D5DB" font-weight="600">${esc(nm)}</text>
+    <text x="${x+cellW/2}" y="24" text-anchor="middle" font-size="8" fill="#9CA3AF">S${col.sem}</text>`;
   });
 
   KPI_DEFS.forEach((kd,ki) => {
     const y = 32+ki*(cellH+2);
-    cells += `<text x="${labelW-4}" y="${y+cellH/2+4}" text-anchor="end" font-size="8" fill="var(--text-secondary)">${esc(kd.label)}</text>`;
+    cells += `<text x="${labelW-4}" y="${y+cellH/2+4}" text-anchor="end" font-size="9" fill="#D1D5DB">${esc(kd.label)}</text>`;
     cols.forEach((col,ci) => {
       const x = labelW+ci*(cellW+2);
       const val = kpiData[col.alias]?.[col.sem]?.[kd.key]||0;
@@ -749,12 +762,12 @@ function _tabKpiIngenieros() {
 
   const html = `<div id="bi-comp-wrap">
   <div class="bi-card" style="margin-bottom:14px" id="bi-comp-config">
-    <div class="bi-card-title">&#x1F465; Analisis Comparativo de Ingenieros</div>
+    <div class="bi-card-title">&#x1F465; Análisis Comparativo de Ingenieros</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Periodo</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-          <label style="font-size:12px;color:var(--text-secondary)">Anio:</label>
+          <label style="font-size:12px;color:var(--text-secondary)">Año:</label>
           <select id="bi-comp-year" style="background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:5px 8px;font-size:12px">
             <option value="${yearActual-1}">${yearActual-1}</option>
             <option value="${yearActual}" selected>${yearActual}</option>
@@ -1396,8 +1409,8 @@ function _render() {
   .bi-tab{background:transparent;border:none;border-bottom:2px solid transparent;padding:8px 18px;cursor:pointer;font-size:13px;color:var(--text-secondary)}
   .bi-tab.active{border-bottom-color:var(--accent);color:var(--text-primary);font-weight:600}
   .bi-table{width:100%;border-collapse:collapse;font-size:12px}
-  .bi-table th{text-align:center;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;white-space:nowrap;background:var(--surface-2,var(--bg));position:sticky;top:0;z-index:2}
-  .bi-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
+  .bi-table th{text-align:center;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text-primary);font-size:11px;font-weight:700;white-space:nowrap;background:var(--surface-2,var(--bg));position:sticky;top:0;z-index:2}
+  .bi-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text-primary)}
   .bi-table tbody tr:hover{background:var(--surface2)}
   .bi-filter select{background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer}
   .bi-comp-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}

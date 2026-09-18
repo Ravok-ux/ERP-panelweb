@@ -526,8 +526,11 @@ export const CotizacionesPanelModule = (() => {
         items:          c.items || [],
         cotizacionId:   cotId,
         cotizacionFolio: c.folio || '',
+        fechaPedido:    serverTimestamp(),
         creadoEn:       serverTimestamp(),
-        creadoPor:      Sesion.alias
+        creadoPor:      Sesion.alias,
+        origen:         'web_cotizacion',
+        _ts:            Date.now(),
       });
 
       await updateDoc(doc(db,'cotizaciones',cotId), {
