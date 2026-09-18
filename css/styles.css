@@ -147,17 +147,19 @@ input[type='date'].input, input[type='month'].input, input[type='date'].form-inp
 }
 
 /* ── Inputs y selects nativos sin clase (herencia de tema) ─── */
-input:not([class]), select:not([class]), textarea:not([class]) {
+input:not([class]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+select:not([class]), textarea:not([class]) {
   width: 100%; padding: 8px 11px; border-radius: 8px;
   border: 1.5px solid var(--border); background: var(--surface-2, var(--surface));
   color: var(--text-primary); font-size: 13px; font-family: inherit;
   box-sizing: border-box; outline: none; -webkit-appearance: none; appearance: none;
   transition: border-color .15s, box-shadow .15s;
 }
-input:not([class]):focus, select:not([class]):focus, textarea:not([class]):focus {
+input:not([class]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
+select:not([class]):focus, textarea:not([class]):focus {
   border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.14);
 }
-input:not([class])::placeholder, textarea:not([class])::placeholder {
+input:not([class]):not([type="checkbox"]):not([type="radio"])::placeholder, textarea:not([class])::placeholder {
   color: var(--text-muted, #6B7280); opacity: 1;
 }
 select:not([class]) {
@@ -736,12 +738,48 @@ input[type='date']:not([class]), input[type='month']:not([class]) {
 .role-i  { background: rgba(37,99,235,.1);  color: #1D4ED8; border: 1px solid rgba(37,99,235,.15); }
 .role-r  { background: rgba(22,163,74,.1);  color: #15803D; border: 1px solid rgba(22,163,74,.2); }
 
-/* Toggle switch */
+/* ── Toggle switch global (checkboxes sin clase) ──────────── */
+input[type="checkbox"]:not([class]) {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 40px !important;
+  height: 22px !important;
+  min-width: 40px;
+  border-radius: 11px;
+  background: #4B5563;
+  border: none;
+  outline: none;
+  position: relative;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background .2s;
+  flex-shrink: 0;
+  display: inline-block;
+  box-sizing: content-box;
+}
+input[type="checkbox"]:not([class])::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: transform .2s;
+  pointer-events: none;
+}
+input[type="checkbox"]:not([class]):checked { background: #2563EB; }
+input[type="checkbox"]:not([class]):checked::before { transform: translateX(18px); }
+input[type="checkbox"]:not([class]):focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,.35); }
+input[type="checkbox"]:not([class]):disabled { opacity: .45; cursor: not-allowed; }
+
+/* Toggle switch de usuarios.js (estructura label > input + span) — proteger con !important */
 .toggle-col { text-align: center; width: 38px; }
 .toggle {
   position: relative; width: 32px; height: 17px; display: inline-block;
 }
-.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle input { opacity: 0 !important; width: 0 !important; height: 0 !important; position: absolute; }
 .toggle-slider {
   position: absolute; inset: 0; background: var(--border);
   border: 1px solid var(--border); border-radius: 9px; cursor: pointer;
@@ -1337,6 +1375,8 @@ input[type='date']:not([class]), input[type='month']:not([class]) {
 /* ── Toggle ── */
 [data-theme="dark"] .toggle-slider { background: #30363D; border-color: #30363D; }
 [data-theme="dark"] .toggle-slider::before { background: #8B949E; }
+[data-theme="light"] input[type="checkbox"]:not([class]) { background: #9CA3AF; }
+[data-theme="light"] input[type="checkbox"]:not([class]):checked { background: #2563EB; }
 
 /* ── Tablas ── */
 [data-theme="dark"] table              { color: #E6EDF3; }
