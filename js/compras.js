@@ -432,17 +432,13 @@ function _bindAcciones() {
               data-idpret="${it.idPretoriano || it.productoId || ''}"
               data-nombre="${esc(it.nombreProducto || it.nombre || '')}"
               data-costo="${it.precioUnitario || 0}"
-              class="oc-rec-qty" value="${it.cantidad}"
-              style="width:80px;border:1px solid var(--border);border-radius:5px;
-                padding:4px 6px;font-size:12px;background:var(--surface);color:var(--text-primary);
-                text-align:right">
+              class="oc-rec-qty form-input" value="${it.cantidad}"
+              style="width:80px;text-align:right">
           </td>
           <td style="padding:8px 10px;text-align:center">
-            <textarea class="oc-rec-nota" data-idx="${idx}" rows="1"
+            <textarea class="oc-rec-nota form-input" data-idx="${idx}" rows="1"
               placeholder="Diferencia / merma…"
-              style="width:100%;border:1px solid var(--border);border-radius:5px;
-                padding:4px 6px;font-size:11px;background:var(--surface);color:var(--text-primary);
-                resize:none"></textarea>
+              style="resize:none"></textarea>
           </td>
         </tr>`).join("");
 

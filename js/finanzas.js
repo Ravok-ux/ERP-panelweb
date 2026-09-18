@@ -230,6 +230,66 @@ const FIN_CSS = `
   display: flex; justify-content: flex-end; gap: 8px;
 }
 
+/* ── Input / select / date overrides (scope: fin-wrap + modals) ── */
+#fin-wrap .input,
+.fin-modal-overlay .input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #374151);
+  background: var(--surface-2, #1F2937);
+  color: var(--text-primary, #F9FAFB);
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+#fin-wrap .input:focus,
+.fin-modal-overlay .input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.14);
+}
+#fin-wrap .input::placeholder,
+.fin-modal-overlay .input::placeholder {
+  color: var(--text-muted, #6B7280);
+  opacity: 1;
+}
+#fin-wrap .input:disabled,
+.fin-modal-overlay .input:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+#fin-wrap select.input,
+.fin-modal-overlay select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+#fin-wrap input[type="month"].input,
+#fin-wrap input[type="date"].input,
+.fin-modal-overlay input[type="month"].input,
+.fin-modal-overlay input[type="date"].input {
+  color-scheme: dark;
+  cursor: pointer;
+}
+.fin-modal-overlay .fin-field label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted, #6B7280);
+  margin-bottom: 5px;
+}
+.fin-modal-overlay .fin-form-grid { display: grid; gap: 14px; }
+.fin-modal-overlay .fin-form-grid.cols2 { grid-template-columns: 1fr 1fr; }
+.fin-modal-overlay .fin-form-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+
 /* Misc */
 .fin-empty { text-align: center; padding: 32px; color: var(--text-muted, #94a3b8); font-size: 13px; }
 .fin-loading { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }

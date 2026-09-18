@@ -504,14 +504,12 @@ function _abrirDesbloqueo(clienteId, clienteNombre) {
       <p style="margin:0 0 16px;font-size:13px;color:#9CA3AF">${esc(clienteNombre)}</p>
       <label style="font-size:13px;display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
         Duración
-        <select id="dl-horas" style="padding:8px;border:1px solid var(--border);border-radius:7px;
-          background:var(--surface);color:var(--text-primary)">${opts}</select>
+        <select id="dl-horas" class="cfg-input">${opts}</select>
       </label>
       <label style="font-size:13px;display:flex;flex-direction:column;gap:6px;margin-bottom:18px">
         Motivo (opcional)
-        <textarea id="dl-motivo" rows="2"
-          style="padding:8px;border:1px solid var(--border);border-radius:7px;
-            background:var(--surface);color:var(--text-primary);resize:none;box-sizing:border-box;width:100%"
+        <textarea id="dl-motivo" rows="2" class="cfg-input"
+          style="resize:none"
           placeholder="Ej. Autorizado por gerencia para pedido urgente"></textarea>
       </label>
       <div style="display:flex;gap:8px;justify-content:flex-end">

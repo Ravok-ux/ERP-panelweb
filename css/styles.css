@@ -117,19 +117,43 @@ html, body {
 
 .form-group  { margin-bottom: 16px; }
 .form-label  { display: block; font-size: 13px; font-weight: 700; color: var(--text-sec); margin-bottom: 5px; }
-.form-input  {
+.form-input, .input  {
   width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
   padding: 9px 12px; font-size: 13px; color: var(--text-primary);
-  background: var(--surface); outline: none; transition: border-color .15s;
-  font-family: inherit;
+  background: var(--surface-2, var(--surface)); outline: none; transition: border-color .15s, box-shadow .15s;
+  font-family: inherit; box-sizing: border-box; -webkit-appearance: none; appearance: none;
 }
-.form-input:focus { border-color: var(--green-mid); }
+.form-input:focus, .input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.14); }
+.form-input::placeholder, .input::placeholder { color: var(--text-muted, #6B7280); opacity: 1; }
+.form-input:disabled, .input:disabled { opacity: .5; cursor: not-allowed; }
+select.input, select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px; cursor: pointer;
+}
+input[type='date'].input, input[type='month'].input, input[type='date'].form-input, input[type='month'].form-input {
+  color-scheme: dark; cursor: pointer;
+}
 
 /* ── Inputs y selects nativos sin clase (herencia de tema) ─── */
 input:not([class]), select:not([class]), textarea:not([class]) {
-  background: var(--surface);
-  color: var(--text-primary);
-  border-color: var(--border);
+  width: 100%; padding: 8px 11px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--surface-2, var(--surface));
+  color: var(--text-primary); font-size: 13px; font-family: inherit;
+  box-sizing: border-box; outline: none; -webkit-appearance: none; appearance: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:not([class]):focus, select:not([class]):focus, textarea:not([class]):focus {
+  border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.14);
+}
+input:not([class])::placeholder, textarea:not([class])::placeholder {
+  color: var(--text-muted, #6B7280); opacity: 1;
+}
+select:not([class]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; cursor: pointer;
+}
+input[type='date']:not([class]), input[type='month']:not([class]) {
+  color-scheme: dark; cursor: pointer;
 }
 
 .login-error {

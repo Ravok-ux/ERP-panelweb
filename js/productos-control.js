@@ -202,10 +202,9 @@ function _html() {
           <div style="font-size:10.5px;color:#9CA3AF" id="pc-subtitle">Cargando…</div>
         </div>
         <div style="flex:1"></div>
-        <input id="pc-buscar" type="text"
+        <input id="pc-buscar" type="text" class="form-input"
           placeholder="Buscar por Nombre / Descripción / Código / Clave SAT…"
-          style="padding:7px 12px;border-radius:6px;border:1px solid var(--border);
-            background:var(--surface);color:var(--text-primary);font-size:12px;width:280px">
+          style="width:280px">
         ${PUEDE_EDITAR() ? `
           <button onclick="ProdCtrlUI.abrirAltaProducto()"
             style="padding:7px 16px;border-radius:6px;border:none;background:#1B5E20;
@@ -324,9 +323,7 @@ function _html() {
           ${_field("pc-e-peso",        "Peso",             "number", "0.0")}
           <div>
             <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Embalaje / Unidad</label>
-            <select id="pc-e-unidad"
-              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-                font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;appearance:auto"
+            <select id="pc-e-unidad" class="form-input"
               onchange="ProdCtrlUI.onUnidadChange(this)">
               <option value="">— Sin especificar —</option>
               <option value="Bulto">Bulto</option>
@@ -341,10 +338,8 @@ function _html() {
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Familia / tipo</label>
-            <select id="pc-e-familia"
-              onchange="document.getElementById('pc-e-litros-wrap').style.display=this.value==='N10'?'':'none'"
-              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-                font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;appearance:auto">
+            <select id="pc-e-familia" class="form-input"
+              onchange="document.getElementById('pc-e-litros-wrap').style.display=this.value==='N10'?'':'none'">
               <option value="">Estándar</option>
               <option value="N10">💧 N10 — Litros</option>
             </select>
@@ -356,10 +351,8 @@ function _html() {
 
         <div style="margin-bottom:12px">
           <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Descripción</label>
-          <textarea id="pc-e-descripcion" rows="2"
-            style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;
-              resize:vertical;font-family:inherit"></textarea>
+          <textarea id="pc-e-descripcion" rows="2" class="form-input"
+            style="resize:vertical"></textarea>
         </div>
 
         <!-- ── Foto del producto ── -->
@@ -391,9 +384,7 @@ function _html() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
           <div>
             <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Impuesto</label>
-            <select id="pc-e-impuesto"
-              style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-                font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+            <select id="pc-e-impuesto" class="form-input">
               <option value="Exento">Exento de Impuesto</option>
               <option value="IVA">Con IVA 16%</option>
               <option value="IEPS">Con IEPS</option>
@@ -463,9 +454,7 @@ function _th(extra) {
 function _field(id, label, type, placeholder) {
   return `<div>
     <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">${label}</label>
-    <input id="${id}" type="${type}" placeholder="${placeholder}"
-      style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-        font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box"
+    <input id="${id}" type="${type}" placeholder="${placeholder}" class="form-input"
       ${type==="number" ? 'min="0" step="0.01"' : 'maxlength="120"'}>
   </div>`;
 }
@@ -474,10 +463,7 @@ function _field(id, label, type, placeholder) {
 function _comboField(id, label, placeholder) {
   return `<div>
     <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">${label}</label>
-    <select id="${id}"
-      style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
-        font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;
-        appearance:auto">
+    <select id="${id}" class="form-input">
       <option value="">${placeholder}</option>
     </select>
   </div>`;

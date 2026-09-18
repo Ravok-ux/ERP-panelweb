@@ -51,7 +51,9 @@ export const MetasModule = {
                      padding:12px 16px; border-bottom:1px solid var(--border,#e2e8f0); flex-wrap:wrap; gap:8px; }
         .met-title { margin:0; font-size:1.1rem; font-weight:700; }
         .met-header-actions { display:flex; gap:8px; align-items:center; }
-        .met-select{ padding:6px 10px; border:1px solid var(--border,#e2e8f0); border-radius:6px; font-size:.88rem; }
+        .met-select{ padding:6px 10px; border:1.5px solid var(--border,#e2e8f0); border-radius:6px; font-size:.88rem;
+          background:var(--surface-2,var(--surface)); color:var(--text-primary); outline:none; cursor:pointer;
+          -webkit-appearance:none; appearance:none; }
         .met-kpis  { display:flex; gap:12px; padding:12px 16px; flex-wrap:wrap; }
         .kpi-box   { background:var(--surface); border:1px solid var(--border,#e2e8f0);
                      border-radius:8px; padding:12px 18px; min-width:130px; }

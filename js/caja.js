@@ -35,13 +35,13 @@ function _html() {
   <div class="caja-header">
     <h2>🏦 Arqueo / Corte de Caja</h2>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-      <select id="caja-filtro-status" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:.9rem">
+      <select id="caja-filtro-status" class="form-input" style="width:auto">
         <option value="">Todos</option>
         <option value="PENDIENTE">Pendientes</option>
         <option value="VALIDADO">Validados</option>
         <option value="DIFERENCIA">Con diferencia</option>
       </select>
-      <select id="caja-filtro-alias" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:.9rem">
+      <select id="caja-filtro-alias" class="form-input" style="width:auto">
         <option value="">Todos</option>
       </select>
       <button id="caja-btn-nuevo" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:.4rem .9rem;font-size:.9rem;font-weight:700;cursor:pointer">+ Nuevo corte</button>
