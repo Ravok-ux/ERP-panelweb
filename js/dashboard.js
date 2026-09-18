@@ -1154,16 +1154,17 @@ function _renderDashFeed() {
     const a   = d.data();
     const cfg = _eventConfig(a.tipo);
     const ts  = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
-    const isAlarm = a.tipo === "PEDIDO_PENDIENTE_AUTH";
+    const isAlarm = a.tipo === "PEDIDO_PENDIENTE_AUTH" && !a.resuelto;
     const extraStyle = isAlarm
       ? `background:#EF444412;border-width:2px;animation:dash-alarm 1.4s ease-in-out infinite`
       : "";
+    const iconMostrar = (a.tipo === "PEDIDO_PENDIENTE_AUTH" && a.resuelto) ? "✅" : cfg.icon;
     return `
-      <div class="feed-event" style="border-color:${cfg.color};${extraStyle}">
-        <div class="ev-icon">${cfg.icon}</div>
+      <div class="feed-event" style="border-color:${isAlarm ? "#EF4444" : cfg.color};${extraStyle}${a.resuelto ? ";opacity:.6" : ""}">
+        <div class="ev-icon">${iconMostrar}</div>
         <div class="ev-body">
           <div class="ev-who" style="${isAlarm ? "color:#EF4444;font-weight:800" : ""}">${isAlarm ? "AUTORIZACIÓN" : (esc(a.alias) || "–")}</div>
-          <div class="ev-what">${esc(_resumenActividad(a))}</div>
+          <div class="ev-what">${esc(a.resuelto && a.tipo === "PEDIDO_PENDIENTE_AUTH" ? `✔ Resuelta · ${a.cliente || "–"}` : _resumenActividad(a))}</div>
           <div class="ev-time">${ts}</div>
         </div>
       </div>`;
