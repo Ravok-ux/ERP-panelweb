@@ -23,6 +23,12 @@ const MXN  = v => new Intl.NumberFormat("es-MX", { style:"currency", currency:"M
 const NUM  = v => new Intl.NumberFormat("es-MX").format(v || 0);
 const esc  = s => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const _kpi  = (ico, lbl, val, color, sub = "") => `
+  <div class="kpi-card" style="border-left-color:${color}">
+    <div class="kpi-icon">${ico}</div>
+    <div class="kpi-val">${val}</div>
+    <div class="kpi-label">${lbl}${sub ? ` · ${sub}` : ""}</div>
+  </div>`;
 
 // ── Carga Firestore ───────────────────────────────────────────────
 async function _cargar() {
@@ -1385,12 +1391,6 @@ function _tabInventario() {
       <span style="font-weight:700;font-size:13px;color:${color}">${MXN(val)}</span>
     </div>`;
 
-  const _kpi = (ico, lbl, val, color, sub = "") => `
-    <div class="kpi-card" style="border-left-color:${color}">
-      <div class="kpi-icon">${ico}</div>
-      <div class="kpi-val">${val}</div>
-      <div class="kpi-label">${lbl}${sub ? ` · ${sub}` : ""}</div>
-    </div>`;
 
   // ABC classification — A: 80% valor acumulado, B: siguiente 15%, C: resto
   const todosOrdenados = [...rows].sort((a, b) => b.valorCosto - a.valorCosto);
@@ -1670,7 +1670,7 @@ function _render() {
 async function _tabCartera() {
   let docs = [];
   try {
-    const snap = await getDocs(query(collection(db, "remisiones_credito"), orderBy("fecha","desc"), limit(500)));
+    const snap = await getDocs(query(collection(db, "remisiones_credito"), orderBy("fechaCreacion","desc"), limit(500)));
     docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch(_) {}
 
@@ -1678,14 +1678,16 @@ async function _tabCartera() {
 
   const ahora = Date.now();
   const buckets = { "0-30":[], "31-60":[], "61-90":[], "90+":[] };
-  let totalCartera = 0, totalCobrado = 0;
+  let totalCartera = 0;
   const deudoresMapa = {};
 
   docs.forEach(r => {
-    const fechaMs = r.fecha?.toMillis ? r.fecha.toMillis() : (r.fecha || 0);
-    const dias = Math.floor((ahora - fechaMs) / 86400000);
-    const monto = Number(r.total || r.monto || 0);
-    const cobrado = Number(r.montoCobrado || 0);
+    // Calcular antigüedad desde fechaVencimiento (si existe) o fechaCreacion
+    const fechaBase = r.fechaVencimiento || r.fechaCreacion;
+    const fechaMs = fechaBase?.toMillis ? fechaBase.toMillis() : (fechaBase?.seconds ? fechaBase.seconds*1000 : 0);
+    const dias = Math.max(0, Math.floor((ahora - fechaMs) / 86400000));
+    const monto = Number(r.montoOriginal || r.total || r.monto || 0);
+    const cobrado = Number(r.totalAbonado || r.montoCobrado || 0);
     const pendiente = monto - cobrado;
     if (pendiente <= 0) return;
     totalCartera += pendiente;
@@ -1743,13 +1745,13 @@ async function _tabCartera() {
 async function _tabComisiones() {
   let docs = [];
   try {
-    const snap = await getDocs(query(collection(db, "comisiones_n10"), orderBy("mes","desc"), limit(500)));
+    const snap = await getDocs(query(collection(db, "comisiones_n10"), orderBy("mes_key","desc"), limit(500)));
     docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch(_) {}
 
   if (!docs.length) return `<div class="bi-card"><div class="bi-card-title">💵 Comisiones</div><p style="color:var(--text-muted);font-size:13px">Sin datos en comisiones_n10.</p></div>`;
 
-  // Agrupar por alias y mes
+  // Agrupar por alias y mes_key
   const porAlias = {};
   docs.forEach(d => {
     const alias = d.alias || d.ingeniero || "—";
@@ -1758,16 +1760,16 @@ async function _tabComisiones() {
   });
 
   const aliases = Object.keys(porAlias).sort();
-  const meses   = [...new Set(docs.map(d => d.mes || "").filter(Boolean))].sort().slice(-6);
+  const meses   = [...new Set(docs.map(d => d.mes_key || "").filter(Boolean))].sort().slice(-6);
 
   const rows = aliases.map(alias => {
     const celdas = meses.map(mes => {
-      const doc = porAlias[alias].find(d => d.mes === mes);
+      const doc = porAlias[alias].find(d => d.mes_key === mes);
       if (!doc) return `<td style="color:var(--text-muted)">—</td>`;
-      const total = Number(doc.totalComision || doc.total || 0);
+      const total = Number(doc.comision || doc.totalComision || doc.total || 0);
       return `<td style="font-family:monospace;font-weight:700;color:#4ADE80">${MXN(total)}</td>`;
     }).join("");
-    const totalAlias = porAlias[alias].reduce((s,d) => s + Number(d.totalComision||d.total||0), 0);
+    const totalAlias = porAlias[alias].reduce((s,d) => s + Number(d.comision||d.totalComision||d.total||0), 0);
     return `<tr><td style="text-align:left;font-weight:600">${esc(alias)}</td>${celdas}<td style="font-family:monospace;font-weight:700">${MXN(totalAlias)}</td></tr>`;
   }).join("");
 
@@ -1790,29 +1792,22 @@ async function _tabComisiones() {
 // ── Tab Cobertura de Ruta ─────────────────────────────────────────
 async function _tabCobertura() {
   const ahora = Date.now();
-  let clientes = [], visitas = [];
+  let clientes = [];
   try {
-    const [cSnap, vSnap] = await Promise.all([
-      getDocs(query(collection(db, "clientes"), limit(500))),
-      getDocs(query(collection(db, "visitas"), orderBy("timestamp","desc"), limit(1000))),
-    ]);
+    const cSnap = await getDocs(query(collection(db, "clientes"), limit(500)));
     clientes = cSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    visitas  = vSnap.docs.map(d => ({ ...d.data(), _cid: d.data().clienteId || d.data().idCliente || "" }));
   } catch(_) {}
 
   if (!clientes.length) return `<div class="bi-card"><div class="bi-card-title">🗺️ Cobertura de Ruta</div><p style="color:var(--text-muted);font-size:13px">Sin datos en clientes.</p></div>`;
 
-  // Última visita por cliente
-  const ultimaVisita = {};
-  visitas.forEach(v => {
-    const cid = v._cid;
-    if (!cid) return;
-    const ms = v.timestamp?.toMillis ? v.timestamp.toMillis() : 0;
-    if (!ultimaVisita[cid] || ms > ultimaVisita[cid]) ultimaVisita[cid] = ms;
-  });
-
-  const rows = clientes.map(c => {
-    const ultima = ultimaVisita[c.id] || null;
+  const rows = clientes.filter(c => c.activo !== false).map(c => {
+    // fechaUltimaVisita puede ser Timestamp, ms number, o ISO string
+    const fuv = c.fechaUltimaVisita;
+    let ultima = null;
+    if (fuv?.toMillis)        ultima = fuv.toMillis();
+    else if (fuv?.seconds)    ultima = fuv.seconds * 1000;
+    else if (typeof fuv === "number") ultima = fuv;
+    else if (typeof fuv === "string" && fuv) ultima = new Date(fuv).getTime() || null;
     const diasSin = ultima ? Math.floor((ahora - ultima) / 86400000) : null;
     const badge = diasSin === null ? `<span style="color:#9CA3AF">Sin visita</span>`
       : diasSin <= 30 ? `<span style="color:#4ADE80">${diasSin}d</span>`
