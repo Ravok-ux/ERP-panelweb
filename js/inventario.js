@@ -802,9 +802,9 @@ function _escucharMovimientos() {
   const desdeTs = desde ? new Date(dy,dm-1,dd,0,0,0).getTime() : Date.now()-7*86400000;
   const hastaTs = hasta ? new Date(hy,hm-1,hd,23,59,59).getTime() : Date.now();
 
-  let constraints = [where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
+  // Filtro tipo client-side: evita requerir índice compuesto tipo+_ts
+  const constraints = [where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
     orderBy("_ts","desc"), limit(500)];
-  if (tipo) constraints = [where("tipo","==",tipo), ...constraints];
   const q = query(collection(db, "movimientos_stock"), ...constraints);
 
   const tbody = document.getElementById("mov-body");
@@ -813,7 +813,8 @@ function _escucharMovimientos() {
 
   _unsubsMov.push(onSnapshot(q, snap => {
     if (!tbody) return;
-    const rows = snap.docs.map(d => d.data());
+    let rows = snap.docs.map(d => d.data());
+    if (tipo) rows = rows.filter(r => r.tipo === tipo);
     if (!rows.length) {
       tbody.innerHTML = `<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--text-sec)">Sin movimientos</td></tr>`;
       return;
@@ -920,9 +921,6 @@ function _montarConteoFisico() {
   // ── Historial de conteos ───────────────────────────────────
   let _conteoActivo = null;
   let _conteoItems  = [];   // [{productoId, nombre, stockSistema, stockConteo}]
-
-  const { getDocs: gd2, query: q2, collection: col2, orderBy: ob2, limit: lim2, addDoc: ad2, doc: dc2, updateDoc: upd2 } =
-    { getDocs: null, query: null, collection: null, orderBy: null, limit: null, addDoc: null, doc: null, updateDoc: null };
 
   async function _cargarHistorial() {
     const { getDocs, query: qry, collection: colRef, orderBy: oby, limit: lmt } =
@@ -1144,7 +1142,7 @@ function _montarConteoFisico() {
     const ingUid = _conteoActivo.ingUid || null;
     const etiqueta = ingUid ? "stock del ingeniero" : "inventario";
     if (!conDif.length) { window.toast?.("Sin diferencias para ajustar","info"); return; }
-    if (!confirm(`¿Aplicar ${conDif.length} ajuste(s) al ${etiqueta} y cerrar el conteo?`)) return;
+    if (!await window.modal({ title: "Cerrar conteo", message: `¿Aplicar ${conDif.length} ajuste(s) al ${etiqueta} y cerrar el conteo? Esta acción no se puede deshacer.`, danger: true, confirmLabel: "Aplicar y cerrar" })) return;
 
     const btn = document.getElementById("cnt-aplicar-btn");
     btn.disabled = true; btn.textContent = "Aplicando…";
@@ -1840,7 +1838,8 @@ function _montarMermas() {
     const desdeTs = desde ? new Date(dy,dm-1,dd,0,0,0).getTime() : Date.now()-30*86400000;
     const hastaTs = hasta ? new Date(hy,hm-1,hd,23,59,59).getTime() : Date.now();
 
-    let cs = [where("tipo","==","MERMA"), where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
+    // Filtro tipo==MERMA client-side: evita requerir índice compuesto tipo+_ts
+    const cs = [where("_ts",">=",desdeTs), where("_ts","<=",hastaTs),
       orderBy("_ts","desc"), limit(500)];
     const q = query(collection(db, "movimientos_stock"), ...cs);
 
@@ -1848,7 +1847,7 @@ function _montarMermas() {
     const MOTIVO_LBL  = { ROTURA:"Rotura", DERRAME:"Derrame", VENCIMIENTO:"Vencimiento", PERDIDA:"Pérdida", OTRO:"Otro" };
 
     _unsubs.push(onSnapshot(q, snap => {
-      let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.tipo === "MERMA");
       if (tipoFil) rows = rows.filter(r => r.motivoMerma === tipoFil);
       _mrmRowsCache = rows;
 
