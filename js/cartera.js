@@ -139,7 +139,7 @@ function _html() {
     .cfg-card { background:var(--surface);border:1px solid var(--border);
       border-radius:10px;padding:20px }
     .cfg-input { width:100%;padding:7px 10px;padding-right:30px;border:1px solid var(--border);
-      border-radius:7px;background:var(--surface-2,var(--surface));
+      border-radius:8px;background:var(--surface-2,var(--surface));
       color:var(--text-primary);font-size:13px;box-sizing:border-box }
   </style>
 

@@ -90,7 +90,7 @@ function _html() {
       </select>
     </div>
 
-    <div style="background:var(--surface-2);border-radius:8px;padding:.75rem;margin:.75rem 0">
+    <div style="background:var(--surface-2);border-radius:10px;padding:.75rem;margin:.75rem 0">
       <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem">
         TOTAL SISTEMA (calculado)
         <span id="caja-sistema-loading" style="display:none;margin-left:8px;font-size:.72rem;font-weight:400;color:#2563EB">⏳ calculando…</span>

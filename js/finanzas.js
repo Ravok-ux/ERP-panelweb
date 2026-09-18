@@ -176,11 +176,14 @@ const FIN_CSS = `
   transition: filter .1s;
 }
 .fin-btn:hover { filter: brightness(.93); }
-.fin-btn-primary { background: var(--accent, #16a34a); color: #fff; }
+.fin-btn-primary { background: var(--green-dark, #1B5E20); color: #fff; border: none; border-radius: var(--radius, 8px); padding: 9px 20px; font-size: 13px; font-weight: 700; }
 .fin-btn-secondary {
   background: transparent;
+  color: var(--text-sec);
   border: 1px solid var(--border, #d1d5db);
-  color: var(--text, #374151);
+  border-radius: var(--radius, 8px);
+  padding: 9px 20px;
+  font-size: 13px;
 }
 .fin-btn-sm { padding: 5px 10px; font-size: 12px; }
 
@@ -194,7 +197,7 @@ const FIN_CSS = `
 /* Modals */
 .fin-modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.5);
   backdrop-filter: blur(3px);
   display: flex; align-items: center; justify-content: center;
   z-index: 9000;

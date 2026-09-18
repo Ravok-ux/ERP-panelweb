@@ -663,7 +663,7 @@ function _renderizar() {
         case "estado":
           return `<td style="${COL_TD}text-align:center">
             <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:9px;
-              background:${activo?"#DCFCE7":"#FEE2E2"};color:${activo?"#166534":"#DC2626"}">
+              background:${activo?"#DCFCE7":"#F3F4F6"};color:${activo?"#166534":"#6B7280"}">
               ${activo ? "Activo" : "Inactivo"}
             </span></td>`;
         case "acciones":

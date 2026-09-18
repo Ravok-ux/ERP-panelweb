@@ -84,14 +84,13 @@ function _html() {
         <option value="TODOS">Todos los ingenieros</option>
       </select>
       <button onclick="PedidosUI.nuevoPedido()"
-        style="padding:7px 14px;background:#1B5E20;color:#fff;border:none;border-radius:6px;
-          cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap">
+        class="btn-primary" style="white-space:nowrap"
         + Pedido
       </button>
     </div>
 
     <!-- Modal Nuevo Pedido -->
-    <div id="pd-form-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+    <div id="pd-form-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
       z-index:1001;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
       <div style="background:var(--surface);border-radius:16px;width:680px;max-width:100%;
         border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.22);margin:auto">
@@ -737,7 +736,7 @@ function _editarPedido(pedidoId) {
 
   // Modal inline
   const overlay = document.createElement("div");
-  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;
     display:flex;align-items:center;justify-content:center`;
   const modal = document.createElement("div");
   modal.style.cssText = `background:var(--surface,#fff);border-radius:12px;padding:20px;
@@ -759,8 +758,7 @@ function _editarPedido(pedidoId) {
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button id="pd-edit-cancel" style="padding:6px 14px;border:1px solid #D1D5DB;border-radius:6px;
         background:none;cursor:pointer;font-size:12px">Cancelar</button>
-      <button id="pd-edit-save" style="padding:6px 14px;background:#1D5C33;color:#fff;border:none;
-        border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">Guardar</button>
+      <button id="pd-edit-save" class="btn-primary" style="padding:6px 14px;font-size:12px">Guardar</button>
     </div>`;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -1008,8 +1006,7 @@ function _renderFormPedido(body) {
         Cancelar
       </button>
       <button onclick="PedidosUI.confirmarPedido()"
-        style="padding:9px 26px;border:none;border-radius:6px;
-          background:#1B5E20;color:#fff;font-size:13px;font-weight:700;cursor:pointer"
+        class="btn-primary"
         id="pd-btn-confirmar">
         ✅ Confirmar pedido
       </button>
