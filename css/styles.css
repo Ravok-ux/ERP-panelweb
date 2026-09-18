@@ -116,13 +116,14 @@ html, body {
 .login-sub   { font-size: 9px; color: var(--green-mid); letter-spacing: 2px; font-weight: 700; margin-top: 2px; }
 
 /* ── Chevron universal en todos los <select> ──────────────── */
+/* !important necesario: los inline styles aplanan padding-right con padding shorthand */
 select {
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 30px;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  padding-right: 30px !important;
   cursor: pointer;
 }
 
