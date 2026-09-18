@@ -76,6 +76,13 @@ function _filtrar() {
     (!_filtros.zona      || p.zona      === _filtros.zona)
   );
 }
+// Solo ingeniero/zona, sin corte de período (para Comparativo y Demanda)
+function _filtrarIngZona() {
+  return _pedidos.filter(p =>
+    (!_filtros.ingeniero || p.ingeniero === _filtros.ingeniero) &&
+    (!_filtros.zona      || p.zona      === _filtros.zona)
+  );
+}
 
 // ── Agrupaciones ─────────────────────────────────────────────────
 function _agrupar(datos, campo) {
@@ -187,22 +194,46 @@ function _linea(buckets, color = "#4ADE80") {
 function _tabDashboard(datos) {
   const total   = datos.reduce((s,p) => s+p.monto, 0);
   const ticket  = datos.length ? total/datos.length : 0;
-  const cls     = new Set(datos.map(p => p.clienteId||p.cliente)).size;
-  const semanas = _porMes(datos, 8).map(m => ({ ...m, label: m.label.slice(0,3) }));
+  const clSet   = new Set(datos.map(p => p.clienteId||p.cliente));
+  const meses   = _porMes(datos, 8).map(m => ({ ...m, label: m.label.slice(0,3) }));
 
-  const kpi = (ico, lbl, val, color) => `
+  // Nuevos vs recurrentes: clientes del período anterior de igual duración
+  const periodoMs  = parseInt(_filtros.periodo) * 86400000;
+  const cutActual  = new Date(Date.now() - periodoMs);
+  const cutAnterior = new Date(Date.now() - periodoMs * 2);
+  const clsAntes   = new Set(_pedidos.filter(p => p.fecha >= cutAnterior && p.fecha < cutActual).map(p=>p.clienteId||p.cliente));
+  const nuevos     = [...clSet].filter(c => !clsAntes.has(c)).length;
+  const recurrentes = [...clSet].filter(c =>  clsAntes.has(c)).length;
+
+  // Tipo de pago
+  const pagoGrp = _agrupar(datos, "pago");
+  const totalPago = pagoGrp.reduce((s,x)=>s+x.total,0)||1;
+
+  const kpi = (ico, lbl, val, color, sub="") => `
     <div class="kpi-card" style="border-left-color:${color}">
       <div class="kpi-icon">${ico}</div>
       <div class="kpi-val">${val}</div>
-      <div class="kpi-label">${lbl}</div>
+      <div class="kpi-label">${lbl}${sub?`<br><span style="font-size:10px;opacity:.7">${sub}</span>`:""}</div>
     </div>`;
+
+  const pagoBarras = pagoGrp.slice(0,5).map(g => {
+    const pct = Math.round(g.total/totalPago*100);
+    const col = g.key.toLowerCase().includes("contado")?"#4ADE80":g.key.toLowerCase().includes("cr")?"#F59E0B":"#60A5FA";
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="width:80px;font-size:11px;color:var(--text-secondary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.key)}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:3px;height:14px">
+        <div style="width:${pct}%;background:${col};height:100%;border-radius:3px"></div>
+      </div>
+      <div style="width:90px;font-size:11px;font-weight:600;color:var(--text-primary);text-align:right">${MXN(g.total)} (${pct}%)</div>
+    </div>`;
+  }).join("");
 
   return `
 <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
   ${kpi("💰","VENTAS PERÍODO",MXN(total),"var(--text-muted,#9CA3AF)")}
   ${kpi("📋","PEDIDOS",NUM(datos.length),"#60A5FA")}
   ${kpi("🧾","TICKET PROMEDIO",MXN(ticket),"#FBBF24")}
-  ${kpi("🏢","CLIENTES ACTIVOS",NUM(cls),"#A78BFA")}
+  ${kpi("🏢","CLIENTES",NUM(clSet.size),"#A78BFA",`${nuevos} nuevos · ${recurrentes} recurrentes`)}
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -216,9 +247,15 @@ function _tabDashboard(datos) {
   </div>
 </div>
 
-<div class="bi-card" style="margin-bottom:14px">
-  <div class="bi-card-title">Tendencia — últimos 8 meses</div>
-  ${_linea(semanas)}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+  <div class="bi-card">
+    <div class="bi-card-title">Tendencia — últimos 8 meses</div>
+    ${_linea(meses)}
+  </div>
+  <div class="bi-card">
+    <div class="bi-card-title">Tipo de pago</div>
+    ${pagoBarras||`<p style="color:var(--text-muted);font-size:12px">Sin datos</p>`}
+  </div>
 </div>
 
 <div class="bi-card">
@@ -233,10 +270,16 @@ function _tabRentabilidad(datos) {
   const zonas    = _agrupar(datos, "zona");
   const totalG   = clientes.reduce((s,x)=>s+x.total, 0);
 
+  let cumPct = 0, paretoMostrado = false;
   const rowCl = clientes.slice(0,30).map((c,i) => {
-    const pct = totalG ? (c.total/totalG*100).toFixed(1) : 0;
+    const pct = totalG ? (c.total/totalG*100) : 0;
+    cumPct += pct;
     const w   = Math.round(c.total/(clientes[0]?.total||1)*100);
-    return `<tr>
+    const paretoRow = (!paretoMostrado && cumPct >= 80)
+      ? `<tr><td colspan="6" style="text-align:center;font-size:10px;color:#FBBF24;padding:3px 8px;background:rgba(251,191,36,0.06);border-top:1px dashed #FBBF24;border-bottom:1px dashed #FBBF24">▲ Pareto 80% — los ${i+1} clientes anteriores concentran el 80% del ingreso</td></tr>`
+      : "";
+    if (!paretoMostrado && cumPct >= 80) paretoMostrado = true;
+    return `${paretoRow}<tr>
       <td style="color:var(--text-muted);font-size:11px">${i+1}</td>
       <td style="font-weight:500;text-align:left">${esc(c.key)}</td>
       <td style="font-family:monospace">${MXN(c.total)}</td>
@@ -245,7 +288,7 @@ function _tabRentabilidad(datos) {
           <div style="width:56px;background:var(--surface2);border-radius:2px;height:7px">
             <div style="width:${w}%;background:#4ADE80;height:100%;border-radius:2px"></div>
           </div>
-          <span style="font-size:11px;color:var(--text-muted)">${pct}%</span>
+          <span style="font-size:11px;color:var(--text-muted)">${pct.toFixed(1)}%</span>
         </div>
       </td>
       <td>${c.count}</td>
@@ -253,8 +296,19 @@ function _tabRentabilidad(datos) {
     </tr>`;
   }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>`;
 
+  // Agrupar tipo pago por zona
+  const pagosPorZona = {};
+  datos.forEach(p => {
+    const z = p.zona || "—";
+    if (!pagosPorZona[z]) pagosPorZona[z] = {};
+    const tp = p.pago || "—";
+    pagosPorZona[z][tp] = (pagosPorZona[z][tp]||0) + p.monto;
+  });
+
   const rowZ = zonas.map(z => {
     const pct = totalG ? (z.total/totalG*100).toFixed(1) : 0;
+    const pagos = pagosPorZona[z.key]||{};
+    const topPago = Object.entries(pagos).sort((a,b)=>b[1]-a[1])[0];
     return `<tr>
       <td style="font-weight:500">${esc(z.key)}</td>
       <td style="font-family:monospace">${MXN(z.total)}</td>
@@ -262,8 +316,9 @@ function _tabRentabilidad(datos) {
       <td>${z.count}</td>
       <td>${z.clientes}</td>
       <td style="font-family:monospace">${MXN(z.ticket)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${topPago?esc(topPago[0]):"—"}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>`;
+  }).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>`;
 
   return `
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
@@ -271,7 +326,7 @@ function _tabRentabilidad(datos) {
     <div class="bi-card-title">Rentabilidad por zona</div>
     <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
       <table class="bi-table">
-        <thead><tr><th>Zona</th><th>Total</th><th>%</th><th>Pedidos</th><th>Clientes</th><th>Ticket prom.</th></tr></thead>
+        <thead><tr><th>Zona</th><th>Total</th><th>%</th><th>Pedidos</th><th>Clientes</th><th>Ticket prom.</th><th>Pago predominante</th></tr></thead>
         <tbody>${rowZ}</tbody>
       </table>
     </div>
@@ -371,7 +426,7 @@ async function _cargarKPIs(aliases, semanas, year) {
   for (const alias of aliases) {
     try {
       const snap = await getDocs(query(collection(db, "pedidos"),
-        where("ingenieroAlias", "==", alias), limit(500)));
+        where("ingenieroAlias", "==", alias), limit(2000)));
       pedidosPorAlias[alias] = snap.docs.map(d => ({ ...d.data(), _id: d.id }))
         .filter(p => VALID_S.includes(p.status));
     } catch(_) { pedidosPorAlias[alias] = []; }
@@ -548,7 +603,7 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
       });
       if (bajando.length >= 2) {
         const lastSem = semanas[semanas.length-1];
-        insights.push({ tipo:"alerta", texto: `${resolverNombre(alias)||alias} S${semanas[semanas.length-2]}→S${lastSem}: caida en ${bajando.map(k=>k.label).join(", ")} — verificar si la semana esta completa` });
+        insights.push({ tipo:"alerta", texto: `${resolverNombre(alias)||alias} S${semanas[semanas.length-2]}→S${lastSem}: caída en ${bajando.map(k=>k.label).join(", ")} — verificar si la semana está completa` });
       }
     });
   }
@@ -575,7 +630,7 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
     if (desv > 0.25 * avg && avg > 0) {
       const minV = Math.min(...vals), maxV = Math.max(...vals);
       const minS = semanas[vals.indexOf(minV)], maxS = semanas[vals.indexOf(maxV)];
-      insights.push({ tipo:"alerta", texto: `${resolverNombre(alias)||alias}: recuperacion volatil — min ${MXN(minV)} (S${minS}) vs max ${MXN(maxV)} (S${maxS}), sin patron estable` });
+      insights.push({ tipo:"alerta", texto: `${resolverNombre(alias)||alias}: recuperación volátil — mín ${MXN(minV)} (S${minS}) vs máx ${MXN(maxV)} (S${maxS}), sin patrón estable` });
     }
   });
 
@@ -588,7 +643,7 @@ function _calcularInsights(kpiData, metas, aliases, semanas) {
         return metaVal > 0 && val >= metaVal;
       });
       if (sobreMeta.length >= 3)
-        insights.push({ tipo:"positivo", texto: `${resolverNombre(alias)||alias} S${s}: supero meta en ${sobreMeta.map(k=>k.label).join(", ")} — identificar y replicar condiciones` });
+        insights.push({ tipo:"positivo", texto: `${resolverNombre(alias)||alias} S${s}: superó meta en ${sobreMeta.map(k=>k.label).join(", ")} — identificar y replicar condiciones` });
     });
   });
 
@@ -776,8 +831,7 @@ function _tabKpiIngenieros() {
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
           <label style="font-size:12px;color:var(--text-secondary)">Año:</label>
           <select id="bi-comp-year" style="background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:5px 8px;font-size:12px">
-            <option value="${yearActual-1}">${yearActual-1}</option>
-            <option value="${yearActual}" selected>${yearActual}</option>
+            ${[yearActual-3,yearActual-2,yearActual-1,yearActual].map(y=>`<option value="${y}"${y===yearActual?" selected":""}>${y}</option>`).join("")}
           </select>
           <label style="font-size:12px;color:var(--text-secondary)">Sem. inicio:</label>
           <select id="bi-comp-sem-ini" style="background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:5px 8px;font-size:12px">${semOptsIni}</select>
@@ -884,7 +938,7 @@ function _tabKpiIngenieros() {
       </div>`);
 
       bloques.push(`<div class="bi-card" style="margin-bottom:14px">
-        <div class="bi-card-title">&#x1F4B3; Tendencia — Recuperacion de cartera</div>
+        <div class="bi-card-title">&#x1F4B3; Tendencia — Recuperación de cartera</div>
         ${_grafTendencia(kpiData,metas,aliases,semanas,KPI_DEFS[3])}
       </div>`);
 
@@ -914,6 +968,48 @@ function _tabKpiIngenieros() {
         <div style="overflow-x:auto">${_grafHeatmap(kpiData,metas,aliases,semanas)}</div>
       </div>`);
 
+      // Score ponderado global por ingeniero
+      const scoreRows = aliases.map((alias,ai) => {
+        const color = ING_COLORS[ai%ING_COLORS.length];
+        const scoreSems = semanas.map(s => {
+          let score = 0, pesoTotal = 0;
+          KPI_DEFS.forEach(kd => {
+            const m = metas[alias]?.[kd.metaField] || 0;
+            if (!m) return;
+            const v = kpiData[alias]?.[s]?.[kd.key] || 0;
+            score += Math.min(v/m, 1.5) * kd.peso;
+            pesoTotal += kd.peso;
+          });
+          return pesoTotal > 0 ? score/pesoTotal : null;
+        });
+        const avgScore = scoreSems.filter(s=>s!==null).reduce((a,b)=>a+b,0) / Math.max(scoreSems.filter(s=>s!==null).length,1);
+        const semCells = scoreSems.map(s =>
+          s===null ? `<td style="color:var(--text-muted);text-align:center">—</td>`
+          : `<td style="text-align:center;font-weight:700;color:${s>=1?"#16A34A":s>=0.6?"#FBBF24":"#EF4444"}">${Math.round(s*100)}%</td>`
+        ).join("");
+        return `<tr>
+          <td style="font-weight:600;white-space:nowrap">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px"></span>
+            ${esc(resolverNombre(alias)||alias)}
+          </td>
+          ${semCells}
+          <td style="text-align:center;font-weight:800;font-size:14px;color:${avgScore>=1?"#16A34A":avgScore>=0.6?"#FBBF24":"#EF4444"}">${Math.round(avgScore*100)}%</td>
+        </tr>`;
+      }).join("");
+      bloques.push(`<div class="bi-card" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="bi-card-title" style="margin-bottom:0">&#x1F3C6; Score ponderado global (pesos KPI_DEFS)</div>
+          <button id="bi-csv-export" style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#818CF8;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">&#x21E9; Exportar CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="bi-table">
+            <thead><tr><th style="text-align:left">Ingeniero</th>${semanas.map(s=>`<th>S${s}</th>`).join("")}<th>Prom.</th></tr></thead>
+            <tbody>${scoreRows||`<tr><td colspan="${semanas.length+2}" style="text-align:center;color:var(--text-muted)">Configure metas para calcular el score</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Pesos: Venta 20% · Visitas 20% · Litros N10 20% · Recuperación 20% · Convertidos 15% · Prospectos 5%</div>
+      </div>`);
+
       const { insights, recs } = _calcularInsights(kpiData,metas,aliases,semanas);
       const insHtml = insights.length
         ? insights.map(ins =>
@@ -935,6 +1031,23 @@ function _tabKpiIngenieros() {
       </div>`);
 
       res.innerHTML = bloques.join("");
+
+      // CSV export
+      res.querySelector("#bi-csv-export")?.addEventListener("click", () => {
+        const hdrs = ["Ingeniero","KPI",...semanas.map(s=>`S${s}`),"Promedio"];
+        const csvRows = [hdrs.join(",")];
+        aliases.forEach(alias => {
+          KPI_DEFS.forEach(kd => {
+            const vals = semanas.map(s => kpiData[alias]?.[s]?.[kd.key]||0);
+            const avg = vals.reduce((a,b)=>a+b,0)/Math.max(vals.length,1);
+            csvRows.push([`"${resolverNombre(alias)||alias}"`,`"${kd.label}"`,...vals.map(v=>v.toFixed(2)),avg.toFixed(2)].join(","));
+          });
+        });
+        const blob = new Blob([csvRows.join("\n")], { type:"text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href=url; a.download=`kpi_s${semanas[0]}-s${semanas[semanas.length-1]}.csv`; a.click();
+        URL.revokeObjectURL(url);
+      });
     } catch(e) {
       res.innerHTML = `<div style="padding:20px;color:#EF4444">Error al analizar: ${esc(e.message)}</div>`;
       console.error("[BI Comparativo]", e);
@@ -1006,7 +1119,7 @@ function _tabComparativo(todos) {
     ${tbl(kA,kB,mesAct,mesAnt)}
   </div>
   <div class="bi-card">
-    <div class="bi-card-title">YoY &#8212; Mes actual vs mismo mes anio anterior</div>
+    <div class="bi-card-title">YoY &#8212; Mes actual vs mismo mes año anterior</div>
     ${tbl(kA,kC,mesAct,mesYoY)}
   </div>
 </div>
@@ -1054,46 +1167,78 @@ function _tabDemanda(todos) {
     return Math.ceil((u[0]*1 + u[1]*2 + u[2]*3) / 6);
   };
 
+  // Mapa de stock actual por nombre de producto
+  const stockMap = {};
+  _invItems.forEach(item => { stockMap[item.nombre.toLowerCase().trim()] = item.stockActual; });
+
   const products = Object.values(histProd)
     .map(p => ({ ...p, total: p.h.reduce((s,v)=>s+v,0), proy: proySiguiente(p.h) }))
-    .sort((a,b) => b.total - a.total)
-    .slice(0, 25);
+    .sort((a,b) => b.total - a.total);
 
   const siguienteMes = MESES[(ahora.getMonth()+1)%12] + " " +
     (ahora.getMonth()===11 ? ahora.getFullYear()+1 : ahora.getFullYear());
 
+  // Advertencia mes incompleto
+  const diasMes = new Date(ahora.getFullYear(), ahora.getMonth()+1, 0).getDate();
+  const pctMes  = ahora.getDate() / diasMes;
+  const avisoMes = pctMes < 0.85
+    ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#D97706;margin-bottom:12px">
+        ⚠️ El mes actual (${MESES[ahora.getMonth()]}) solo tiene un ${Math.round(pctMes*100)}% de días transcurridos — la proyección puede subestimar la demanda real.
+       </div>` : "";
+
   const heads = mesesDef.map(m => `<th style="text-align:center">${m.label}</th>`).join("");
 
   const rows = products.map(p => {
+    const stockActual = stockMap[p.nombre.toLowerCase().trim()] ?? null;
+    const cubre = stockActual !== null ? stockActual >= p.proy : null;
     const celdas = p.h.map(v => `<td style="text-align:center">${v||"—"}</td>`).join("");
     const tend = p.h[5] > p.h[4] ? "📈" : p.h[5] < p.h[4] ? "📉" : "➡️";
-    const col  = p.proy > (p.h[5]||0) ? "#4ADE80" : "#F87171";
-    return `<tr>
+    const colProy = p.proy > (p.h[5]||0) ? "#4ADE80" : "#F87171";
+    const stockCell = stockActual === null
+      ? `<td style="text-align:center;color:var(--text-muted)">—</td>`
+      : `<td style="text-align:center;font-weight:700;color:${cubre?"#4ADE80":"#F87171"}">${NUM(stockActual)}${cubre?"":" ⚠️"}</td>`;
+    return `<tr data-nombre="${esc(p.nombre.toLowerCase())}">
       <td style="font-weight:500;white-space:nowrap">${esc(p.nombre)}</td>
       ${celdas}
       <td style="text-align:center">${tend}</td>
-      <td style="text-align:center;font-weight:700;color:${col}">${p.proy||"—"}</td>
+      <td style="text-align:center;font-weight:700;color:${colProy}">${p.proy||"—"}</td>
+      ${stockCell}
     </tr>`;
-  }).join("") || `<tr><td colspan="${nMeses+3}" style="text-align:center;color:var(--text-muted)">Sin datos suficientes</td></tr>`;
+  }).join("") || `<tr><td colspan="${nMeses+4}" style="text-align:center;color:var(--text-muted)">Sin datos suficientes</td></tr>`;
 
   return `
 <div class="bi-card">
-  <div class="bi-card-title">Proyección de demanda — ${siguienteMes}</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="bi-card-title" style="margin-bottom:0">Proyección de demanda — ${siguienteMes}</div>
+    <input id="bi-dem-buscar" placeholder="🔍 Buscar producto…" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:5px 10px;font-size:12px;width:180px">
+  </div>
+  ${avisoMes}
   <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-    Promedio ponderado de los últimos 3 meses (peso 1×–2×–3×).
-    Basada en ${todos.length} pedidos históricos. Unidades vendidas por producto.
+    Promedio ponderado de los últimos 3 meses (peso 1×–2×–3×) · ${todos.length} pedidos históricos · Stock en <span style="color:#4ADE80">verde</span> = cubre proyección, <span style="color:#F87171">rojo ⚠️</span> = quiebre inminente.
   </p>
-  <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 250px)">
-    <table class="bi-table">
+  <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 300px)">
+    <table class="bi-table" id="bi-dem-tabla">
       <thead><tr>
         <th>Producto</th>${heads}
         <th style="text-align:center">Tend.</th>
         <th style="text-align:center">Proy. ${MESES[(ahora.getMonth()+1)%12]}</th>
+        <th style="text-align:center">Stock actual</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>
-</div>`;
+</div>
+<script>
+(()=>{
+  const inp = document.getElementById("bi-dem-buscar");
+  if(inp) inp.addEventListener("input", ()=>{
+    const q = inp.value.toLowerCase();
+    document.querySelectorAll("#bi-dem-tabla tbody tr").forEach(tr=>{
+      tr.style.display = !q || (tr.dataset.nombre||"").includes(q) ? "" : "none";
+    });
+  });
+})();
+</script>`;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1120,11 +1265,22 @@ async function _cargarInventario() {
     });
   } catch (_) {}
 
-  // 2. Inventario actual
+  // 2. Inventario actual — primero intenta colección "inventario", fallback a "productos"
   try {
     const norm = s => String(s || "").toLowerCase().trim();
+    let invDocs = [];
     const invSnap = await getDocs(query(collection(db, "inventario"), orderBy("nombre"), limit(500)));
-    _invItems = invSnap.docs.map(d => {
+    if (invSnap.docs.length > 0) {
+      invDocs = invSnap.docs;
+    } else {
+      // Fallback: leer de productos (campo stock)
+      const prodSnap2 = await getDocs(query(collection(db, "productos"), limit(500)));
+      invDocs = prodSnap2.docs.map(d => ({
+        id: d.id,
+        data: () => ({ ...d.data(), stockActual: Number(d.data().stock || d.data().stockActual || 0), nombre: d.data().nombre || d.id }),
+      }));
+    }
+    _invItems = invDocs.map(d => {
       const data = d.data();
       const keys = [d.id, data.codigoN10, data.nombre].filter(Boolean);
       const rawCosto = Number(data.costo);
@@ -1236,9 +1392,32 @@ function _tabInventario() {
       <div class="kpi-label">${lbl}${sub ? ` · ${sub}` : ""}</div>
     </div>`;
 
-  // Top 20 productos por valor en costo
-  const topProds = [...rows].sort((a, b) => b.valorCosto - a.valorCosto).slice(0, 20);
+  // ABC classification — A: 80% valor acumulado, B: siguiente 15%, C: resto
+  const todosOrdenados = [...rows].sort((a, b) => b.valorCosto - a.valorCosto);
+  let cumValABC = 0;
+  todosOrdenados.forEach(r => {
+    cumValABC += r.valorCosto;
+    const pctCum = totalCosto > 0 ? cumValABC / totalCosto : 0;
+    r.abc = pctCum <= 0.80 ? "A" : pctCum <= 0.95 ? "B" : "C";
+  });
+
+  // Quiebres de stock: items con stock=0 que tuvieron ventas recientes
+  const demandaReciente = new Set();
+  _pedidos.filter(p => (Date.now()-p.fecha.getTime()) < 60*86400000).forEach(p =>
+    p.productos.forEach(pr => { if(pr.nombre) demandaReciente.add(pr.nombre.toLowerCase().trim()); })
+  );
+  const quiebres = _invItems.filter(r => r.stockActual === 0 && demandaReciente.has(r.nombre.toLowerCase().trim()));
+
+  // Top 20 por valor en costo
+  const topProds = todosOrdenados.slice(0, 20);
   const barMax   = topProds[0]?.valorCosto || 1;
+
+  // Alerta quiebres HTML
+  const alertaQuiebres = quiebres.length ? `
+  <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:12px 16px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:#EF4444;margin-bottom:8px">🚨 ${quiebres.length} producto(s) con quiebre de stock y demanda reciente (últimos 60 días)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${quiebres.map(r=>`<span style="background:rgba(239,68,68,0.15);color:#FCA5A5;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600">${esc(r.nombre)}</span>`).join("")}</div>
+  </div>` : "";
 
   return `
 <!-- KPIs globales -->
@@ -1249,6 +1428,8 @@ function _tabInventario() {
   ${_kpi("🔄", "ROTACIÓN ANUAL",  rotacion ? `${rotacion}×` : "—", "#60A5FA", dio ? `${dio} días inv.` : "")}
   ${_kpi("💸", "HOLDING COST",    MXN(costoHolding), "#F87171", `${carryPct.toFixed(1)}% del inventario`)}
 </div>
+
+${alertaQuiebres}
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
 
@@ -1345,15 +1526,17 @@ function _tabInventario() {
     <table class="bi-table">
       <thead><tr>
         <th style="text-align:left">Producto</th>
-        <th>Familia</th><th>Stock</th>
+        <th>ABC</th><th>Familia</th><th>Stock</th>
         <th>Costo unit.</th><th>Precio venta</th>
         <th>Valor costo</th><th>Valor precio</th><th>% part.</th>
       </tr></thead>
       <tbody>${topProds.length ? topProds.map(r => {
         const pct = totalCosto > 0 ? (r.valorCosto / totalCosto * 100).toFixed(1) : "0.0";
         const w   = Math.round(r.valorCosto / barMax * 100);
+        const abcColor = r.abc === "A" ? "#4ADE80" : r.abc === "B" ? "#FBBF24" : "#9CA3AF";
         return `<tr>
           <td style="text-align:left;font-weight:600">${esc(r.nombre)}</td>
+          <td style="text-align:center"><span style="font-size:11px;font-weight:700;color:${abcColor};background:${abcColor}20;padding:1px 7px;border-radius:4px">${r.abc||"—"}</span></td>
           <td style="font-size:11px;color:var(--text-muted)">${esc(r.familia)}</td>
           <td style="font-variant-numeric:tabular-nums">${NUM(r.stockActual)}</td>
           <td style="font-family:monospace">${r.costo > 0 ? MXN(r.costo) : "—"}</td>
@@ -1398,16 +1581,23 @@ function _render() {
     { id:"comparativo",   label:"&#x1F4C5; Comparativo" },
     { id:"kpi_ingenieros",label:"&#x1F465; KPI Ingenieros" },
     { id:"demanda",       label:"&#x1F52E; Demanda" },
-    { id:"inventario",    label:"&#x1F3ED; Inventario" },
+    { id:"inventario",   label:"&#x1F3ED; Inventario" },
+    { id:"cartera",      label:"&#x1F4B3; Cartera" },
+    { id:"comisiones",   label:"&#x1F4B5; Comisiones" },
+    { id:"cobertura",    label:"&#x1F5FA;&#xFE0F; Cobertura" },
   ];
 
   let body = "";
   if (_tab === "dashboard")      body = _tabDashboard(datos);
   if (_tab === "rentabilidad")   body = _tabRentabilidad(datos);
-  if (_tab === "comparativo")    body = _tabComparativo(_pedidos);
+  if (_tab === "comparativo")    body = _tabComparativo(_filtrarIngZona());
   if (_tab === "kpi_ingenieros") body = _tabKpiIngenieros();
-  if (_tab === "demanda")        body = _tabDemanda(_pedidos);
+  if (_tab === "demanda")        body = _tabDemanda(_filtrarIngZona());
   if (_tab === "inventario")     body = _tabInventario();
+  let _asyncTabFn = null;
+  if (_tab === "cartera")    { _asyncTabFn = _tabCartera;    body = `<div id="bi-body" style="padding:20px;color:var(--text-muted);text-align:center">Cargando…</div>`; }
+  if (_tab === "comisiones") { _asyncTabFn = _tabComisiones; body = `<div id="bi-body" style="padding:20px;color:var(--text-muted);text-align:center">Cargando…</div>`; }
+  if (_tab === "cobertura")  { _asyncTabFn = _tabCobertura;  body = `<div id="bi-body" style="padding:20px;color:var(--text-muted);text-align:center">Cargando…</div>`; }
 
   _container.innerHTML = `
 <style>
@@ -1455,6 +1645,8 @@ function _render() {
   ${body}
 </div>`;
 
+  if (_asyncTabFn) _asyncTabFn().then(h => { if (_container) { const el = _container.querySelector("#bi-body"); if (el) el.innerHTML = h; } });
+
   _container.querySelector("#bi-periodo")?.addEventListener("change", e => { _filtros.periodo = e.target.value; _render(); });
   _container.querySelector("#bi-ingeniero")?.addEventListener("change", e => { _filtros.ingeniero = e.target.value; _render(); });
   _container.querySelector("#bi-zona")?.addEventListener("change", e => { _filtros.zona = e.target.value; _render(); });
@@ -1472,6 +1664,182 @@ function _render() {
     });
     _render();
   });
+}
+
+// ── Tab Cartera & Crédito ─────────────────────────────────────────
+async function _tabCartera() {
+  let docs = [];
+  try {
+    const snap = await getDocs(query(collection(db, "remisiones_credito"), orderBy("fecha","desc"), limit(500)));
+    docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(_) {}
+
+  if (!docs.length) return `<div class="bi-card"><div class="bi-card-title">📋 Cartera & Crédito</div><p style="color:var(--text-muted);font-size:13px">Sin datos en remisiones_credito.</p></div>`;
+
+  const ahora = Date.now();
+  const buckets = { "0-30":[], "31-60":[], "61-90":[], "90+":[] };
+  let totalCartera = 0, totalCobrado = 0;
+  const deudoresMapa = {};
+
+  docs.forEach(r => {
+    const fechaMs = r.fecha?.toMillis ? r.fecha.toMillis() : (r.fecha || 0);
+    const dias = Math.floor((ahora - fechaMs) / 86400000);
+    const monto = Number(r.total || r.monto || 0);
+    const cobrado = Number(r.montoCobrado || 0);
+    const pendiente = monto - cobrado;
+    if (pendiente <= 0) return;
+    totalCartera += pendiente;
+    const cliente = r.clienteNombre || r.cliente || r.id;
+    deudoresMapa[cliente] = (deudoresMapa[cliente] || 0) + pendiente;
+    if      (dias <= 30) buckets["0-30"].push(pendiente);
+    else if (dias <= 60) buckets["31-60"].push(pendiente);
+    else if (dias <= 90) buckets["61-90"].push(pendiente);
+    else                  buckets["90+"].push(pendiente);
+  });
+
+  // DSO aproximado
+  const ventasMes = _pedidos.filter(p => (ahora - p.fecha.getTime()) < 30*86400000).reduce((s,p) => s + p.total, 0);
+  const dso = ventasMes > 0 ? Math.round(totalCartera / (ventasMes / 30)) : null;
+
+  const topDeudores = Object.entries(deudoresMapa).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const bucketColors = { "0-30":"#4ADE80","31-60":"#FBBF24","61-90":"#F97316","90+":"#EF4444" };
+
+  const bucketRows = Object.entries(buckets).map(([b,arr]) => {
+    const tot = arr.reduce((s,v) => s+v, 0);
+    const pct = totalCartera > 0 ? (tot/totalCartera*100).toFixed(1) : "0.0";
+    return `<tr>
+      <td style="text-align:left"><span style="font-weight:700;color:${bucketColors[b]}">${b} días</span></td>
+      <td>${arr.length}</td>
+      <td style="font-family:monospace;font-weight:700">${MXN(tot)}</td>
+      <td>${pct}%</td>
+      <td style="min-width:80px"><div style="height:8px;border-radius:4px;background:${bucketColors[b]};width:${pct}%;max-width:100%"></div></td>
+    </tr>`;
+  }).join("");
+
+  return `
+<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
+  ${_kpi("💳","CARTERA TOTAL", MXN(totalCartera),"#FBBF24")}
+  ${_kpi("📅","DSO", dso ? `${dso} días` : "—","#60A5FA","días promedio cobro")}
+  ${_kpi("🔴","VENCIDA +90d", MXN(buckets["90+"].reduce((s,v)=>s+v,0)),"#EF4444")}
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+  <div class="bi-card">
+    <div class="bi-card-title">⏳ Aging por vencimiento</div>
+    <table class="bi-table"><thead><tr>
+      <th style="text-align:left">Período</th><th>Remis.</th><th>Monto</th><th>%</th><th style="min-width:80px">Proporción</th>
+    </tr></thead><tbody>${bucketRows}</tbody></table>
+  </div>
+  <div class="bi-card">
+    <div class="bi-card-title">🏆 Top 10 deudores</div>
+    <table class="bi-table"><thead><tr><th style="text-align:left">Cliente</th><th>Pendiente</th></tr></thead>
+    <tbody>${topDeudores.map(([c,v]) => `<tr><td style="text-align:left;font-weight:500">${esc(c)}</td><td style="font-family:monospace;font-weight:700;color:#F87171">${MXN(v)}</td></tr>`).join("")}</tbody>
+    </table>
+  </div>
+</div>`;
+}
+
+// ── Tab Comisiones ─────────────────────────────────────────────────
+async function _tabComisiones() {
+  let docs = [];
+  try {
+    const snap = await getDocs(query(collection(db, "comisiones_n10"), orderBy("mes","desc"), limit(500)));
+    docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(_) {}
+
+  if (!docs.length) return `<div class="bi-card"><div class="bi-card-title">💵 Comisiones</div><p style="color:var(--text-muted);font-size:13px">Sin datos en comisiones_n10.</p></div>`;
+
+  // Agrupar por alias y mes
+  const porAlias = {};
+  docs.forEach(d => {
+    const alias = d.alias || d.ingeniero || "—";
+    if (!porAlias[alias]) porAlias[alias] = [];
+    porAlias[alias].push(d);
+  });
+
+  const aliases = Object.keys(porAlias).sort();
+  const meses   = [...new Set(docs.map(d => d.mes || "").filter(Boolean))].sort().slice(-6);
+
+  const rows = aliases.map(alias => {
+    const celdas = meses.map(mes => {
+      const doc = porAlias[alias].find(d => d.mes === mes);
+      if (!doc) return `<td style="color:var(--text-muted)">—</td>`;
+      const total = Number(doc.totalComision || doc.total || 0);
+      return `<td style="font-family:monospace;font-weight:700;color:#4ADE80">${MXN(total)}</td>`;
+    }).join("");
+    const totalAlias = porAlias[alias].reduce((s,d) => s + Number(d.totalComision||d.total||0), 0);
+    return `<tr><td style="text-align:left;font-weight:600">${esc(alias)}</td>${celdas}<td style="font-family:monospace;font-weight:700">${MXN(totalAlias)}</td></tr>`;
+  }).join("");
+
+  return `
+<div class="bi-card">
+  <div class="bi-card-title">💵 Comisiones por ingeniero (últimos 6 meses)</div>
+  <div style="overflow-x:auto">
+  <table class="bi-table">
+    <thead><tr>
+      <th style="text-align:left">Ingeniero</th>
+      ${meses.map(m => `<th>${esc(m)}</th>`).join("")}
+      <th>Total acum.</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  </div>
+</div>`;
+}
+
+// ── Tab Cobertura de Ruta ─────────────────────────────────────────
+async function _tabCobertura() {
+  const ahora = Date.now();
+  let clientes = [], visitas = [];
+  try {
+    const [cSnap, vSnap] = await Promise.all([
+      getDocs(query(collection(db, "clientes"), limit(500))),
+      getDocs(query(collection(db, "visitas"), orderBy("timestamp","desc"), limit(1000))),
+    ]);
+    clientes = cSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    visitas  = vSnap.docs.map(d => ({ ...d.data(), _cid: d.data().clienteId || d.data().idCliente || "" }));
+  } catch(_) {}
+
+  if (!clientes.length) return `<div class="bi-card"><div class="bi-card-title">🗺️ Cobertura de Ruta</div><p style="color:var(--text-muted);font-size:13px">Sin datos en clientes.</p></div>`;
+
+  // Última visita por cliente
+  const ultimaVisita = {};
+  visitas.forEach(v => {
+    const cid = v._cid;
+    if (!cid) return;
+    const ms = v.timestamp?.toMillis ? v.timestamp.toMillis() : 0;
+    if (!ultimaVisita[cid] || ms > ultimaVisita[cid]) ultimaVisita[cid] = ms;
+  });
+
+  const rows = clientes.map(c => {
+    const ultima = ultimaVisita[c.id] || null;
+    const diasSin = ultima ? Math.floor((ahora - ultima) / 86400000) : null;
+    const badge = diasSin === null ? `<span style="color:#9CA3AF">Sin visita</span>`
+      : diasSin <= 30 ? `<span style="color:#4ADE80">${diasSin}d</span>`
+      : diasSin <= 60 ? `<span style="color:#FBBF24">${diasSin}d</span>`
+      : `<span style="color:#EF4444;font-weight:700">${diasSin}d</span>`;
+    return { nombre: c.nombre || c.id, zona: c.zona || "—", diasSin, badge };
+  }).sort((a,b) => (b.diasSin ?? 9999) - (a.diasSin ?? 9999));
+
+  const sinVisita   = rows.filter(r => r.diasSin === null).length;
+  const masde60     = rows.filter(r => r.diasSin !== null && r.diasSin > 60).length;
+  const cubiertos30 = rows.filter(r => r.diasSin !== null && r.diasSin <= 30).length;
+
+  return `
+<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
+  ${_kpi("✅","VISITADOS ≤30d", cubiertos30,"#4ADE80")}
+  ${_kpi("⚠️","SIN VISITA +60d", masde60,"#F97316")}
+  ${_kpi("❌","SIN VISITA NUNCA", sinVisita,"#EF4444")}
+</div>
+<div class="bi-card">
+  <div class="bi-card-title">🗺️ Clientes por días sin visita</div>
+  <div style="overflow-x:auto;max-height:400px">
+  <table class="bi-table">
+    <thead><tr><th style="text-align:left">Cliente</th><th>Zona</th><th>Días sin visita</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td style="text-align:left;font-weight:500">${esc(r.nombre)}</td><td style="color:var(--text-muted)">${esc(r.zona)}</td><td>${r.badge}</td></tr>`).join("")}</tbody>
+  </table>
+  </div>
+</div>`;
 }
 
 // ── Exports ───────────────────────────────────────────────────────
