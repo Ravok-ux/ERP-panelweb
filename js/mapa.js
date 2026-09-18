@@ -438,11 +438,11 @@ function _escucharFeedMapa() {
 
     el.innerHTML = snap.docs.map(d => {
       const a      = d.data();
-      const c      = colors[a.tipo] || "#6B7280";
-      const ico    = icons[a.tipo]  || "•";
+      const isAuth = a.tipo === "PEDIDO_PENDIENTE_AUTH" && !a.resuelto;
+      const c      = isAuth ? "#EF4444" : (colors[a.tipo] || "#6B7280");
+      const ico    = (a.tipo === "PEDIDO_PENDIENTE_AUTH" && a.resuelto) ? "✅" : (icons[a.tipo] || "•");
       const ts     = _tiempoRelativo(a.timestamp?.toDate?.() || new Date());
-      const isAuth = a.tipo === "PEDIDO_PENDIENTE_AUTH";
-      const extraStyle = isAuth ? `background:#EF444412;animation:dash-alarm 1.4s ease-in-out infinite;border-width:2px` : "";
+      const extraStyle = isAuth ? `background:#EF444412;animation:dash-alarm 1.4s ease-in-out infinite;border-width:2px` : (a.resuelto && a.tipo === "PEDIDO_PENDIENTE_AUTH" ? "opacity:.6" : "");
       return `
         <div class="mev" style="border-color:${c};${extraStyle}">
           <div style="font-size:13px;flex-shrink:0">${ico}</div>
@@ -482,7 +482,7 @@ function _tiempoRelativo(date) {
 }
 function _resumen(a) {
   switch(a.tipo) {
-    case "PEDIDO_PENDIENTE_AUTH": return `⚠️ ${a.cliente || "–"} requiere autorización`;
+    case "PEDIDO_PENDIENTE_AUTH": return a.resuelto ? `✔ Resuelta · ${a.cliente || "–"}` : `⚠️ ${a.cliente || "–"} requiere autorización`;
     case "PEDIDO_CONFIRMADO": return `${a.folio || "–"} · ${_fmt(a.total || 0)}`;
     case "ABONO_REGISTRADO":  return `Abono ${_fmt(a.monto || 0)}`;
     case "REMISION_CREADA":   return `Remisión ${_fmt(a.total || 0)}`;
