@@ -781,15 +781,15 @@ function _escucharN10(mesKey, filtroUid = "") {
 
     el.innerHTML = `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <table class="erp-table">
           <thead>
             <tr style="background:var(--surface-2);border-bottom:1px solid var(--border)">
-              <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-muted)">INGENIERO</th>
-              <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--text-muted)">LITROS MES</th>
-              <th style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-muted)">TRAMO</th>
-              <th style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-muted)">$/L</th>
-              <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--text-muted)">COMISIÓN</th>
-              <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-muted)">AVANCE vs META</th>
+              <th style="text-align:left;color:var(--text-muted)">INGENIERO</th>
+              <th style="text-align:right;color:var(--text-muted)">LITROS MES</th>
+              <th style="text-align:center;color:var(--text-muted)">TRAMO</th>
+              <th style="text-align:center;color:var(--text-muted)">$/L</th>
+              <th style="text-align:right;color:var(--text-muted)">COMISIÓN</th>
+              <th style="text-align:left;color:var(--text-muted)">AVANCE vs META</th>
             </tr>
           </thead>
           <tbody>
@@ -846,7 +846,7 @@ function _rowN10(r) {
         </div>
         ${ventas.length === 0
           ? `<div style="color:var(--text-muted);font-size:11px">Sin ventas registradas</div>`
-          : `<table style="width:100%;border-collapse:collapse;font-size:11px">
+          : `<table class="erp-table">
               <tr style="color:var(--text-muted)">
                 <th style="text-align:left;padding:3px 8px;font-weight:600">Pedido</th>
                 <th style="text-align:left;padding:3px 8px;font-weight:600">Cliente</th>
@@ -857,7 +857,7 @@ function _rowN10(r) {
                 <tr style="border-top:1px solid var(--border)">
                   <td style="padding:4px 8px;font-weight:700;font-family:monospace">${esc(v.ventaId ?? "–")}</td>
                   <td style="padding:4px 8px">${esc(v.cliente ?? "–")}</td>
-                  <td style="padding:4px 8px;text-align:right;font-weight:700">${fmtL(v.litros)}</td>
+                  <td style="text-align:right">${fmtL(v.litros)}</td>
                   <td style="padding:4px 8px;color:var(--text-muted)">
                     ${v.fecha ? new Date(v.fecha).toLocaleDateString("es-MX",{day:"numeric",month:"short"}) : "–"}
                   </td>

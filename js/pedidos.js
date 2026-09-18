@@ -120,7 +120,7 @@ function _html() {
     <div style="background:var(--surface,#fff);border-radius:10px;border:1px solid var(--border,#E5E7EB);overflow:hidden;
       box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <table class="erp-table">
           <thead>
             <tr style="background:var(--surface2,#F9FAFB);border-bottom:1px solid var(--border,#E5E7EB)">
               <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-primary)">FOLIO</th>
@@ -924,7 +924,7 @@ function _renderFormPedido(body) {
           box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:3px"></div>
       </div>
       <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <table class="erp-table">
           <thead>
             <tr style="background:var(--surface-2);border-bottom:1px solid var(--border)">
               <th style="padding:8px 10px;text-align:left;font-weight:700;color:var(--text-sec)">Producto</th>

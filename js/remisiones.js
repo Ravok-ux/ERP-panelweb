@@ -91,7 +91,7 @@ function _html() {
     <div style="flex:1;overflow:auto;padding:0 20px 20px">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+          <table class="erp-table">
             <thead>
               <tr style="background:var(--surface-2);border-bottom:1px solid var(--border)">
                 <th style="${_th()}">FOLIO</th>
@@ -132,7 +132,7 @@ function _html() {
         border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;line-height:2;display:grid;
         grid-template-columns:repeat(4,1fr);gap:4px 16px"></div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <table class="erp-table">
           <thead>
             <tr style="border-bottom:1px solid var(--border)">
               <th style="${_th()}">#</th>

@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════
 // compras.js — Órdenes de compra a proveedores
 // ══════════════════════════════════════════════════════════════
 
@@ -353,12 +353,12 @@ function _bindAcciones() {
         ${oc.notas ? `<div style="font-size:11px;color:#9CA3AF;margin-bottom:10px">📝 ${esc(oc.notas)}</div>` : ""}
         ${items ? `
         <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <table class="erp-table">
             <thead><tr style="border-bottom:1px solid var(--border)">
-              <th style="padding:6px 8px;text-align:left;color:#6B7280;font-weight:600">Producto</th>
-              <th style="padding:6px 8px;text-align:right;color:#6B7280;font-weight:600">Cant.</th>
-              <th style="padding:6px 8px;text-align:right;color:#6B7280;font-weight:600">Precio unit.</th>
-              <th style="padding:6px 8px;text-align:right;color:#6B7280;font-weight:600">Subtotal</th>
+              <th style="text-align:left">Producto</th>
+              <th style="text-align:right">Cant.</th>
+              <th style="text-align:right">Precio unit.</th>
+              <th style="text-align:right">Subtotal</th>
             </tr></thead>
             <tbody>${items}</tbody>
           </table>
@@ -457,13 +457,13 @@ function _bindAcciones() {
             Ajusta las cantidades reales recibidas. El stock se actualiza automáticamente al guardar.
           </div>
           <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <table class="erp-table">
               <thead>
                 <tr style="background:var(--surface-2)">
-                  <th style="padding:8px 10px;text-align:left;color:#6B7280;font-weight:600">Producto</th>
-                  <th style="padding:8px 10px;text-align:center;color:#6B7280;font-weight:600">OC Cant.</th>
-                  <th style="padding:8px 10px;text-align:center;color:#6B7280;font-weight:600">Recibido</th>
-                  <th style="padding:8px 10px;text-align:center;color:#6B7280;font-weight:600">Nota / Diferencia</th>
+                  <th style="text-align:left">Producto</th>
+                  <th style="text-align:center">OC Cant.</th>
+                  <th style="text-align:center">Recibido</th>
+                  <th style="text-align:center">Nota / Diferencia</th>
                 </tr>
               </thead>
               <tbody>${filas || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#9CA3AF">Sin productos en esta OC</td></tr>'}</tbody>

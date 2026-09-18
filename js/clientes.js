@@ -137,29 +137,24 @@ function _html() {
           font-size:13px;color:#9CA3AF;pointer-events:none">ðŸ”</span>
         <input id="cli-search" type="text" placeholder="Buscar nombre, telÃ©fono, direcciÃ³nâ€¦"
           oninput="ClientesUI.buscar(this.value)"
-          style="width:100%;padding:7px 10px 7px 30px;border:1px solid var(--border);
-            border-radius:6px;font-size:12px;background:var(--surface);
-            color:var(--text-primary);box-sizing:border-box">
+          class="form-input" style="padding:7px 10px 7px 30px;background:var(--surface);color:var(--text-primary)">
       </div>
 
       <!-- Segmento -->
       <select id="cli-sel-seg" onchange="ClientesUI.setSegmento(this.value)"
-        style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;
-          font-size:12px;background:var(--surface);color:var(--text-primary)">
+        class="form-input" style="background:var(--surface);color:var(--text-primary)">
         <option value="TODOS">Todos los segmentos</option>
       </select>
 
       <!-- Ingeniero -->
       <select id="cli-sel-ing" onchange="ClientesUI.setIngeniero(this.value)"
-        style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;
-          font-size:12px;background:var(--surface);color:var(--text-primary)">
+        class="form-input" style="background:var(--surface);color:var(--text-primary)">
         <option value="TODOS">Todos los ingenieros</option>
       </select>
 
       <!-- Estado -->
       <select id="cli-sel-estado" onchange="ClientesUI.setEstado(this.value)"
-        style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;
-          font-size:12px;background:var(--surface);color:var(--text-primary)">
+        class="form-input" style="background:var(--surface);color:var(--text-primary)">
         <option value="TODOS">Activos e inactivos</option>
         <option value="activos">Solo activos</option>
         <option value="inactivos">Solo inactivos</option>
@@ -167,8 +162,7 @@ function _html() {
 
       <!-- Saldo -->
       <select id="cli-sel-saldo" onchange="ClientesUI.setSaldo(this.value)"
-        style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;
-          font-size:12px;background:var(--surface);color:var(--text-primary)">
+        class="form-input" style="background:var(--surface);color:var(--text-primary)">
         <option value="TODOS">Con y sin saldo</option>
         <option value="con_saldo">Con saldo pendiente</option>
         <option value="sin_saldo">Sin saldo</option>
@@ -208,7 +202,7 @@ function _html() {
 
       <!-- Nuevo cliente (acciÃ³n primaria) -->
       <button onclick="ClientesUI.nuevoCliente()"
-        style="padding:7px 16px;background:#1B5E20;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;flex-shrink:0">
+        class="btn-primary" style="white-space:nowrap;flex-shrink:0;cursor:pointer">
         + Cliente
       </button>
     </div>
@@ -221,18 +215,18 @@ function _html() {
         <div id="cli-scroll-phantom" style="height:1px"></div>
       </div>
       <div id="cli-scroll-outer" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 330px)">
-        <table style="width:100%;border-collapse:collapse;font-size:12px" id="cli-table">
+        <table class="erp-table" id="cli-table">
           <thead>
             <tr style="background:var(--surface-2);border-bottom:2px solid var(--border)">
-              <th id="cli-th-clienteId" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ID</th>
-              <th id="cli-th-nombre"    onclick="ClientesUI.sortBy('nombre')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por nombre">CLIENTE <span id="cli-sort-nombre" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-segmento"  onclick="ClientesUI.sortBy('segmento')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por segmento">SEGMENTO <span id="cli-sort-segmento" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-ingeniero" onclick="ClientesUI.sortBy('ingeniero')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por ingeniero">INGENIERO <span id="cli-sort-ingeniero" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-zona"      onclick="ClientesUI.sortBy('zona')" style="padding:10px 14px;text-align:left;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por zona">ZONA <span id="cli-sort-zona" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-saldo"     onclick="ClientesUI.sortBy('saldo')" style="padding:10px 14px;text-align:right;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por saldo">SALDO <span id="cli-sort-saldo" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-visita"    onclick="ClientesUI.sortBy('ultimaVisita')" style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por Ãºltima visita">ÃšLTIMA VISITA <span id="cli-sort-ultimaVisita" style="font-size:10px;opacity:.5"></span></th>
-              <th id="cli-th-estado"    style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ESTADO</th>
-              <th id="cli-th-acciones"  style="padding:10px 14px;text-align:center;font-weight:700;color:var(--text-sec);position:sticky;top:0;background:var(--surface-2);z-index:2"></th>
+              <th id="cli-th-clienteId" style="white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ID</th>
+              <th id="cli-th-nombre"    onclick="ClientesUI.sortBy('nombre')" style="white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por nombre">CLIENTE <span id="cli-sort-nombre" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-segmento"  onclick="ClientesUI.sortBy('segmento')" style="white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por segmento">SEGMENTO <span id="cli-sort-segmento" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-ingeniero" onclick="ClientesUI.sortBy('ingeniero')" style="white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por ingeniero">INGENIERO <span id="cli-sort-ingeniero" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-zona"      onclick="ClientesUI.sortBy('zona')" style="white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por zona">ZONA <span id="cli-sort-zona" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-saldo"     onclick="ClientesUI.sortBy('saldo')" style="text-align:right;white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por saldo">SALDO <span id="cli-sort-saldo" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-visita"    onclick="ClientesUI.sortBy('ultimaVisita')" style="text-align:center;white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2;cursor:pointer;user-select:none" title="Ordenar por Ãºltima visita">ÃšLTIMA VISITA <span id="cli-sort-ultimaVisita" style="font-size:10px;opacity:.5"></span></th>
+              <th id="cli-th-estado"    style="text-align:center;white-space:nowrap;position:sticky;top:0;background:var(--surface-2);z-index:2">ESTADO</th>
+              <th id="cli-th-acciones"  style="text-align:center;position:sticky;top:0;background:var(--surface-2);z-index:2"></th>
             </tr>
           </thead>
           <tbody id="cli-tbody">
@@ -253,15 +247,12 @@ function _html() {
       <ul id="cli-cols-list" style="list-style:none;padding:0;margin:0 0 18px;display:flex;flex-direction:column;gap:6px"></ul>
       <div style="display:flex;gap:8px;justify-content:space-between">
         <button onclick="ClientesUI.resetCols()"
-          style="padding:7px 14px;border:1px solid var(--border);border-radius:6px;
-            background:transparent;color:#9CA3AF;font-size:11px;cursor:pointer">Restablecer</button>
+          class="btn-secondary" style="cursor:pointer">Restablecer</button>
         <div style="display:flex;gap:8px">
           <button onclick="ClientesUI.cerrarConfigCols()"
-            style="padding:7px 14px;border:1px solid var(--border);border-radius:6px;
-              background:transparent;color:var(--text-sec);font-size:12px;cursor:pointer">Cancelar</button>
+            class="btn-secondary" style="cursor:pointer">Cancelar</button>
           <button onclick="ClientesUI.guardarCols()"
-            style="padding:7px 18px;border:none;border-radius:6px;
-              background:#1565C0;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>
+            class="btn-primary" style="cursor:pointer">Guardar</button>
         </div>
       </div>
     </div>
@@ -295,8 +286,7 @@ function _html() {
         <div>
           <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Tipo *</label>
           <select id="cli-ubic-tipo"
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+            class="form-input" style="background:var(--surface);color:var(--text-primary)">
             <option value="parcela">ðŸŒ¾ Parcela / Campo</option>
             <option value="domicilio">ðŸ  Domicilio</option>
             <option value="invernadero">ðŸ— Invernadero</option>
@@ -306,15 +296,13 @@ function _html() {
         <div>
           <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Etiqueta</label>
           <input id="cli-ubic-etiqueta" type="text" placeholder="Ej. Campo norte, Domicilio principalâ€¦"
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+            class="form-input" style="background:var(--surface);color:var(--text-primary)">
         </div>
       </div>
       <div style="margin-bottom:10px">
         <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Ingeniero responsable de esta ubicaciÃ³n</label>
         <select id="cli-ubic-zona"
-          style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-            font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+          class="form-input" style="background:var(--surface);color:var(--text-primary)">
           <option value="">â€” Sin asignar â€”</option>
         </select>
       </div>
@@ -340,21 +328,18 @@ function _html() {
       <div style="margin-bottom:10px">
         <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">DirecciÃ³n (se completa automÃ¡ticamente)</label>
         <input id="cli-ubic-dir" type="text" readonly
-          style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-            font-size:12px;background:var(--surface-2);color:var(--text-primary);box-sizing:border-box;opacity:.8">
+          class="form-input" style="background:var(--surface-2);color:var(--text-primary);opacity:.8">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div>
           <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Latitud</label>
           <input id="cli-ubic-lat" type="text" readonly
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;font-family:monospace;background:var(--surface-2);color:var(--text-primary);box-sizing:border-box;opacity:.8">
+            class="form-input" style="font-family:monospace;background:var(--surface-2);color:var(--text-primary);opacity:.8">
         </div>
         <div>
           <label style="font-size:11px;font-weight:600;color:#6B7280;display:block;margin-bottom:4px">Longitud</label>
           <input id="cli-ubic-lng" type="text" readonly
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;font-family:monospace;background:var(--surface-2);color:var(--text-primary);box-sizing:border-box;opacity:.8">
+            class="form-input" style="font-family:monospace;background:var(--surface-2);color:var(--text-primary);opacity:.8">
         </div>
       </div>
 
@@ -362,14 +347,11 @@ function _html() {
         padding:8px 12px;font-size:11.5px;color:#DC2626;margin-bottom:12px"></div>
 
       <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="ClientesUI.cerrarUbicacion()"
-          style="padding:8px 18px;border:1px solid var(--border);border-radius:6px;
-            background:transparent;color:var(--text-primary);font-size:12px;cursor:pointer">
+        <button onclick="ClientesUI.cerrarUbicacion()" class="btn-secondary" style="cursor:pointer">
           Cancelar
         </button>
         <button id="cli-ubic-btn-guardar" onclick="ClientesUI.guardarUbicacion()"
-          style="padding:8px 22px;border:none;border-radius:6px;
-            background:#1565C0;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+          class="btn-primary" style="cursor:pointer">
           Guardar ubicaciÃ³n
         </button>
       </div>
@@ -1050,9 +1032,7 @@ async function _abrirDetalle(id) {
         ðŸ“ Nota interna (solo panel web)
       </label>
       <textarea id="cli-det-nota" rows="3" placeholder="Agrega una nota sobre este clienteâ€¦"
-        style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;
-          font-size:12px;resize:vertical;background:var(--surface);
-          color:var(--text-primary);box-sizing:border-box;font-family:inherit"
+        class="form-input" style="resize:vertical;background:var(--surface);color:var(--text-primary);font-family:inherit"
       >${esc(c.notaWeb || "")}</textarea>
       ${c.notaWebActualizado
         ? `<div style="font-size:10px;color:#9CA3AF;margin-top:3px">
@@ -1085,8 +1065,7 @@ async function _abrirDetalle(id) {
       </button>
       <div style="display:flex;gap:10px">
         <button onclick="ClientesUI.cerrarDetalle()"
-          style="padding:8px 18px;border:1px solid var(--border);border-radius:6px;
-            background:transparent;color:var(--text-sec);font-size:12px;cursor:pointer">
+          class="btn-secondary" style="cursor:pointer">
           Cerrar
         </button>
         <button onclick="ClientesUI.abrirEdicion('${esc(c.id)}')"
@@ -1095,8 +1074,7 @@ async function _abrirDetalle(id) {
           âœï¸ Editar cliente
         </button>
         <button id="cli-det-guardar" onclick="ClientesUI.guardarNota()"
-          style="padding:8px 22px;border:none;border-radius:6px;
-            background:#1B5E20;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+          class="btn-primary" style="cursor:pointer">
           Guardar nota
         </button>
       </div>
@@ -1245,17 +1223,14 @@ async function _importarExcel(file) {
         </div>
         <div style="margin-bottom:16px">
           <div style="font-size:11px;font-weight:600;color:var(--text-sec);margin-bottom:4px">Ingeniero asignado</div>
-          <select id="_imp-ing-sel" style="width:100%;padding:8px 10px;border:1px solid var(--border);
-            border-radius:6px;font-size:13px;background:var(--surface);color:var(--text-primary)">
+          <select id="_imp-ing-sel" class="form-input" style="background:var(--surface);color:var(--text-primary)">
             <option value="">â€” Importar sin asignar â€”</option>
             ${selectOpts}
           </select>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
-          <button id="_imp-cancel" style="padding:9px 20px;border:1px solid var(--border);border-radius:6px;
-            background:transparent;color:var(--text-sec);font-size:13px;cursor:pointer">Cancelar</button>
-          <button id="_imp-ok" style="padding:9px 24px;border:none;border-radius:6px;
-            background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer">âœ… Importar</button>
+          <button id="_imp-cancel" class="btn-secondary" style="cursor:pointer">Cancelar</button>
+          <button id="_imp-ok" class="btn-primary" style="cursor:pointer">âœ… Importar</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -1343,7 +1318,7 @@ async function _abrirFormCliente(clienteId = null) {
         ${(c.diasVisita & d.bit) ? "checked" : ""}> ${d.label}
     </label>`).join("");
 
-  const ingSelect = `<select id="clf-ingeniero" style="${_inputStyle()}">
+  const ingSelect = `<select id="clf-ingeniero" class="form-input">
     <option value="">â€” Sin asignar â€”</option>
     ${_ingenierosList.map(a => `<option value="${esc(a)}" ${c.ingeniero===a?"selected":""}>${esc(a)}</option>`).join("")}
   </select>`;
@@ -1366,37 +1341,37 @@ async function _abrirFormCliente(clienteId = null) {
       <!-- IdentificaciÃ³n -->
       ${_seccion("ðŸ“‹ IdentificaciÃ³n")}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        ${_field("Nombre completo *", `<input id="clf-nombre" required style="${_inputStyle()}" value="${esc(c.nombre||'')}">`)}
-        ${_field("ID del cliente", `<input id="clf-clienteid" readonly style="${_inputStyle()}opacity:.6;font-family:monospace"
+        ${_field("Nombre completo *", `<input id="clf-nombre" required class="form-input" value="${esc(c.nombre||'')}">`)}
+        ${_field("ID del cliente", `<input id="clf-clienteid" readonly class="form-input" style="opacity:.6;font-family:monospace"
           value="${esc(c.clienteId || (clienteId ? 'â€”' : '(se asignarÃ¡ al guardar)'))}"
           title="El ID se genera automÃ¡ticamente y no puede modificarse">`)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        ${_field("NÃºmero cliente (externo)", `<input id="clf-numero" style="${_inputStyle()}" value="${esc(c.numeroCliente||'')}">`)}
-        ${_field("RFC", `<input id="clf-rfc" style="${_inputStyle()}" placeholder="XXXX000000XXX" value="${esc(c.rfc||'')}">`)}
-        ${_field("TelÃ©fono", `<input id="clf-tel" style="${_inputStyle()}" placeholder="10 dÃ­gitos" value="${esc(c.telefono||'')}">`)}
+        ${_field("NÃºmero cliente (externo)", `<input id="clf-numero" class="form-input" value="${esc(c.numeroCliente||'')}">`)}
+        ${_field("RFC", `<input id="clf-rfc" class="form-input" placeholder="XXXX000000XXX" value="${esc(c.rfc||'')}">`)}
+        ${_field("TelÃ©fono", `<input id="clf-tel" class="form-input" placeholder="10 dÃ­gitos" value="${esc(c.telefono||'')}">`)}
       </div>
       <!-- DirecciÃ³n -->
       ${_seccion("ðŸ“ DirecciÃ³n")}
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
-        ${_field("Calle", `<input id="clf-calle" style="${_inputStyle()}" value="${esc(c.calle||'')}">` )}
-        ${_field("NÃºm. Ext.", `<input id="clf-numext" style="${_inputStyle()}" value="${esc(c.numExt||'')}">`)}
+        ${_field("Calle", `<input id="clf-calle" class="form-input" value="${esc(c.calle||'')}">` )}
+        ${_field("NÃºm. Ext.", `<input id="clf-numext" class="form-input" value="${esc(c.numExt||'')}">`)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        ${_field("Colonia / Localidad", `<input id="clf-colonia" style="${_inputStyle()}" value="${esc(c.colonia||'')}">`)}
-        ${_field("Municipio / Ciudad", `<input id="clf-ciudad" style="${_inputStyle()}" value="${esc(c.ciudad||'')}">`)}
-        ${_field("Estado", `<input id="clf-estado" style="${_inputStyle()}" value="${esc(c.estado||'')}">`)}
+        ${_field("Colonia / Localidad", `<input id="clf-colonia" class="form-input" value="${esc(c.colonia||'')}">`)}
+        ${_field("Municipio / Ciudad", `<input id="clf-ciudad" class="form-input" value="${esc(c.ciudad||'')}">`)}
+        ${_field("Estado", `<input id="clf-estado" class="form-input" value="${esc(c.estado||'')}">`)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        ${_field("CP", `<input id="clf-cp" style="${_inputStyle()}" placeholder="00000" value="${esc(c.cp||'')}">`)}
-        ${_field("Zona / Ruta", `<input id="clf-zona" style="${_inputStyle()}" value="${esc(c.zona||'')}">`)}
+        ${_field("CP", `<input id="clf-cp" class="form-input" placeholder="00000" value="${esc(c.cp||'')}">`)}
+        ${_field("Zona / Ruta", `<input id="clf-zona" class="form-input" value="${esc(c.zona||'')}">`)}
       </div>
 
       <!-- GeolocalizaciÃ³n -->
       ${_seccion("ðŸŒ GeolocalizaciÃ³n")}
       <div style="display:flex;gap:8px;margin-bottom:2px">
         <input id="clf-geobus" type="text" placeholder="Busca una direcciÃ³n para obtener coordenadasâ€¦"
-          style="${_inputStyle()}flex:1;margin-bottom:0">
+          class="form-input" style="flex:1;margin-bottom:0">
         <button type="button" onclick="ClientesUI.geolocalizarCliente()"
           title="Usar mi ubicaciÃ³n GPS"
           style="padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);
@@ -1407,15 +1382,15 @@ async function _abrirFormCliente(clienteId = null) {
       <div id="clf-geobus-results" style="display:none;border:1px solid var(--border);border-radius:6px;
         background:var(--surface);max-height:140px;overflow-y:auto;font-size:12px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
-        ${_field("Latitud", `<input id="clf-lat" type="number" step="any" style="${_inputStyle()}" placeholder="18.9234" value="${esc(c.lat||'')}">`)}
-        ${_field("Longitud", `<input id="clf-lng" type="number" step="any" style="${_inputStyle()}" placeholder="-99.2340" value="${esc(c.lng||'')}">`)}
+        ${_field("Latitud", `<input id="clf-lat" type="number" step="any" class="form-input" placeholder="18.9234" value="${esc(c.lat||'')}">`)}
+        ${_field("Longitud", `<input id="clf-lng" type="number" step="any" class="form-input" placeholder="-99.2340" value="${esc(c.lng||'')}">`)}
       </div>
 
       <!-- Comercial -->
       ${_seccion("ðŸ’¼ Datos comerciales")}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${_field("Segmento / Tipo", `
-          <select id="clf-segmento" style="${_inputStyle()}"
+          <select id="clf-segmento" class="form-input"
             onchange="const o=document.getElementById('clf-segmento-nuevo');o.style.display=this.value==='__nuevo'?'':'none'">
             <option value="">â€” Seleccionar â€”</option>
             ${SEGMENTOS.map(s => `<option value="${esc(s)}" ${c.segmento===s?"selected":""}>${esc(s)}</option>`).join("")}
@@ -1423,13 +1398,13 @@ async function _abrirFormCliente(clienteId = null) {
             <option value="__nuevo">âž• Agregar nuevoâ€¦</option>
           </select>
           <input id="clf-segmento-nuevo" type="text" placeholder="Nombre del nuevo segmento"
-            style="${_inputStyle()}margin-top:6px;display:none">
+            class="form-input" style="margin-top:6px;display:none">
         `)}
         ${_field("Ingeniero asignado", ingSelect)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${_field("Tipo de cultivo", `
-          <input id="clf-tipocultivo" list="clf-cultivos-list" style="${_inputStyle()}"
+          <input id="clf-tipocultivo" list="clf-cultivos-list" class="form-input"
             placeholder="Jitomate, maÃ­z, calabacitaâ€¦"
             value="${esc(c.tipoCultivo||'')}">
           <datalist id="clf-cultivos-list">
@@ -1455,7 +1430,7 @@ async function _abrirFormCliente(clienteId = null) {
             <option value="Ornamental"></option>
           </datalist>
         `)}
-        ${_field("Tipo de instalaciÃ³n", `<input id="clf-tipo" style="${_inputStyle()}"
+        ${_field("Tipo de instalaciÃ³n", `<input id="clf-tipo" class="form-input"
           placeholder="Invernadero, campo abiertoâ€¦"
           value="${esc(c.tipo||'')}">`)}
       </div>
@@ -1465,7 +1440,7 @@ async function _abrirFormCliente(clienteId = null) {
           border:1px solid var(--border);border-radius:6px">${diasChecks}</div>
       </div>
       ${_frecuencias.length ? _field("Frecuencia de visita", `
-        <select id="clf-frecuencia" style="${_inputStyle()}">
+        <select id="clf-frecuencia" class="form-input">
           <option value="">â€” Sin categorÃ­a â€”</option>
           ${_frecuencias.map((f, i) =>
             `<option value="${i}" data-label="${esc(f.label)}" data-dias="${f.dias}"
@@ -1509,32 +1484,30 @@ async function _abrirFormCliente(clienteId = null) {
       <!-- Cartera -->
       ${_seccion("ðŸ’° Cartera y crÃ©dito")}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        ${_field("Estado legal", `<select id="clf-estadolegal" style="${_inputStyle()}">
+        ${_field("Estado legal", `<select id="clf-estadolegal" class="form-input">
           <option value="">â€” Seleccionar â€”</option>
           ${ESTADOS_LEGAL.map(e => `<option value="${e}" ${c.estadoLegal===e?"selected":""}>${e}</option>`).join("")}
         </select>`)}
-        ${_field("Deuda original ($)", `<input id="clf-deuda" type="number" min="0" step="0.01" style="${_inputStyle()}" value="${esc(c.deudaOriginal||'')}">`)}
+        ${_field("Deuda original ($)", `<input id="clf-deuda" type="number" min="0" step="0.01" class="form-input" value="${esc(c.deudaOriginal||'')}">`)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        ${_field("LÃ­mite de crÃ©dito ($)", `<input id="clf-limite" type="number" min="0" step="0.01" style="${_inputStyle()}" value="${esc(c.limiteCredito||'')}">`)}
-        ${_field("Condiciones de pago", `<input id="clf-condpago" style="${_inputStyle()}" placeholder="CrÃ©dito 30 dÃ­as" value="${esc(c.condicionesPago||'')}">`)}
+        ${_field("LÃ­mite de crÃ©dito ($)", `<input id="clf-limite" type="number" min="0" step="0.01" class="form-input" value="${esc(c.limiteCredito||'')}">`)}
+        ${_field("Condiciones de pago", `<input id="clf-condpago" class="form-input" placeholder="CrÃ©dito 30 dÃ­as" value="${esc(c.condicionesPago||'')}">`)}
       </div>
 
       <!-- Observaciones -->
       ${_seccion("ðŸ“ Observaciones")}
       ${_field("Notas", `<textarea id="clf-notas" rows="3"
-        style="${_inputStyle()}resize:vertical;">${esc(c.notas||'')}</textarea>`)}
+        class="form-input" style="resize:vertical">${esc(c.notas||'')}</textarea>`)}
 
       <!-- Acciones -->
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
         <button onclick="ClientesUI.cerrarFormCliente()"
-          style="padding:9px 20px;border:1px solid var(--border);border-radius:6px;
-            background:transparent;color:var(--text-sec);font-size:13px;cursor:pointer">
+          class="btn-secondary" style="cursor:pointer">
           Cancelar
         </button>
         <button id="clf-btn-guardar" onclick="ClientesUI._guardarFormCliente('${clienteId||''}')"
-          style="padding:9px 24px;border:none;border-radius:6px;
-            background:#1B5E20;color:#fff;font-size:13px;font-weight:700;cursor:pointer">
+          class="btn-primary" style="cursor:pointer">
           ${clienteId ? "ðŸ’¾ Guardar cambios" : "âœ… Crear cliente"}
         </button>
       </div>
@@ -1591,10 +1564,7 @@ function _initGeoBuscador() {
   }, { signal });
 }
 
-function _inputStyle() {
-  return `width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-    font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;`;
-}
+function _inputStyle() { return ""; }
 function _seccion(label) {
   return `<div style="font-size:11px;font-weight:800;color:var(--text-sec);letter-spacing:.06em;
     text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:4px">${label}</div>`;
@@ -2133,20 +2103,17 @@ function _abrirFormVisita(clienteDocId) {
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748B;display:block;margin-bottom:4px">Objetivo de la visita</label>
           <input id="_vis-objetivo" type="text" placeholder="Presentar oferta, cobrar, seguimientoâ€¦"
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+            class="form-input" style="background:var(--surface);color:var(--text-primary)">
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748B;display:block;margin-bottom:4px">Resultado</label>
           <textarea id="_vis-resultado" rows="2" placeholder="QuÃ© pasÃ³, compromisos, acuerdosâ€¦"
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box;resize:vertical"></textarea>
+            class="form-input" style="background:var(--surface);color:var(--text-primary);resize:vertical"></textarea>
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748B;display:block;margin-bottom:4px">PrÃ³xima cita / seguimiento</label>
           <input id="_vis-proxima" type="text" placeholder="ej. 2026-09-15 o 'en 2 semanas'"
-            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-              font-size:12px;background:var(--surface);color:var(--text-primary);box-sizing:border-box">
+            class="form-input" style="background:var(--surface);color:var(--text-primary)">
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">

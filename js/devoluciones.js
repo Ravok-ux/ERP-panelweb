@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════
 // devoluciones.js — Módulo de devoluciones N10 ERP
 // Flujo: solicitud → aprobación/rechazo → ajuste inventario + cartera
 // ══════════════════════════════════════════════════════════════
@@ -85,7 +85,7 @@ function _html() {
       </div>
     </div>
 
-    <table class="data-table" id="dev-table">
+    <table class="data-table erp-table" id="dev-table">
       <thead>
         <tr>
           <th>Folio</th><th>CLIENTE</th><th>INGENIERO</th>
@@ -448,7 +448,7 @@ function _abrirDetalle(dev) {
   document.getElementById("dev-side-body").innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px;padding:16px">
       <div><span class="badge ${st.cls}">${st.label}</span></div>
-      <table class="det-table">
+      <table class="det-table erp-table">
         <tr><th>Cliente</th><td>${esc(dev.clienteNombre)}</td></tr>
         <tr><th>Ingeniero</th><td>${esc(resolverNombre(dev.ingenieroAlias))}</td></tr>
         <tr><th>Folio ref.</th><td>${esc(dev.folioRef)}</td></tr>
