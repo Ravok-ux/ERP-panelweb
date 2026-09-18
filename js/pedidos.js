@@ -84,7 +84,7 @@ function _html() {
         <option value="TODOS">Todos los ingenieros</option>
       </select>
       <button onclick="PedidosUI.nuevoPedido()"
-        class="btn-primary" style="white-space:nowrap"
+        class="btn-primary" style="white-space:nowrap">
         + Pedido
       </button>
     </div>
