@@ -104,7 +104,7 @@ export const PromocionesModule = (() => {
         .pf-row { margin-bottom:16px; }
         .pf-label { font-size:10.5px; font-weight:700; color:var(--text-sec);
           text-transform:uppercase; letter-spacing:.07em; display:block; margin-bottom:5px; }
-        .pf-input { width:100%; padding:10px 13px; border-radius:9px;
+        .pf-input { width:100%; padding:10px 13px; padding-right:32px; border-radius:9px;
           border:1.5px solid var(--border); background:var(--surface);
           color:var(--text-primary); font-size:13.5px; box-sizing:border-box;
           transition:border-color .15s, box-shadow .15s; }
