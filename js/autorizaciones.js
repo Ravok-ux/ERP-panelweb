@@ -10,7 +10,7 @@ import { crearNotificacion } from "./notificaciones.js";
 import {
   collection, doc, updateDoc, getDocs,
   onSnapshot, query, where, orderBy, limit,
-  serverTimestamp, Timestamp
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { logAudit } from "./app.js";
 
@@ -186,7 +186,9 @@ function _suscribirPendientes() {
 }
 
 function _suscribirHistorial() {
-  const hace30 = Timestamp.fromMillis(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // fechaAutorizacion se almacena como Date.now() (número en ms), no como Timestamp.
+  // Comparar contra número para que Firestore encuentre los documentos.
+  const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const q = query(
     collection(db, "pedidos"),
     where("fechaAutorizacion", ">=", hace30),
@@ -197,7 +199,7 @@ function _suscribirHistorial() {
     _historial = snap.docs
       .map(d => ({ ...d.data(), id: d.id }))
       .filter(p => [STATUS_CONFIRMADO, STATUS_RECHAZADO].includes(p.status))
-      .slice(0, 50);
+      .slice(0, 100);
     _renderHistorial();
   }, err => {
     console.error("[Autorizaciones] historial:", err);
@@ -311,13 +313,22 @@ function _renderHistorial() {
   }
 
   wrap.innerHTML = lista.map(p => {
-    const esOk = p.status === STATUS_CONFIRMADO;
+    const esOk    = p.status === STATUS_CONFIRMADO;
+    const quien   = esOk ? (p.autorizadoPor || "–") : (p.rechazadoPor || "–");
+    const tsResol = _tsMillis(p.fechaAutorizacion);
+    const tsPed   = _tsMillis(p.fechaPedido);
+    const espera  = (tsResol && tsPed) ? _duracion(tsPed, tsResol) : null;
     return `
       <div class="aut-card ${esOk ? "confirmado" : "rechazado"}">
         <div class="aut-card-top">
           <div>
             <div class="aut-folio">${esc(p.folio || p.id)}</div>
-            <div class="aut-meta">👤 ${esc(resolverNombre(p.ingenieroAlias))} · 🏭 ${esc(p.clienteNombre || "–")} · 📅 ${_fmtFecha(p.fechaPedido)}</div>
+            <div class="aut-meta">
+              👤 ${esc(resolverNombre(p.ingenieroAlias))} &nbsp;·&nbsp;
+              🏭 ${esc(p.clienteNombre || "–")} &nbsp;·&nbsp;
+              📅 ${_fmtFecha(p.fechaPedido)} &nbsp;·&nbsp;
+              ${esc(p.tipoVenta || "CONTADO")}
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <span class="aut-total">${_fmtMXN(p.total)}</span>
@@ -325,10 +336,10 @@ function _renderHistorial() {
           </div>
         </div>
         <div class="aut-resolucion">
-          ${esOk
-            ? `Aprobado por <b>${esc(p.autorizadoPor || "–")}</b> el ${_fmtFecha(p.fechaAutorizacion)}`
-            : `Rechazado por <b>${esc(p.rechazadoPor || "–")}</b> el ${_fmtFecha(p.fechaAutorizacion)}${p.motivoRechazo ? ` · "<i>${esc(p.motivoRechazo)}</i>"` : ""}`
-          }
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+            <span>${esOk ? "✅" : "❌"} <b>${esc(quien)}</b> &nbsp;·&nbsp; ${_fmtFechaHora(p.fechaAutorizacion)}${espera ? ` &nbsp;·&nbsp; <span style="opacity:.7">respondido en ${espera}</span>` : ""}</span>
+          </div>
+          ${(!esOk && p.motivoRechazo) ? `<div style="margin-top:4px;color:var(--badge-red-text,#991b1b);font-style:italic">"${esc(p.motivoRechazo)}"</div>` : ""}
         </div>
       </div>`;
   }).join("");
@@ -570,4 +581,23 @@ function _fmtFecha(ts) {
   if (!ts) return "–";
   const d = typeof ts === "number" ? new Date(ts) : ts?.toDate?.() ?? new Date(ts);
   return d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function _fmtFechaHora(ts) {
+  if (!ts) return "–";
+  const ms = _tsMillis(ts);
+  if (!ms) return "–";
+  const d = new Date(ms);
+  const fecha = d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  const hora  = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return `${fecha} ${hora}`;
+}
+
+function _duracion(tsDesde, tsHasta) {
+  const mins = Math.round((tsHasta - tsDesde) / 60_000);
+  if (mins < 1)   return "<1 min";
+  if (mins < 60)  return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem > 0 ? `${hrs}h ${rem}min` : `${hrs}h`;
 }
