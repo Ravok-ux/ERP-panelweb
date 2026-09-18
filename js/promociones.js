@@ -588,20 +588,36 @@ export const PromocionesModule = (() => {
     tbody.innerHTML = '<tr><td colspan="4">Cargando…</td></tr>';
     try {
       const snap = await getDocs(query(collection(db, COL_PUNTOS), orderBy('puntos', 'desc'), limit(100)));
+      if (!snap.docs.length) { tbody.innerHTML = '<tr><td colspan="4">Sin registros.</td></tr>'; return; }
+
+      // Resolver nombres de cliente en paralelo desde la colección 'clientes'
+      const nombresMap = {};
+      await Promise.all(snap.docs.map(async d => {
+        const p = d.data();
+        if (p.clienteNombre) { nombresMap[d.id] = p.clienteNombre; return; }
+        try {
+          const cs = await getDoc(doc(db, 'clientes', d.id));
+          nombresMap[d.id] = cs.exists() ? (cs.data().nombre || p.clienteId || d.id) : (p.clienteId || d.id);
+        } catch (_) { nombresMap[d.id] = p.clienteId || d.id; }
+      }));
+
       let docs = snap.docs;
       if (busqueda) {
         const lower = norm(busqueda);
-        docs = docs.filter(d => norm(d.data().clienteNombre || '').includes(lower));
+        docs = docs.filter(d => norm(nombresMap[d.id] || '').includes(lower));
       }
-      if (!docs.length) { tbody.innerHTML = '<tr><td colspan="4">Sin registros.</td></tr>'; return; }
+      if (!docs.length) { tbody.innerHTML = '<tr><td colspan="4">Sin resultados.</td></tr>'; return; }
+
       tbody.innerHTML = docs.map(d => {
         const p = d.data();
-        const fecha = p.ultimaActividad ? new Date(p.ultimaActividad).toLocaleDateString('es-MX') : '—';
+        const nombre = nombresMap[d.id] || d.id;
+        const ts = p.ultimaActividad;
+        const fecha = ts ? new Date(typeof ts === 'number' ? ts : ts.toMillis?.() ?? ts).toLocaleDateString('es-MX') : '—';
         return `<tr>
-          <td>${esc(p.clienteNombre || d.id)}</td>
-          <td class="num">${esc(String(p.puntos || 0))}</td>
-          <td>${esc(fecha)}</td>
-          <td><button class="btn-sm" data-cid="${esc(d.id)}" data-cnombre="${esc(p.clienteNombre || d.id)}">Ajustar</button></td>
+          <td style="font-weight:500">${esc(nombre)}</td>
+          <td class="num" style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${Number(p.puntos || 0).toLocaleString('es-MX')}</td>
+          <td style="font-size:11px;color:#9CA3AF">${esc(fecha)}</td>
+          <td style="text-align:center"><button class="btn-sm" data-cid="${esc(d.id)}" data-cnombre="${esc(nombre)}">Ajustar</button></td>
         </tr>`;
       }).join('');
       tbody.querySelectorAll('button[data-cid]').forEach(btn =>
@@ -655,7 +671,8 @@ export const PromocionesModule = (() => {
       const ref  = doc(db, COL_PUNTOS, clienteId);
       const snap = await getDoc(ref);
       const nuevo = Math.max(0, (snap.exists() ? (snap.data().puntos || 0) : 0) + delta);
-      await setDoc(ref, { puntos: nuevo, ultimaActividad: Date.now() }, { merge: true });
+      const clienteNombreGuardado = form.clienteNombre.value || clienteId;
+      await setDoc(ref, { puntos: nuevo, clienteNombre: clienteNombreGuardado, ultimaActividad: Date.now() }, { merge: true });
       container.querySelector('#modalPuntos').classList.add('hidden');
       _cargarPuntos(container, '');
     } catch (err) { window.toast?.('Error: ' + err.message, 'error'); }
