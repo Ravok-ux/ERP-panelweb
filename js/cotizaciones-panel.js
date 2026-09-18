@@ -56,11 +56,6 @@ export const CotizacionesPanelModule = (() => {
         gap:12px; flex-wrap:wrap; margin-bottom:16px }
       .cot-kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
         gap:10px; margin-bottom:16px }
-      .cot-kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px;
-        padding:14px 16px; display:flex; flex-direction:column; gap:3px }
-      .cot-kpi-val { font-size:24px; font-weight:800; font-variant-numeric:tabular-nums }
-      .cot-kpi-lbl { font-size:10px; font-weight:600; color:#9CA3AF;
-        text-transform:uppercase; letter-spacing:.06em }
       .cot-filtros { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:12px }
       .cot-pill { padding:5px 12px; border-radius:20px; border:1.5px solid var(--border);
         background:transparent; font-size:11.5px; font-weight:600;
@@ -131,26 +126,30 @@ export const CotizacionesPanelModule = (() => {
       </div>
 
       <!-- KPIs -->
-      <div class="cot-kpis">
-        <div class="cot-kpi">
-          <div class="cot-kpi-val" id="kpi-total" style="color:var(--text-primary)">—</div>
-          <div class="cot-kpi-lbl">Total</div>
+      <div class="cot-kpis kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+        <div class="kpi-card" style="border-left-color:var(--text-muted,#9CA3AF)">
+          <div class="kpi-val" id="kpi-total">—</div>
+          <div class="kpi-label">TOTAL</div>
         </div>
-        <div class="cot-kpi">
-          <div class="cot-kpi-val" id="kpi-enviadas" style="color:#D97706">—</div>
-          <div class="cot-kpi-lbl">📤 Enviadas</div>
+        <div class="kpi-card" style="border-left-color:#D97706">
+          <div class="kpi-icon">📤</div>
+          <div class="kpi-val" id="kpi-enviadas">—</div>
+          <div class="kpi-label">ENVIADAS</div>
         </div>
-        <div class="cot-kpi">
-          <div class="cot-kpi-val" id="kpi-aprobadas" style="color:#16A34A">—</div>
-          <div class="cot-kpi-lbl">✅ Aprobadas</div>
+        <div class="kpi-card" style="border-left-color:#16A34A">
+          <div class="kpi-icon">✅</div>
+          <div class="kpi-val" id="kpi-aprobadas">—</div>
+          <div class="kpi-label">APROBADAS</div>
         </div>
-        <div class="cot-kpi">
-          <div class="cot-kpi-val" id="kpi-rechazadas" style="color:#DC2626">—</div>
-          <div class="cot-kpi-lbl">❌ Rechazadas</div>
+        <div class="kpi-card" style="border-left-color:#DC2626">
+          <div class="kpi-icon">❌</div>
+          <div class="kpi-val" id="kpi-rechazadas">—</div>
+          <div class="kpi-label">RECHAZADAS</div>
         </div>
-        <div class="cot-kpi">
-          <div class="cot-kpi-val" id="kpi-convertidas" style="color:#7C3AED">—</div>
-          <div class="cot-kpi-lbl">🛒 Convertidas</div>
+        <div class="kpi-card" style="border-left-color:#7C3AED">
+          <div class="kpi-icon">🛒</div>
+          <div class="kpi-val" id="kpi-convertidas">—</div>
+          <div class="kpi-label">CONVERTIDAS</div>
         </div>
       </div>
 

@@ -86,11 +86,6 @@ function _html() {
     .vis-tab.active { color:var(--accent,#3B82F6); border-bottom-color:var(--accent,#3B82F6); font-weight:700 }
     .vis-kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
       gap:10px; margin:16px 0 }
-    .vis-kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px;
-      padding:12px 14px }
-    .vis-kpi-val { font-size:22px; font-weight:800; font-variant-numeric:tabular-nums }
-    .vis-kpi-lbl { font-size:10px; font-weight:600; color:#9CA3AF;
-      text-transform:uppercase; letter-spacing:.05em; margin-top:2px }
     .vis-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px }
     .vis-tabla-wrap { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 250px); border:1px solid var(--border); border-radius:10px }
     .vis-tabla { width:100%; border-collapse:collapse; font-size:13px }
@@ -127,26 +122,29 @@ function _html() {
     <!-- Panel Calendario -->
     <div id="vis-panel-calendario">
       <!-- KPIs -->
-      <div class="vis-kpis">
-        <div class="vis-kpi">
-          <div class="vis-kpi-val" id="vis-k-total" style="color:var(--text-primary)">—</div>
-          <div class="vis-kpi-lbl">Clientes</div>
+      <div class="vis-kpis kpi-row" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+        <div class="kpi-card" style="border-left-color:var(--text-muted,#9CA3AF)">
+          <div class="kpi-val" id="vis-k-total">—</div>
+          <div class="kpi-label">CLIENTES</div>
         </div>
-        <div class="vis-kpi">
-          <div class="vis-kpi-val" id="vis-k-vencidas" style="color:#DC2626">—</div>
-          <div class="vis-kpi-lbl">⚠️ Vencidas</div>
+        <div class="kpi-card" style="border-left-color:#DC2626">
+          <div class="kpi-icon">⚠️</div>
+          <div class="kpi-val" id="vis-k-vencidas">—</div>
+          <div class="kpi-label">VENCIDAS</div>
         </div>
-        <div class="vis-kpi">
-          <div class="vis-kpi-val" id="vis-k-hoy" style="color:#D97706">—</div>
-          <div class="vis-kpi-lbl">🔔 Hoy</div>
+        <div class="kpi-card" style="border-left-color:#D97706">
+          <div class="kpi-icon">🔔</div>
+          <div class="kpi-val" id="vis-k-hoy">—</div>
+          <div class="kpi-label">HOY</div>
         </div>
-        <div class="vis-kpi">
-          <div class="vis-kpi-val" id="vis-k-semana" style="color:#16A34A">—</div>
-          <div class="vis-kpi-lbl">📅 Esta semana</div>
+        <div class="kpi-card" style="border-left-color:#16A34A">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-val" id="vis-k-semana">—</div>
+          <div class="kpi-label">ESTA SEMANA</div>
         </div>
-        <div class="vis-kpi">
-          <div class="vis-kpi-val" id="vis-k-sin" style="color:#9CA3AF">—</div>
-          <div class="vis-kpi-lbl">Sin programar</div>
+        <div class="kpi-card" style="border-left-color:#9CA3AF">
+          <div class="kpi-val" id="vis-k-sin">—</div>
+          <div class="kpi-label">SIN PROGRAMAR</div>
         </div>
       </div>
 

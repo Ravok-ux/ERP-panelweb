@@ -189,17 +189,18 @@ function _tabDashboard(datos) {
   const semanas = _porMes(datos, 8).map(m => ({ ...m, label: m.label.slice(0,3) }));
 
   const kpi = (ico, lbl, val, color) => `
-    <div class="bi-kpi">
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">${ico} ${lbl}</div>
-      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
+    <div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-icon">${ico}</div>
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${lbl}</div>
     </div>`;
 
   return `
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
-  ${kpi("💰","Ventas período",MXN(total),"var(--text-primary)")}
-  ${kpi("📋","Pedidos",NUM(datos.length),"#60A5FA")}
-  ${kpi("🧾","Ticket promedio",MXN(ticket),"#FBBF24")}
-  ${kpi("🏢","Clientes activos",NUM(cls),"#A78BFA")}
+<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
+  ${kpi("💰","VENTAS PERÍODO",MXN(total),"var(--text-muted,#9CA3AF)")}
+  ${kpi("📋","PEDIDOS",NUM(datos.length),"#60A5FA")}
+  ${kpi("🧾","TICKET PROMEDIO",MXN(ticket),"#FBBF24")}
+  ${kpi("🏢","CLIENTES ACTIVOS",NUM(cls),"#A78BFA")}
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -571,10 +572,10 @@ function _tabInventario() {
     </div>`;
 
   const _kpi = (ico, lbl, val, color, sub = "") => `
-    <div class="bi-kpi">
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">${ico} ${lbl}</div>
-      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
-      ${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ""}
+    <div class="kpi-card" style="border-left-color:${color}">
+      <div class="kpi-icon">${ico}</div>
+      <div class="kpi-val">${val}</div>
+      <div class="kpi-label">${lbl}${sub ? ` · ${sub}` : ""}</div>
     </div>`;
 
   // Top 20 productos por valor en costo
@@ -583,12 +584,12 @@ function _tabInventario() {
 
   return `
 <!-- KPIs globales -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
-  ${_kpi("📦", "Valor en costo",  MXN(totalCosto),  "var(--text-primary)")}
-  ${_kpi("🏷️", "Valor en precio", MXN(totalPrecio), "#4ADE80", margen >= 0 ? `+${MXN(margen)} margen` : `${MXN(margen)}`)}
-  ${_kpi("📊", "% Margen bruto",  `${margenPct.toFixed(1)}%`, "#FBBF24")}
-  ${_kpi("🔄", "Rotación anual",  rotacion ? `${rotacion}×` : "—", "#60A5FA", dio ? `${dio} días inv.` : "")}
-  ${_kpi("💸", "Holding cost",    MXN(costoHolding), "#F87171", `${carryPct.toFixed(1)}% del inventario`)}
+<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
+  ${_kpi("📦", "VALOR EN COSTO",  MXN(totalCosto),  "var(--text-muted,#9CA3AF)")}
+  ${_kpi("🏷️", "VALOR EN PRECIO", MXN(totalPrecio), "#4ADE80", margen >= 0 ? `+${MXN(margen)} margen` : `${MXN(margen)}`)}
+  ${_kpi("📊", "% MARGEN BRUTO",  `${margenPct.toFixed(1)}%`, "#FBBF24")}
+  ${_kpi("🔄", "ROTACIÓN ANUAL",  rotacion ? `${rotacion}×` : "—", "#60A5FA", dio ? `${dio} días inv.` : "")}
+  ${_kpi("💸", "HOLDING COST",    MXN(costoHolding), "#F87171", `${carryPct.toFixed(1)}% del inventario`)}
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -752,7 +753,6 @@ function _render() {
 <style>
   .bi-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .bi-card-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px}
-  .bi-kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
   .bi-tab{background:transparent;border:none;border-bottom:2px solid transparent;padding:8px 18px;cursor:pointer;font-size:13px;color:var(--text-secondary)}
   .bi-tab.active{border-bottom-color:var(--accent);color:var(--text-primary);font-weight:600}
   .bi-table{width:100%;border-collapse:collapse;font-size:12px}
