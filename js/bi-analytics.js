@@ -753,11 +753,18 @@ function _tabKpiIngenieros() {
   const semActual = _isoWeek(ahora);
   const yearActual = ahora.getFullYear();
 
+  const _semLabel = (s) => {
+    const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const {start, end} = _weekRange(yearActual, s);
+    const ini = `${start.getUTCDate()} ${MESES[start.getUTCMonth()]}`;
+    const fin = `${end.getUTCDate()} ${MESES[end.getUTCMonth()]}`;
+    return `S${s} (${ini} – ${fin})`;
+  };
   const semOptsIni = Array.from({length:52},(_,i)=>i+1).map(s =>
-    `<option value="${s}" ${s===Math.max(semActual-6,1)?"selected":""}>${"S"+s}</option>`
+    `<option value="${s}" ${s===Math.max(semActual-6,1)?"selected":""}>${_semLabel(s)}</option>`
   ).join("");
   const semOptsFin = Array.from({length:52},(_,i)=>i+1).map(s =>
-    `<option value="${s}" ${s===semActual?"selected":""}>${"S"+s}</option>`
+    `<option value="${s}" ${s===semActual?"selected":""}>${_semLabel(s)}</option>`
   ).join("");
 
   const html = `<div id="bi-comp-wrap">
