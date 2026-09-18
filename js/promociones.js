@@ -69,6 +69,19 @@ export const PromocionesModule = (() => {
           backdrop-filter:blur(3px); z-index:1000; align-items:flex-start; justify-content:center;
           padding:32px 12px 48px; overflow-y:auto; }
         .promo-modal-overlay.open { display:flex; }
+        .modal-overlay { display:flex; position:fixed; inset:0; background:rgba(0,0,0,.6);
+          backdrop-filter:blur(3px); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.hidden { display:none; }
+        .modal-box { background:var(--surface); border-radius:14px; padding:24px;
+          width:min(420px,95vw); border:1px solid var(--border);
+          box-shadow:0 16px 48px rgba(0,0,0,.18); display:flex; flex-direction:column; gap:12px; }
+        .modal-box h4 { margin:0; font-size:15px; font-weight:800; color:var(--text-primary); }
+        .modal-box label { display:flex; flex-direction:column; gap:4px;
+          font-size:11px; font-weight:700; color:var(--text-sec); text-transform:uppercase; letter-spacing:.06em; }
+        .modal-box .input-select, .modal-box .input-text { padding:9px 12px; border-radius:8px;
+          border:1.5px solid var(--border); background:var(--surface);
+          color:var(--text-primary); font-size:13px; width:100%; box-sizing:border-box; }
+        .modal-box .form-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
         .promo-modal { background:var(--surface); border-radius:18px;
           width:500px; max-width:96vw; border:1px solid var(--border);
           box-shadow:0 24px 64px rgba(0,0,0,.18); overflow:hidden; }
@@ -250,6 +263,7 @@ export const PromocionesModule = (() => {
           <h4 id="modalPuntosTitulo">Ajustar puntos</h4>
           <form id="formAjustePuntos" novalidate>
             <input type="hidden" name="clienteId">
+            <input type="hidden" name="clienteNombre">
             <label>Operación
               <select name="operacion" class="input-select">
                 <option value="sumar">Sumar puntos</option>
@@ -602,6 +616,7 @@ export const PromocionesModule = (() => {
     const form  = container.querySelector('#formAjustePuntos');
     form.reset();
     form.clienteId.value = clienteId;
+    form.clienteNombre.value = clienteNombre;
     container.querySelector('#modalPuntosTitulo').textContent = `Ajustar puntos — ${clienteNombre}`;
     _regEsc(() => { modal.classList.add('hidden'); _unregEsc(); });
 
@@ -610,8 +625,9 @@ export const PromocionesModule = (() => {
     try {
       const ahora = Date.now();
       const snap = await getDocs(query(collection(db, COL_CAMPANAS),
-        where('activa', '==', true), where('fechaFinTs', '>=', ahora)));
-      snap.forEach(d => {
+        where('activa', '==', true)));
+      const docsVigentes = snap.docs.filter(d => (d.data().fechaFinTs || 0) >= ahora);
+      docsVigentes.forEach(d => {
         const opt = document.createElement('option');
         opt.value = d.id; opt.textContent = d.data().nombre;
         sel.appendChild(opt);
@@ -628,6 +644,7 @@ export const PromocionesModule = (() => {
     try {
       await addDoc(collection(db, COL_HISTORIAL), {
         clienteId,
+        clienteNombre: form.clienteNombre.value || clienteId,
         campanaId: form.campanaId.value || null,
         puntos: delta,
         tipo: form.operacion.value,
@@ -658,7 +675,7 @@ export const PromocionesModule = (() => {
         const signo = h.puntos > 0 ? '+' : '';
         return `<tr>
           <td>${esc(fecha)}</td>
-          <td>${esc(h.clienteId || '')}</td>
+          <td>${esc(h.clienteNombre || h.clienteId || '')}</td>
           <td>${esc(h.campanaId || '—')}</td>
           <td class="num">${signo}${esc(String(h.puntos))}</td>
           <td>${esc(h.tipo || '')}</td>
@@ -793,8 +810,9 @@ export const LealtadConfigModule = (() => {
       });
       tbody.querySelectorAll(".lc-del").forEach(btn => {
         btn.addEventListener("click", async () => {
-          if (!confirm("¿Eliminar esta regla?")) return;
-          await deleteDoc(doc(db, COL, btn.dataset.id));
+          if (!await window.modal({ title: "Eliminar regla", message: "¿Eliminar esta regla de lealtad?", danger: true, confirmLabel: "Eliminar" })) return;
+          try { await deleteDoc(doc(db, COL, btn.dataset.id)); }
+          catch (err) { window.toast?.("Error al eliminar: " + err.message, "error"); }
         });
       });
     });
@@ -836,12 +854,20 @@ export const LealtadConfigModule = (() => {
     if (!refId) { window.toast?.("Ingresa el ID de referencia.", "warn"); return; }
 
     const payload = { tipo, refId, nombre: nombre || refId, puntosPorPeso: pts, activo, timestamp: serverTimestamp() };
-    if (_editId) {
-      await setDoc(doc(db, COL, _editId), payload, { merge: true });
-    } else {
-      await addDoc(collection(db, COL), payload);
+    const btn = _container.querySelector("#lc-btn-guardar");
+    if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
+    try {
+      if (_editId) {
+        await setDoc(doc(db, COL, _editId), payload, { merge: true });
+      } else {
+        await addDoc(collection(db, COL), payload);
+      }
+      _cerrarModal();
+    } catch (err) {
+      window.toast?.("Error al guardar: " + err.message, "error");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Guardar"; }
     }
-    _cerrarModal();
   }
 
   return { mount, destroy };
