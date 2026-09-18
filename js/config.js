@@ -4,7 +4,7 @@
 
 import { db } from "./firebase-config.js";
 import { Sesion } from "./auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const DOC_PATH = "configuracion/tickets";
@@ -19,6 +19,17 @@ const DEFAULTS = {
     footerRemision: "El cliente acepta los productos en buen estado al recibir este comprobante.\nFactura disponible al liquidar el adeudo.",
 };
 
+// Campos con maxlength para el contador de caracteres
+const CHAR_FIELDS = [
+    { id: "cfg-nombre",         max: 40 },
+    { id: "cfg-subtitulo",      max: 40 },
+    { id: "cfg-telefono",       max: 20 },
+    { id: "cfg-sitioweb",       max: 40 },
+    { id: "cfg-footer-venta",   max: 200 },
+    { id: "cfg-footer-abono",   max: 200 },
+    { id: "cfg-footer-remision",max: 200 },
+];
+
 function _puedeAcceder() {
     const rol = Sesion.rol;
     return rol === "SUPER_ADMIN" || rol === "GERENTE" || rol === "ADMINISTRADOR";
@@ -28,6 +39,7 @@ function _html() {
     return `
 <div class="cfg-wrap">
 
+  <!-- ── Encabezado del ticket ── -->
   <div class="cfg-card">
     <div class="cfg-card-head">
       <div class="cfg-card-icon">🏢</div>
@@ -37,20 +49,30 @@ function _html() {
       </div>
     </div>
     <div class="cfg-fields">
-      <label class="cfg-label">Nombre de la empresa</label>
-      <input class="cfg-input" id="cfg-nombre" type="text" maxlength="40" placeholder="NUTRICIÓN DE 10">
-
-      <label class="cfg-label">Subtítulo / giro</label>
-      <input class="cfg-input" id="cfg-subtitulo" type="text" maxlength="40" placeholder="Agroquímicos y Nutrición">
-
-      <label class="cfg-label">Teléfono</label>
-      <input class="cfg-input" id="cfg-telefono" type="tel" maxlength="20" placeholder="(667) 123-4567">
-
-      <label class="cfg-label">Sitio web</label>
-      <input class="cfg-input" id="cfg-sitioweb" type="text" maxlength="40" placeholder="nutricionde10.com.mx">
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-nombre">Nombre de la empresa</label>
+        <input class="cfg-input" id="cfg-nombre" type="text" maxlength="40" placeholder="NUTRICIÓN DE 10">
+        <div class="cfg-char-count" id="cnt-cfg-nombre">0 / 40</div>
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-subtitulo">Subtítulo / giro</label>
+        <input class="cfg-input" id="cfg-subtitulo" type="text" maxlength="40" placeholder="Agroquímicos y Nutrición">
+        <div class="cfg-char-count" id="cnt-cfg-subtitulo">0 / 40</div>
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-telefono">Teléfono</label>
+        <input class="cfg-input" id="cfg-telefono" type="tel" maxlength="20" placeholder="(667) 123-4567">
+        <div class="cfg-char-count" id="cnt-cfg-telefono">0 / 20</div>
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-sitioweb">Sitio web</label>
+        <input class="cfg-input" id="cfg-sitioweb" type="text" maxlength="40" placeholder="nutricionde10.com.mx">
+        <div class="cfg-char-count" id="cnt-cfg-sitioweb">0 / 40</div>
+      </div>
     </div>
   </div>
 
+  <!-- ── Pie de página por tipo ── -->
   <div class="cfg-card">
     <div class="cfg-card-head">
       <div class="cfg-card-icon">📝</div>
@@ -60,18 +82,25 @@ function _html() {
       </div>
     </div>
     <div class="cfg-fields">
-      <label class="cfg-label">Ticket de venta / pedido</label>
-      <textarea class="cfg-textarea" id="cfg-footer-venta" rows="3" maxlength="200"></textarea>
-
-      <label class="cfg-label">Recibo de abono</label>
-      <textarea class="cfg-textarea" id="cfg-footer-abono" rows="3" maxlength="200"></textarea>
-
-      <label class="cfg-label">Remisión a crédito</label>
-      <textarea class="cfg-textarea" id="cfg-footer-remision" rows="3" maxlength="200"></textarea>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-footer-venta">Ticket de venta / pedido</label>
+        <textarea class="cfg-textarea" id="cfg-footer-venta" rows="3" maxlength="200"></textarea>
+        <div class="cfg-char-count" id="cnt-cfg-footer-venta">0 / 200</div>
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-footer-abono">Recibo de abono</label>
+        <textarea class="cfg-textarea" id="cfg-footer-abono" rows="3" maxlength="200"></textarea>
+        <div class="cfg-char-count" id="cnt-cfg-footer-abono">0 / 200</div>
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-footer-remision">Remisión a crédito</label>
+        <textarea class="cfg-textarea" id="cfg-footer-remision" rows="3" maxlength="200"></textarea>
+        <div class="cfg-char-count" id="cnt-cfg-footer-remision">0 / 200</div>
+      </div>
     </div>
   </div>
 
-  <!-- Control operativo — feature toggles globales -->
+  <!-- ── Control operativo ── -->
   <div class="cfg-card" id="ctrl-card">
     <div class="cfg-card-head">
       <div class="cfg-card-icon">🎛️</div>
@@ -94,12 +123,11 @@ function _html() {
             <div style="font-size:13px;font-weight:500;color:var(--text-primary)">${label}</div>
             <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">${desc}</div>
           </div>
-          <label class="ctrl-toggle" title="${label}">
+          <label class="ctrl-toggle" title="Activar o desactivar ${label}">
             <input type="checkbox" id="ctrl-${key}" data-key="${key}" checked
               onchange="ControlUI.toggle('${key}', this.checked)">
             <span class="ctrl-slider"></span>
           </label>
-          <span id="ctrl-lbl-${key}" style="font-size:10px;font-weight:700;width:52px;color:#16A34A">Activo</span>
         </div>`).join("")}
     </div>
     <div style="margin-top:10px;font-size:10.5px;color:#9CA3AF;line-height:1.5">
@@ -108,25 +136,7 @@ function _html() {
     </div>
   </div>
 
-  <div class="cfg-actions">
-    <div id="cfg-status" class="cfg-status hidden"></div>
-    <button class="cfg-btn-secondary" id="cfg-btn-reset">Restaurar valores iniciales</button>
-    <button class="cfg-btn-primary" id="cfg-btn-guardar">Guardar cambios</button>
-  </div>
-
-  <div class="cfg-preview-card">
-    <div class="cfg-preview-head">Vista previa del encabezado en ticket</div>
-    <div class="cfg-receipt" id="cfg-preview">
-      <div class="cr-brand" id="pr-nombre">NUTRICIÓN DE 10</div>
-      <div class="cr-sub" id="pr-subtitulo">Agroquímicos y Nutrición</div>
-      <div class="cr-sub" id="pr-telefono">(667) 123-4567</div>
-      <div class="cr-sub" id="pr-sitioweb">nutricionde10.com.mx</div>
-      <div class="cr-div"></div>
-      <div class="cr-footer" id="pr-footer-venta"></div>
-    </div>
-  </div>
-
-  <!-- Alertas automáticas de cobranza -->
+  <!-- ── Alertas automáticas de cobranza ── -->
   <div class="cfg-card" id="cfg-alertas-cobranza-card">
     <div class="cfg-card-head">
       <div class="cfg-card-icon">💸</div>
@@ -136,18 +146,46 @@ function _html() {
       </div>
     </div>
     <div class="cfg-fields">
-      <label class="cfg-label">
-        <input type="checkbox" id="cfg-alert-activo" style="margin-right:6px"> Activar alertas de cobranza
-      </label>
-      <label class="cfg-label">Días de aviso previo al vencimiento</label>
-      <input class="cfg-input" id="cfg-alert-aviso" type="number" min="1" max="30" value="3">
-      <label class="cfg-label">Alertar cuando ya venció hace (días)</label>
-      <input class="cfg-input" id="cfg-alert-postvenc" type="number" min="1" max="30" value="1">
+      <div class="cfg-toggle-row">
+        <label class="cfg-label" for="cfg-alert-activo">Activar alertas de cobranza</label>
+        <input type="checkbox" id="cfg-alert-activo">
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-alert-aviso">Días de aviso previo al vencimiento</label>
+        <input class="cfg-input" id="cfg-alert-aviso" type="number" min="1" max="30" value="3">
+      </div>
+      <div class="cfg-field-wrap">
+        <label class="cfg-label" for="cfg-alert-postvenc">Alertar cuando ya venció hace (días)</label>
+        <input class="cfg-input" id="cfg-alert-postvenc" type="number" min="1" max="30" value="1">
+      </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;padding:12px 0 0">
-      <button class="cfg-btn-primary" id="cfg-alert-guardar">Guardar alertas</button>
+  </div>
+
+  <!-- ── Acciones ── -->
+  <div class="cfg-actions">
+    <div id="cfg-status" class="cfg-status hidden"></div>
+    <button class="cfg-btn-secondary" id="cfg-btn-reset">Restaurar valores iniciales</button>
+    <button class="cfg-btn-primary" id="cfg-btn-guardar">Guardar cambios</button>
+  </div>
+
+  <!-- ── Vista previa ── -->
+  <div class="cfg-preview-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="cfg-preview-head" style="margin-bottom:0">Vista previa del ticket</div>
+      <div class="cfg-preview-tabs">
+        <button class="cfg-prev-tab active" data-footer="venta">Venta</button>
+        <button class="cfg-prev-tab" data-footer="abono">Abono</button>
+        <button class="cfg-prev-tab" data-footer="remision">Remisión</button>
+      </div>
     </div>
-    <div id="cfg-alert-status" style="font-size:12px;color:#16A34A;height:16px;margin-top:4px"></div>
+    <div class="cfg-receipt" id="cfg-preview">
+      <div class="cr-brand" id="pr-nombre">NUTRICIÓN DE 10</div>
+      <div class="cr-sub" id="pr-subtitulo">Agroquímicos y Nutrición</div>
+      <div class="cr-sub" id="pr-telefono">(667) 123-4567</div>
+      <div class="cr-sub" id="pr-sitioweb">nutricionde10.com.mx</div>
+      <div class="cr-div"></div>
+      <div class="cr-footer" id="pr-footer"></div>
+    </div>
   </div>
 
 </div>`;
@@ -179,7 +217,11 @@ const _css = `
 .cfg-card-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .cfg-card-sub { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
 .cfg-fields { display: flex; flex-direction: column; gap: 14px; }
-.cfg-label { font-size: 12px; color: var(--text-sec); font-weight: 600; margin-bottom: -8px; }
+.cfg-field-wrap { display: flex; flex-direction: column; gap: 5px; }
+.cfg-label { font-size: 12px; color: var(--text-sec); font-weight: 600; }
+.cfg-char-count { font-size: 11px; color: var(--text-muted, #6B7280); text-align: right; }
+.cfg-char-count.near { color: #D97706; }
+.cfg-char-count.full { color: #DC2626; font-weight: 700; }
 .cfg-input, .cfg-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -194,8 +236,14 @@ const _css = `
 }
 .cfg-input:focus, .cfg-textarea:focus {
   outline: none;
-  border-color: var(--green-mid);
-  box-shadow: 0 0 0 2px var(--green-bg);
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.14);
+}
+.cfg-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
 }
 .cfg-actions {
   display: flex;
@@ -246,7 +294,27 @@ const _css = `
   color: var(--text-secondary);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-bottom: 16px;
+}
+.cfg-preview-tabs {
+  display: flex;
+  gap: 4px;
+}
+.cfg-prev-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-sec);
+  cursor: pointer;
+  transition: all .15s;
+}
+.cfg-prev-tab:hover { background: var(--surface); }
+.cfg-prev-tab.active {
+  background: #1E3A5F;
+  color: #93C5FD;
+  border-color: #2563EB;
 }
 .cfg-receipt {
   width: 220px;
@@ -258,30 +326,31 @@ const _css = `
   font-size: 11px;
   line-height: 1.5;
   color: #111;
-  margin: 0 auto;
+  margin: 16px auto 0;
 }
 .cr-brand { font-weight: bold; font-size: 13px; text-align: center; color: #1A5C2E; }
 .cr-sub { text-align: center; color: #555; font-size: 10px; }
 .cr-div { border-top: 1px dashed #888; margin: 6px 0; }
 .cr-footer { font-size: 10px; color: #777; text-align: center; white-space: pre-line; }
 
-/* ── Control operativo toggles ── */
+/* ── Control operativo toggles (azul, consistente con sistema global) ── */
 .ctrl-toggle {
   position: relative; display: inline-block;
   width: 40px; height: 22px; cursor: pointer; flex-shrink: 0;
 }
-.ctrl-toggle input { opacity: 0; width: 0; height: 0; }
+.ctrl-toggle input { opacity: 0 !important; width: 0 !important; height: 0 !important; position: absolute; }
 .ctrl-slider {
   position: absolute; inset: 0; border-radius: 22px;
-  background: #374151; transition: background .2s;
+  background: #4B5563; transition: background .2s;
 }
 .ctrl-slider::before {
   content: ""; position: absolute;
   width: 16px; height: 16px; border-radius: 50%;
-  left: 3px; top: 3px; background:var(--surface); transition: transform .2s;
+  left: 3px; top: 3px; background: #fff; transition: transform .2s;
 }
-.ctrl-toggle input:checked + .ctrl-slider { background: #16A34A; }
+.ctrl-toggle input:checked + .ctrl-slider { background: #2563EB; }
 .ctrl-toggle input:checked + .ctrl-slider::before { transform: translateX(18px); }
+.ctrl-toggle input:disabled + .ctrl-slider { opacity: .45; cursor: not-allowed; }
 `;
 
 // ── Control operativo ─────────────────────────────────────────
@@ -298,22 +367,19 @@ function _iniciarControlListener() {
     FUNC_KEYS.forEach(key => {
       const activo = func[key] !== false;
       const cb = document.getElementById(`ctrl-${key}`);
-      const lbl = document.getElementById(`ctrl-lbl-${key}`);
-      if (cb)  cb.checked = activo;
-      if (lbl) { lbl.textContent = activo ? "Activo" : "Inactivo"; lbl.style.color = activo ? "#16A34A" : "#DC2626"; }
+      if (cb) cb.checked = activo;
     });
     const ts = document.getElementById("ctrl-ts");
-    if (ts && data.actualizadoEn) {
-      const d = data.actualizadoEn.toDate ? data.actualizadoEn.toDate() : new Date(data.actualizadoEn);
-      ts.textContent = `Último cambio: ${d.toLocaleString("es-MX")} por ${data.actualizadoPor ?? "–"}`;
+    if (ts) {
+      ts.textContent = data.actualizadoEn
+        ? `Último cambio: ${(data.actualizadoEn.toDate?.() ?? new Date(data.actualizadoEn)).toLocaleString("es-MX")} por ${data.actualizadoPor ?? "–"}`
+        : "Sin cambios registrados";
     }
   }, err => console.error("[Control]", err));
 }
 
 window.ControlUI = {
   async toggle(key, activo) {
-    const lbl = document.getElementById(`ctrl-lbl-${key}`);
-    if (lbl) { lbl.textContent = activo ? "Activo" : "Inactivo"; lbl.style.color = activo ? "#16A34A" : "#DC2626"; }
     try {
       await setDoc(doc(db, ...CONTROL_DOC.split("/")), {
         funcionalidades: { [key]: activo },
@@ -322,17 +388,17 @@ window.ControlUI = {
       }, { merge: true });
     } catch (e) {
       window.toast?.("Error al guardar control: " + e.message, "error");
-      // Revertir toggle visualmente en caso de error
       const cb = document.getElementById(`ctrl-${key}`);
       if (cb) cb.checked = !activo;
-      if (lbl) { lbl.textContent = !activo ? "Activo" : "Inactivo"; lbl.style.color = !activo ? "#16A34A" : "#DC2626"; }
     }
   }
 };
 
+// ── Módulo principal ──────────────────────────────────────────
 export const ConfigModule = {
 
     _styleEl: null,
+    _previewFooter: "venta",   // tab activo en la vista previa
 
     mount(container) {
         if (!_puedeAcceder()) {
@@ -349,60 +415,68 @@ export const ConfigModule = {
 
         container.innerHTML = _html();
         _iniciarControlListener();
-        this._cargarDatos(container);
-        this._bindEventos(container);
+        this._cargarDatos();
+        this._bindEventos();
         this._cargarAlertasCobranza();
-        this._bindAlertasCobranza();
     },
 
-    async _cargarDatos(container) {
+    async _cargarDatos() {
         try {
-            const db = getFirestore();
             const snap = await getDoc(doc(db, ...DOC_PATH.split("/")));
             const data = snap.exists() ? { ...DEFAULTS, ...snap.data() } : { ...DEFAULTS };
             this._poblarFormulario(data);
+            this._actualizarContadores();
             this._actualizarPreview();
         } catch {
             this._poblarFormulario(DEFAULTS);
+            this._actualizarContadores();
             this._actualizarPreview();
         }
     },
 
     _poblarFormulario(data) {
-        document.getElementById("cfg-nombre").value        = data.nombreEmpresa ?? "";
-        document.getElementById("cfg-subtitulo").value     = data.subtitulo     ?? "";
-        document.getElementById("cfg-telefono").value      = data.telefono      ?? "";
-        document.getElementById("cfg-sitioweb").value      = data.sitioWeb      ?? "";
-        document.getElementById("cfg-footer-venta").value    = data.footerVenta    ?? "";
+        document.getElementById("cfg-nombre").value         = data.nombreEmpresa ?? "";
+        document.getElementById("cfg-subtitulo").value      = data.subtitulo     ?? "";
+        document.getElementById("cfg-telefono").value       = data.telefono      ?? "";
+        document.getElementById("cfg-sitioweb").value       = data.sitioWeb      ?? "";
+        document.getElementById("cfg-footer-venta").value   = data.footerVenta    ?? "";
         document.getElementById("cfg-footer-abono").value   = data.footerAbono   ?? "";
         document.getElementById("cfg-footer-remision").value = data.footerRemision ?? "";
     },
 
     _leerFormulario() {
         return {
-            nombreEmpresa: document.getElementById("cfg-nombre").value.trim().toUpperCase(),
-            subtitulo:     document.getElementById("cfg-subtitulo").value.trim(),
-            telefono:      document.getElementById("cfg-telefono").value.trim(),
-            sitioWeb:      document.getElementById("cfg-sitioweb").value.trim(),
+            nombreEmpresa:  document.getElementById("cfg-nombre").value.trim().toUpperCase(),
+            subtitulo:      document.getElementById("cfg-subtitulo").value.trim(),
+            telefono:       document.getElementById("cfg-telefono").value.trim(),
+            sitioWeb:       document.getElementById("cfg-sitioweb").value.trim(),
             footerVenta:    document.getElementById("cfg-footer-venta").value.trim(),
             footerAbono:    document.getElementById("cfg-footer-abono").value.trim(),
             footerRemision: document.getElementById("cfg-footer-remision").value.trim(),
         };
     },
 
-    _actualizarPreview() {
-        const nombre    = document.getElementById("cfg-nombre")?.value || "";
-        const subtitulo = document.getElementById("cfg-subtitulo")?.value || "";
-        const telefono  = document.getElementById("cfg-telefono")?.value || "";
-        const sitioWeb  = document.getElementById("cfg-sitioweb")?.value || "";
-        const footer    = document.getElementById("cfg-footer-venta")?.value || "";
+    _actualizarContadores() {
+        CHAR_FIELDS.forEach(({ id, max }) => {
+            const el  = document.getElementById(id);
+            const cnt = document.getElementById(`cnt-${id}`);
+            if (!el || !cnt) return;
+            const len = el.value.length;
+            cnt.textContent = `${len} / ${max}`;
+            cnt.className = "cfg-char-count" + (len >= max ? " full" : len >= max * 0.85 ? " near" : "");
+        });
+    },
 
+    _actualizarPreview() {
+        const g = id => document.getElementById(id)?.value || "";
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        set("pr-nombre",       nombre.toUpperCase() || " ");
-        set("pr-subtitulo",    subtitulo || " ");
-        set("pr-telefono",     telefono || " ");
-        set("pr-sitioweb",     sitioWeb || " ");
-        set("pr-footer-venta", footer || " ");
+        set("pr-nombre",    g("cfg-nombre").toUpperCase() || " ");
+        set("pr-subtitulo", g("cfg-subtitulo") || " ");
+        set("pr-telefono",  g("cfg-telefono")  || " ");
+        set("pr-sitioweb",  g("cfg-sitioweb")  || " ");
+
+        const footerMap = { venta: "cfg-footer-venta", abono: "cfg-footer-abono", remision: "cfg-footer-remision" };
+        set("pr-footer", g(footerMap[this._previewFooter]) || " ");
     },
 
     _setStatus(msg, tipo) {
@@ -413,17 +487,34 @@ export const ConfigModule = {
         if (tipo === "ok") setTimeout(() => { el.className = "cfg-status hidden"; }, 3000);
     },
 
-    _bindEventos(container) {
-        ["cfg-nombre","cfg-subtitulo","cfg-telefono","cfg-sitioweb","cfg-footer-venta"].forEach(id => {
-            document.getElementById(id)?.addEventListener("input", () => this._actualizarPreview());
+    _bindEventos() {
+        // Actualizar preview + contadores en tiempo real
+        CHAR_FIELDS.forEach(({ id }) => {
+            document.getElementById(id)?.addEventListener("input", () => {
+                this._actualizarContadores();
+                this._actualizarPreview();
+            });
         });
 
+        // Tabs de vista previa
+        document.querySelectorAll(".cfg-prev-tab").forEach(tab => {
+            tab.addEventListener("click", () => {
+                document.querySelectorAll(".cfg-prev-tab").forEach(t => t.classList.remove("active"));
+                tab.classList.add("active");
+                this._previewFooter = tab.dataset.footer;
+                this._actualizarPreview();
+            });
+        });
+
+        // Restaurar
         document.getElementById("cfg-btn-reset")?.addEventListener("click", async () => {
             if (!await window.modal({ title: "Restaurar valores", message: "¿Restaurar los valores iniciales? Se perderán los cambios no guardados." })) return;
             this._poblarFormulario(DEFAULTS);
+            this._actualizarContadores();
             this._actualizarPreview();
         });
 
+        // Guardar (incluye alertas)
         document.getElementById("cfg-btn-guardar")?.addEventListener("click", () => this._guardar());
     },
 
@@ -439,12 +530,16 @@ export const ConfigModule = {
         if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
 
         try {
-            const db = getFirestore();
+            // Guardar configuración de tickets
             await setDoc(doc(db, ...DOC_PATH.split("/")), {
                 ...data,
                 ultimoEditor:       Sesion.alias,
                 fechaActualizacion: Date.now(),
             });
+
+            // Guardar alertas en el mismo flujo
+            await this._guardarAlertasInterno();
+
             this._setStatus("Configuración guardada correctamente.", "ok");
         } catch (e) {
             this._setStatus("Error al guardar. Verifique la conexión.", "err");
@@ -456,36 +551,22 @@ export const ConfigModule = {
 
     async _cargarAlertasCobranza() {
         try {
-            const db = getFirestore();
             const snap = await getDoc(doc(db, "configuracion", "alertas_cobranza"));
             const d = snap.exists() ? snap.data() : {};
             const el = id => document.getElementById(id);
-            if (el("cfg-alert-activo"))   el("cfg-alert-activo").checked  = d.activo !== false;
-            if (el("cfg-alert-aviso"))    el("cfg-alert-aviso").value     = d.diasAviso ?? 3;
-            if (el("cfg-alert-postvenc")) el("cfg-alert-postvenc").value  = d.diasPostVencimiento ?? 1;
+            if (el("cfg-alert-activo"))   el("cfg-alert-activo").checked = d.activo !== false;
+            if (el("cfg-alert-aviso"))    el("cfg-alert-aviso").value    = d.diasAviso ?? 3;
+            if (el("cfg-alert-postvenc")) el("cfg-alert-postvenc").value = d.diasPostVencimiento ?? 1;
         } catch (e) { console.error("[Config] alertas cobranza:", e); }
     },
 
-    _bindAlertasCobranza() {
-        document.getElementById("cfg-alert-guardar")?.addEventListener("click", async () => {
-            const db     = getFirestore();
-            const activo = document.getElementById("cfg-alert-activo")?.checked ?? true;
-            const aviso  = Number(document.getElementById("cfg-alert-aviso")?.value)  || 3;
-            const post   = Number(document.getElementById("cfg-alert-postvenc")?.value) || 1;
-            const btn    = document.getElementById("cfg-alert-guardar");
-            const status = document.getElementById("cfg-alert-status");
-            if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
-            try {
-                await setDoc(doc(db, "configuracion", "alertas_cobranza"),
-                    { activo, diasAviso: aviso, diasPostVencimiento: post,
-                      ultimoEditor: Sesion.alias, fechaActualizacion: Date.now() });
-                if (status) status.textContent = "✓ Guardado";
-                setTimeout(() => { if (status) status.textContent = ""; }, 3000);
-            } catch (e) {
-                if (status) { status.textContent = "Error: " + e.message; status.style.color = "#DC2626"; }
-            } finally {
-                if (btn) { btn.disabled = false; btn.textContent = "Guardar alertas"; }
-            }
+    async _guardarAlertasInterno() {
+        const activo = document.getElementById("cfg-alert-activo")?.checked ?? true;
+        const aviso  = Number(document.getElementById("cfg-alert-aviso")?.value)  || 3;
+        const post   = Number(document.getElementById("cfg-alert-postvenc")?.value) || 1;
+        await setDoc(doc(db, "configuracion", "alertas_cobranza"), {
+            activo, diasAviso: aviso, diasPostVencimiento: post,
+            ultimoEditor: Sesion.alias, fechaActualizacion: Date.now()
         });
     },
 
