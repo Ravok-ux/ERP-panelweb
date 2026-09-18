@@ -246,10 +246,7 @@ export const CotizacionesPanelModule = (() => {
   // ── Firestore ─────────────────────────────────────────────────────────
   function _escuchar() {
     _unsub?.();
-    const q = _filtroStatus
-      ? query(collection(db,'cotizaciones'), where('status','==',_filtroStatus),
-          orderBy('creadaEn','desc'), limit(300))
-      : query(collection(db,'cotizaciones'), orderBy('creadaEn','desc'), limit(300));
+    const q = query(collection(db,'cotizaciones'), orderBy('creadaEn','desc'), limit(300));
 
     _unsub = onSnapshot(q, snap => {
       _allDocs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -287,10 +284,11 @@ export const CotizacionesPanelModule = (() => {
     if (!tbody) return;
     const q = norm(_busqueda);
     const rows = _allDocs.filter(c =>
-      !q ||
-      norm(c.folio).includes(q) ||
-      norm(c.clienteNombre).includes(q) ||
-      norm(c.ingenieroAlias).includes(q)
+      (!_filtroStatus || c.status === _filtroStatus) &&
+      (!q ||
+        norm(c.folio).includes(q) ||
+        norm(c.clienteNombre).includes(q) ||
+        norm(c.ingenieroAlias).includes(q))
     );
 
     if (!rows.length) {
@@ -443,34 +441,32 @@ export const CotizacionesPanelModule = (() => {
     // Footer con acciones
     const footer = document.getElementById('cot-modal-footer');
     footer.innerHTML = '';
-    if (_puedeEditar() && ['ENVIADA','APROBADA','BORRADOR'].includes(c.status)) {
-      if (['ENVIADA','APROBADA'].includes(c.status)) {
-        footer.innerHTML += `
-          <button id="det-aprobar" class="btn-secondary" data-id="${esc(c.id)}"
-            style="background:#DCFCE7;color:#16A34A;border-color:#16A34A40;font-size:12px">
-            ✅ Aprobar
-          </button>
-          <button id="det-rechazar" class="btn-secondary" data-id="${esc(c.id)}"
-            style="background:#FEE2E2;color:#DC2626;border-color:#DC262640;font-size:12px">
-            ❌ Rechazar
-          </button>
-          <button id="det-convertir" class="btn-primary" data-id="${esc(c.id)}"
-            style="background:#7C3AED;font-size:12px">
-            🛒 Convertir en pedido
-          </button>`;
-      }
+    if (_puedeEditar() && ['ENVIADA','APROBADA'].includes(c.status)) {
+      footer.innerHTML += `
+        <button id="det-aprobar" class="btn-secondary" data-id="${esc(c.id)}"
+          style="background:#DCFCE7;color:#16A34A;border-color:#16A34A40;font-size:12px">
+          ✅ Aprobar
+        </button>
+        <button id="det-rechazar" class="btn-secondary" data-id="${esc(c.id)}"
+          style="background:#FEE2E2;color:#DC2626;border-color:#DC262640;font-size:12px">
+          ❌ Rechazar
+        </button>
+        <button id="det-convertir" class="btn-primary" data-id="${esc(c.id)}"
+          style="background:#7C3AED;font-size:12px">
+          🛒 Convertir en pedido
+        </button>`;
     }
 
     document.getElementById('det-aprobar')?.addEventListener('click', async e => {
-      await _cambiarEstado(e.target.dataset.id, 'APROBADA');
+      await _cambiarEstado(e.currentTarget.dataset.id, 'APROBADA');
     });
     document.getElementById('det-rechazar')?.addEventListener('click', async e => {
       if (!await window.modal?.({ title:'Rechazar cotización', message:'¿Confirmar rechazo?', confirmLabel:'Rechazar' })) return;
-      await _cambiarEstado(e.target.dataset.id, 'RECHAZADA');
+      await _cambiarEstado(e.currentTarget.dataset.id, 'RECHAZADA');
     });
     document.getElementById('det-convertir')?.addEventListener('click', async e => {
       _cerrarModal();
-      await _convertirEnPedido(e.target.dataset.id);
+      await _convertirEnPedido(e.currentTarget.dataset.id);
     });
 
     document.getElementById('cot-modal').classList.add('open');
@@ -551,7 +547,7 @@ export const CotizacionesPanelModule = (() => {
       }
     } catch(e) {
       window.toast?.('Error al convertir: ' + e.message, 'error');
-      convBtns.forEach(b => { b.disabled = false; b.textContent = '📋 Convertir en pedido'; });
+      convBtns.forEach(b => { b.disabled = false; b.textContent = '🛒 Pedido'; });
     }
   }
 
