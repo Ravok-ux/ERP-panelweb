@@ -112,9 +112,33 @@ export const PromocionesModule = (() => {
         .pf-input:focus { outline:none; border-color:#3B82F6;
           box-shadow:0 0 0 3px rgba(59,130,246,.14); background:var(--surface); }
         .pf-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        .pf-campos-tipo { background:var(--surface-2);
-          border:1.5px solid var(--border); border-radius:10px;
-          padding:14px; border-left:3px solid #3B82F6; }
+        .pf-campos-tipo { background:var(--surface); border:1.5px solid var(--border);
+          border-radius:11px; overflow:hidden; padding:0; }
+        .cpt-head { display:flex; align-items:center; gap:10px; padding:11px 15px;
+          background:#0F2040; border-bottom:1px solid #1E3A5F; }
+        .cpt-head-icon { width:28px; height:28px; border-radius:7px; background:#1D4ED8;
+          display:flex; align-items:center; justify-content:center;
+          font-size:14px; flex-shrink:0; }
+        .cpt-head-title { font-size:11px; font-weight:700; color:#93C5FD;
+          text-transform:uppercase; letter-spacing:.08em; }
+        .cpt-body { padding:4px 0; }
+        .cpt-row { display:flex; align-items:center; gap:10px;
+          padding:9px 15px; border-bottom:1px solid var(--border); }
+        .cpt-row:last-child { border-bottom:none; }
+        .cpt-key { flex:1; font-size:12.5px; color:var(--text-sec); font-weight:500; }
+        .cpt-val { display:flex; align-items:center; gap:0; border:1.5px solid var(--border);
+          border-radius:8px; overflow:hidden; background:var(--surface-2,var(--surface)); }
+        .cpt-unit { font-size:11px; font-weight:700; color:#6B7280;
+          background:#1F2937; padding:0 9px; height:36px; display:flex;
+          align-items:center; border-right:1px solid var(--border); }
+        .cpt-input { border:none; outline:none; background:transparent;
+          color:var(--text-primary); font-size:13px; font-weight:700;
+          padding:0 10px; height:36px; width:90px; text-align:right;
+          font-variant-numeric:tabular-nums; }
+        .cpt-input-wide { width:140px; text-align:left; font-weight:500; font-size:13px; }
+        .cpt-select { border:none; outline:none; background:var(--surface-2,var(--surface));
+          color:var(--text-primary); font-size:13px; font-weight:600;
+          padding:0 10px; height:36px; cursor:pointer; }
         .pf-check-row { display:flex; align-items:center; gap:10px;
           padding:11px 14px; background:var(--surface-2); border-radius:9px;
           border:1.5px solid var(--border); cursor:pointer; }
@@ -308,76 +332,77 @@ export const PromocionesModule = (() => {
   // ── Campos dinámicos según tipo ───────────────────────────────────────
 
   function _renderCamposTipo(tipo, datos = {}) {
+    const row = (label, inputHtml) =>
+      `<div class="cpt-row"><span class="cpt-key">${label}</span>${inputHtml}</div>`;
+    const num = (name, val, unit, opts = '') =>
+      `<div class="cpt-val"><span class="cpt-unit">${unit}</span>
+        <input name="${name}" type="number" class="cpt-input" value="${val}" ${opts}></div>`;
+    const txt = (name, val, ph = '') =>
+      `<div class="cpt-val" style="flex:0 0 auto">
+        <input name="${name}" type="text" class="cpt-input cpt-input-wide"
+          value="${esc(val)}" placeholder="${ph}" style="border:none;border-right:none"></div>`;
+    const sel = (name, options) =>
+      `<div class="cpt-val"><select name="${name}" class="cpt-select">${options}</select></div>`;
+
+    const icons = {
+      DESCUENTO_MONTO_PEDIDO:   { icon:'💲', title:'Descuento en pedido' },
+      DESCUENTO_MONTO_PRODUCTO: { icon:'📦', title:'Descuento en producto' },
+      PRODUCTO_GRATIS:          { icon:'🎁', title:'Producto gratis' },
+      PRECIO_FLASH:             { icon:'⚡', title:'Precio flash' },
+      PUNTOS_LEALTAD:           { icon:'⭐', title:'Puntos de lealtad' },
+    };
+    const { icon, title } = icons[tipo] || { icon:'⚙️', title:'Parámetros' };
+
+    let rows = '';
     switch (tipo) {
       case 'DESCUENTO_MONTO_PEDIDO':
-        return `
-          <label>Umbral de pedido (MXN)
-            <input name="umbralPedido" type="number" class="input-text" min="0" step="1" value="${datos.umbralPedido ?? 1000}" required>
-          </label>
-          <label>Monto de descuento (MXN $)
-            <input name="montoDescuento" type="number" class="input-text" min="1" step="1" value="${datos.montoDescuento ?? 100}" required>
-          </label>`;
+        rows =
+          row('Umbral del pedido',    num('umbralPedido',   datos.umbralPedido   ?? 1000, 'MXN', 'min="0" step="1" required')) +
+          row('Monto de descuento',   num('montoDescuento', datos.montoDescuento ?? 100,  'MXN $', 'min="1" step="1" required'));
+        break;
 
       case 'DESCUENTO_MONTO_PRODUCTO':
-        return `
-          <label>ID Pretoriano del producto
-            <input name="productoIdPretoriano" type="number" class="input-text" min="1" value="${datos.productoIdPretoriano ?? ''}" required placeholder="ej. 4521">
-          </label>
-          <label>Umbral de compra del producto (MXN $ — 0 = siempre aplica)
-            <input name="umbralProducto" type="number" class="input-text" min="0" step="1" value="${datos.umbralProducto ?? 0}">
-          </label>
-          <label>Monto de descuento (MXN $)
-            <input name="montoDescuento" type="number" class="input-text" min="1" step="1" value="${datos.montoDescuento ?? 50}" required>
-          </label>`;
+        rows =
+          row('ID Pretoriano',        num('productoIdPretoriano', datos.productoIdPretoriano ?? '', '#', 'min="1" required placeholder="ej. 4521"')) +
+          row('Umbral producto',      num('umbralProducto',       datos.umbralProducto       ?? 0,  'MXN', 'min="0" step="1"')) +
+          row('Monto de descuento',   num('montoDescuento',       datos.montoDescuento       ?? 50, 'MXN $', 'min="1" step="1" required'));
+        break;
 
       case 'PRODUCTO_GRATIS':
-        return `
-          <label>Modo
-            <select name="modoGratis" class="input-select">
-              <option value="POR_MONTO" ${(datos.modoGratis ?? 'POR_MONTO') === 'POR_MONTO' ? 'selected' : ''}>Por monto de pedido</option>
-              <option value="POR_PRODUCTO" ${datos.modoGratis === 'POR_PRODUCTO' ? 'selected' : ''}>Por compra de producto específico</option>
-            </select>
-          </label>
-          <label>Umbral de monto (MXN $) — solo si modo = Por monto
-            <input name="umbralMonto" type="number" class="input-text" min="0" step="1" value="${datos.umbralMonto ?? 2000}">
-          </label>
-          <label>ID Pretoriano del producto trigger — solo si modo = Por producto
-            <input name="productoTriggerIdPretoriano" type="number" class="input-text" min="0" value="${datos.productoTriggerIdPretoriano ?? ''}" placeholder="0 = ignorar">
-          </label>
-          <label>Cantidad mínima trigger
-            <input name="cantidadMinimaTrigger" type="number" class="input-text" min="1" step="1" value="${datos.cantidadMinimaTrigger ?? 1}">
-          </label>
-          <label>ID Pretoriano del producto GRATIS
-            <input name="productoGratisIdPretoriano" type="number" class="input-text" min="1" value="${datos.productoGratisIdPretoriano ?? ''}" required>
-          </label>
-          <label>Nombre del producto gratis
-            <input name="productoGratisNombre" class="input-text" maxlength="100" value="${esc(datos.productoGratisNombre ?? '')}" required>
-          </label>
-          <label>Cantidad a regalar
-            <input name="cantidadGratis" type="number" class="input-text" min="1" step="1" value="${datos.cantidadGratis ?? 1}">
-          </label>
-          <label>Valor unitario referencia (MXN $)
-            <input name="valorUnitarioGratis" type="number" class="input-text" min="0" step="0.01" value="${datos.valorUnitarioGratis ?? 0}">
-          </label>`;
+        rows =
+          row('Modo de activación', sel('modoGratis',
+            `<option value="POR_MONTO" ${(datos.modoGratis ?? 'POR_MONTO') === 'POR_MONTO' ? 'selected' : ''}>Por monto de pedido</option>
+             <option value="POR_PRODUCTO" ${datos.modoGratis === 'POR_PRODUCTO' ? 'selected' : ''}>Por producto específico</option>`)) +
+          row('Umbral de monto',        num('umbralMonto',                datos.umbralMonto                ?? 2000, 'MXN', 'min="0" step="1"')) +
+          row('ID trigger (producto)',  num('productoTriggerIdPretoriano', datos.productoTriggerIdPretoriano ?? '',   '#', 'min="0" placeholder="0 = ignorar"')) +
+          row('Cantidad mínima',        num('cantidadMinimaTrigger',       datos.cantidadMinimaTrigger       ?? 1,    'uds', 'min="1" step="1"')) +
+          row('ID producto gratis',     num('productoGratisIdPretoriano',  datos.productoGratisIdPretoriano  ?? '',   '#', 'min="1" required')) +
+          row('Nombre producto gratis', txt('productoGratisNombre',        datos.productoGratisNombre        ?? '',   'Ej: Fertilizante Premium')) +
+          row('Cantidad a regalar',     num('cantidadGratis',              datos.cantidadGratis              ?? 1,    'uds', 'min="1" step="1"')) +
+          row('Valor referencia',       num('valorUnitarioGratis',         datos.valorUnitarioGratis         ?? 0,    'MXN', 'min="0" step="0.01"'));
+        break;
 
       case 'PRECIO_FLASH':
-        return `
-          <label>ID Pretoriano del producto
-            <input name="productoIdPretoriano" type="number" class="input-text" min="1" value="${datos.productoIdPretoriano ?? ''}" required placeholder="ej. 3318">
-          </label>
-          <label>Precio flash (MXN $)
-            <input name="precioFlash" type="number" class="input-text" min="0.01" step="0.01" value="${datos.precioFlash ?? ''}" required>
-          </label>`;
+        rows =
+          row('ID Pretoriano',  num('productoIdPretoriano', datos.productoIdPretoriano ?? '', '#',     'min="1" required placeholder="ej. 3318"')) +
+          row('Precio flash',   num('precioFlash',          datos.precioFlash          ?? '', 'MXN $', 'min="0.01" step="0.01" required'));
+        break;
 
       case 'PUNTOS_LEALTAD':
-        return `
-          <label>Puntos por cada MXN $1 de subtotal
-            <input name="puntosPorPeso" type="number" class="input-text" min="0.01" step="0.01" value="${datos.puntosPorPeso ?? 1}" required>
-          </label>`;
+        rows =
+          row('Puntos por cada $1 MXN', num('puntosPorPeso', datos.puntosPorPeso ?? 1, 'pts', 'min="0.01" step="0.01" required'));
+        break;
 
       default:
         return '';
     }
+
+    return `
+      <div class="cpt-head">
+        <div class="cpt-head-icon">${icon}</div>
+        <div class="cpt-head-title">${title}</div>
+      </div>
+      <div class="cpt-body">${rows}</div>`;
   }
 
   // ── Campañas ──────────────────────────────────────────────────────────
