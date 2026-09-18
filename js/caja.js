@@ -311,6 +311,7 @@ async function _guardarCorte() {
   const totalDeclarado = ef + tj + tr;
   const totalSistema   = _sistemaCache.ef + _sistemaCache.tj + _sistemaCache.tr;
   const dif            = totalDeclarado - totalSistema;
+  const status         = Math.abs(dif) < 1 ? "VALIDADO" : "DIFERENCIA";
   const turno = _container.querySelector("#caja-f-turno").value;
   const hoyStr = new Date().toISOString().slice(0, 10);
 
@@ -326,7 +327,10 @@ async function _guardarCorte() {
       efectivo:      ef,
       tarjeta:       tj,
       transferencia: tr,
-      status:        "PENDIENTE",
+      status,
+      validadoPor:  Sesion.uid,
+      validadoAlias: Sesion.alias || "",
+      timestampValidacion: serverTimestamp(),
       turno,
       fechaStr:      hoyStr,
       origen:        "MANUAL",
