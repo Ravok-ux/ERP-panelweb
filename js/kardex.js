@@ -36,6 +36,7 @@ const TIPO_META = {
   AJUSTE_INVENTARIO:{ bg:"#EDE9FE", text:"#4C1D95", icon:"≡", label:"Ajuste Inv."    },
   EDITAR_MINIMO:    { bg:"#FEF3C7", text:"#78350F", icon:"⚙", label:"Edit. Mínimo"  },
   REABASTO_SURTIDO: { bg:"#E0F2FE", text:"#0C4A6E", icon:"📦",label:"Reabasto"       },
+  ENTRADA_ALMACEN:  { bg:"#DCFCE7", text:"#166534", icon:"↑", label:"Entrada Almacén" },
   DEVOLUCION:       { bg:"#F5F3FF", text:"#5B21B6", icon:"↩", label:"Devolución"     },
   TRASLADO:         { bg:"#F3F4F6", text:"#374151", icon:"⇄", label:"Traslado"       },
   // APK types
