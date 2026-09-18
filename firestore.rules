@@ -420,7 +420,7 @@ service cloud.firestore {
       // CRUD de plantillas: solo admins
       allow create, update: if cuentaActiva()
                             && miRol() in ['SUPER_ADMIN', 'GERENTE', 'ADMINISTRADOR']
-                            && strValido(request.resource.data.nombre, 80);
+                            && strValido(request.resource.data.titulo, 100);
 
       allow delete: if cuentaActiva() && miRol() in ['SUPER_ADMIN', 'GERENTE'];
     }

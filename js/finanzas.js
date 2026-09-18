@@ -563,7 +563,8 @@ function _glCargarPolizas() {
     window._glEditPoliza = (id) => _glModalPoliza(polizas.find(p=>p.id===id), false);
     window._glVerPoliza  = (id) => _glModalPoliza(polizas.find(p=>p.id===id), true);
     window._glDelPoliza  = (id) => {
-      window.modal('¿Eliminar póliza?', async () => {
+      window.modal({ title: '¿Eliminar póliza?', message: 'Se revertirán los saldos de las cuentas contables.', danger: true, confirmLabel: 'Eliminar' }).then(async ok => {
+        if (!ok) return;
         const snap = await getDoc(doc(db,'polizas',id));
         const movs = snap.exists() ? (snap.data().movimientos || []) : [];
         await deleteDoc(doc(db,'polizas',id));

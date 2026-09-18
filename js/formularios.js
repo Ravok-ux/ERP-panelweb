@@ -151,6 +151,8 @@ export const FormulariosModule = {
         container.querySelectorAll(".frm-tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         _tabActual = btn.dataset.tab;
+        const btnNuevo = document.getElementById("frmBtnNuevo");
+        if (btnNuevo) btnNuevo.style.display = _tabActual === "plantillas" ? "" : "none";
         if (_tabActual === "plantillas") {
           _renderPlantillas();
         } else {
@@ -543,6 +545,9 @@ async function _guardarPlantilla(id) {
   if (!titulo) { window.toast?.("El título es obligatorio.", "warn"); return; }
   if (_camposEnEdicion.length === 0) { window.toast?.("Agrega al menos un campo.", "warn"); return; }
 
+  const btn = document.getElementById("fmBtnGuardar");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
+
   const datos = {
     titulo, descripcion: desc, activo,
     asignadoA: asignado,
@@ -551,14 +556,19 @@ async function _guardarPlantilla(id) {
     updatedAt: serverTimestamp()
   };
 
-  if (id) {
-    await setDoc(doc(db, "formularios", id), datos, { merge: true });
-  } else {
-    datos.creadoPor = Sesion.alias;
-    datos.createdAt = serverTimestamp();
-    await addDoc(collection(db, "formularios"), datos);
+  try {
+    if (id) {
+      await setDoc(doc(db, "formularios", id), datos, { merge: true });
+    } else {
+      datos.creadoPor = Sesion.alias;
+      datos.createdAt = serverTimestamp();
+      await addDoc(collection(db, "formularios"), datos);
+    }
+    _cerrarModal();
+  } catch (e) {
+    window.toast?.("Error al guardar: " + e.message, "error");
+    if (btn) { btn.disabled = false; btn.textContent = "Guardar"; }
   }
-  _cerrarModal();
 }
 
 // ── Exportar respuestas a Excel ───────────────────────────────────────────────
